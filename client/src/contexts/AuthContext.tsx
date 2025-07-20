@@ -15,6 +15,7 @@ import {
   updateEmail,
   signInWithCredential,
   GoogleAuthProvider,
+  linkWithCredential,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { User, UserProfile } from "@/types";
@@ -89,28 +90,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ) {
     setError(null);
     try {
-      // 휴대폰 번호 중복 체크
-      if (number) {
+      // 휴대폰 인증 후 이메일/비밀번호를 연결하는 경우에는 중복 체크 불필요
+      const isPhoneOnlyUser = auth.currentUser &&
+        auth.currentUser.providerData.length === 1 &&
+        auth.currentUser.providerData[0].providerId === "phone";
+
+      if (number && !isPhoneOnlyUser) {
         const usersRef = collection(db, "usersInfo");
         const q = query(usersRef, where("number", "==", number));
         const existing = await getDocs(q);
-        if (!existing.empty) {
+        if (!existing.empty && (existing.docs[0].id !== auth.currentUser?.uid)) {
           const err: any = new Error("이미 가입된 휴대폰 번호입니다.");
           err.code = "auth/phone-already-in-use";
           throw err;
         }
       }
-      // 사용자 생성
-      const credential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password,
-      );
-      const user = credential.user;
+
+      let user: FirebaseUser | null = null;
+
+      // (1) 이미 휴대폰 인증으로 로그인된 사용자가 있는 경우 → 이메일/비밀번호 자격 증명 연결
+      if (
+        auth.currentUser &&
+        auth.currentUser.providerData.some((p) => p.providerId === "phone")
+      ) {
+        const credential = EmailAuthProvider.credential(email, password);
+        const linkResult = await linkWithCredential(auth.currentUser, credential);
+        user = linkResult.user;
+      } else {
+        // (2) 일반 회원가입 (휴대폰 인증 없이 바로)
+        const credential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password,
+        );
+        user = credential.user;
+      }
 
       if (user) {
         try {
-          // 사용자 정보 즉시 저장
+          // 사용자 정보 저장/업데이트
           const userProfile = {
             uid: user.uid,
             email: user.email,
@@ -121,10 +139,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             emailVerified: false,
           };
 
-          // 사용자 정보 저장
-          await setDoc(doc(db, "usersInfo", user.uid), userProfile);
+          await setDoc(doc(db, "usersInfo", user.uid), userProfile, {
+            merge: true,
+          });
 
-          // 서버를 통해 커스텀 이메일 인증 메일 발송
+          // 인증 이메일 발송
           try {
             await fetch("/api/send-verification-email", {
               method: "POST",
@@ -137,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error("Failed to request verification email", err);
           }
 
-          // 로그아웃
+          // 로그아웃 (이메일 인증 후 재로그인 유도)
           await signOut(auth);
           setCurrentUser(null);
           setUserProfile(null);
@@ -166,6 +185,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError("비밀번호는 최소 6자 이상이어야 합니다.");
       } else if (error.code === "auth/phone-already-in-use") {
         setError("이미 가입된 휴대폰 번호입니다.");
+      } else if (error.code === "auth/credential-already-in-use") {
+        setError("이미 다른 계정에 연결된 이메일입니다. 로그인 후 휴대폰을 연동하세요.");
       } else {
         setError("회원가입 중 오류가 발생했습니다.");
       }

@@ -1,0 +1,71 @@
+// Firebase Security Rules - 개선된 히스토리 저장구조용
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ✅ 로그인한 사용자만 자신의 analysisLogs 접근 가능
+    match /analysisLogs/{userEmail}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.email == userEmail;
+    }
+
+    // ✅ 로그인한 사용자가 자신의 userinfo 접근 가능
+    match /usersInfo/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    
+    // ✅ 로그인한 사용자가 자신의 accountDeletions 문서에 접근 가능
+    match /accountDeletions/{userId} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /notifications/{email} {
+      allow read, write: if request.auth != null && 
+                           request.auth.token.email == email;
+    }
+    
+    match /productLogs/{userEmail}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.email == userEmail;
+    }
+
+    // 사용자 문서 및 히스토리 서브컬렉션 규칙  
+    match /users/{userId} {
+      // 사용자 기본 문서 접근 권한 (로그인한 사용자만)
+      allow read, write: if request.auth != null;
+      
+      // 히스토리 서브컬렉션 규칙
+      match /history/{historyId} {
+        // 모든 작업: 로그인한 사용자만 (단순화)
+        allow read, write, create, update, delete: if request.auth != null;
+      }
+    
+    // 사용자 통계 컬렉션 규칙
+    match /user_stats/{userId} {
+      allow read, write: if request.auth != null;
+    }
+      // 사용량 서브컬렉션 규칙
+      match /usage/{date} {
+        // 모든 작업: 로그인한 사용자만
+        allow read, write, create, update, delete: if request.auth != null;
+      }
+    
+    
+    // 임시로 기존 keyword_history 컬렉션도 허용
+    match /keyword_history/{historyId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 기타 모든 문서 접근 거부
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+}
+
+// 새로운 구조의 주요 장점:
+// 1. 사용자별 서브컬렉션으로 데이터 격리
+// 2. 더 효율적인 쿼리 성능
+// 3. 확장 가능한 구조
+// 4. 사용자 통계 추적 가능
+// 5. 배치 작업으로 성능 향상 

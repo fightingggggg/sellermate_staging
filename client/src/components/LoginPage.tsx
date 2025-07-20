@@ -21,7 +21,6 @@ import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
   ConfirmationResult,
-  signOut as firebaseSignOut,
 } from "firebase/auth";
 
 interface LoginPageProps {
@@ -146,7 +145,7 @@ export default function LoginPage({
       await confirmationResult.confirm(verificationCode);
       setPhoneVerified(true);
       setAlertMessage({ message: "휴대폰 인증이 완료되었습니다.", type: "success" });
-      await firebaseSignOut(auth); // phone 인증용 사용자 로그아웃
+      // 휴대폰 인증 후에는 현재 사용자를 유지하여 이후 이메일/비밀번호 자격 증명을 연결합니다.
     } catch (err: any) {
       console.error("verify code error", err);
       setAlertMessage({ message: err?.message || "인증번호가 올바르지 않습니다.", type: "error" });
