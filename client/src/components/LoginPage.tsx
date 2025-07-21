@@ -54,6 +54,7 @@ export default function LoginPage({
   const [terms, setTerms] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const [alertMessage, setAlertMessage] = useState({ message: "", type: "" }); // Alert message state
+  const [showSimpleSignup, setShowSimpleSignup] = useState(false); // 간편 회원가입 폼 표시 여부
   const [, navigate] = useLocation();
   const [signUpProcessing, setSignUpProcessing] = useState(false);
 
@@ -366,193 +367,256 @@ export default function LoginPage({
                 회원가입 후 스마트스토어 상품 분석 기능을 이용하세요.
               </p>
 
-              {alertMessage.message && (
-                <Alert
-                  variant={
-                    alertMessage.type === "success" ? "success" : "destructive"
-                  }
-                >
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{alertMessage.message}</AlertDescription>
-                </Alert>
-              )}
-
-              {/* 이름 입력 */}
-              <div className="space-y-2">
-                <Label htmlFor="fullName">이름</Label>
-                <Input
-                  id="fullName"
-                  placeholder="이름을 입력하세요"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                />
-              </div>
-
-              {/* 국가 코드 + 휴대폰 번호 */}
-              <div className="space-y-2">
-                <Label htmlFor="number">휴대폰 번호</Label>
-                <div className="flex space-x-2">
-                  {/* 국가 코드 선택 */}
-                  <div className="w-28">
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      className="border rounded-md text-sm h-10 px-2"
-                    >
-                      <option value="+82">🇰🇷 +82</option>
-                      <option value="+1">🇺🇸 +1</option>
-                      <option value="+81">🇯🇵 +81</option>
-                      <option value="+86">🇨🇳 +86</option>
-                      <option value="+44">🇬🇧 +44</option>
-                    </select>
-                  </div>
-
-                  {/* 번호 입력 */}
-                  <Input
-                    id="number"
-                    placeholder="번호만 입력"
-                    value={number}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                  />
+              {/* === 간편 회원가입 방식 선택 === */}
+              {!showSimpleSignup && (
+                <div className="grid gap-2 mb-4">
+                  {/* 현재 폼을 이용한 간편 회원가입 */}
                   <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleSendCode}
-                    disabled={sendingCode || !number || phoneVerified}
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => {
+                      console.log("[SIMPLE-SIGNUP] 버튼 클릭");
+                      setShowSimpleSignup(true);
+                      setTimeout(() => {
+                        document.getElementById("simple-signup-form")?.scrollIntoView({
+                          behavior: "smooth",
+                        });
+                      }, 50);
+                    }}
                   >
-                    {sendingCode ? "전송중..." : phoneVerified ? "인증완료" : "인증번호 발송"}
+                    간편 회원가입
+                  </Button>
+
+                  {/* 네이버 간편 로그인/회원가입 */}
+                  <Button
+                    className="w-full bg-[#03C75A] hover:bg-[#02b152] text-white"
+                    onClick={() => {
+                      console.log("[NAVER-SIGNUP] 팝업 로그인 시작");
+                      const popup = window.open(
+                        "/api/auth/naver?popup=1",
+                        "naverLogin",
+                        "width=500,height=650"
+                      );
+
+                      const listener = (event: MessageEvent) => {
+                        if (event.data?.type === "NAVER_LOGIN") {
+                          console.log("[NAVER-SIGNUP] 로그인 성공 데이터", event.data);
+                          // TODO: 로그인 세션 동기화(필요 시) 후 UI 업데이트
+                          popup?.close();
+                          window.removeEventListener("message", listener);
+                          // 예: 성공 알림 토스트
+                          toast({ title: "네이버 로그인 완료" });
+                        }
+                      };
+                      window.addEventListener("message", listener);
+                    }}
+                  >
+                    네이버로 간편 회원가입
+                  </Button>
+
+                  {/* 카카오톡 간편 로그인/회원가입 */}
+                  <Button
+                    className="w-full bg-[#FEE500] hover:bg-[#ffd400] text-black"
+                    onClick={() => {
+                      console.log("[KAKAO-SIGNUP] 버튼 클릭 – /api/auth/kakao 리디렉션");
+                      window.location.href = "/api/auth/kakao";
+                    }}
+                  >
+                    카카오톡으로 간편 회원가입
                   </Button>
                 </div>
-              </div>
-
-              {codeSent && !phoneVerified && (
-                <div className="space-y-2">
-                  <Label htmlFor="smscode">인증번호</Label>
-                  <div className="flex space-x-2">
-                    <Input
-                      id="smscode"
-                      placeholder="6자리 코드"
-                      value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleVerifyCode}
-                      disabled={confirmingCode || verificationCode.length < 4}
-                    >
-                      {confirmingCode ? "확인중..." : "확인"}
-                    </Button>
-                  </div>
-                </div>
               )}
+              {showSimpleSignup && (
+                <>
+                  {alertMessage.message && (
+                    <Alert
+                      variant={
+                        alertMessage.type === "success" ? "success" : "destructive"
+                      }
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{alertMessage.message}</AlertDescription>
+                    </Alert>
+                  )}
 
-              <div id="recaptcha-container" />
+                  {/* 이름 입력 */}
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">이름</Label>
+                    <Input
+                      id="fullName"
+                      placeholder="이름을 입력하세요"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                    />
+                  </div>
 
-              {/* 이메일 입력 */}
-              <div className="space-y-2">
-                <Label htmlFor="register-email">이메일</Label>
-                <Input
-                  id="register-email"
-                  type="email"
-                  placeholder="이메일을 입력하세요"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                />
-              </div>
+                  {/* 국가 코드 + 휴대폰 번호 */}
+                  <div className="space-y-2">
+                    <Label htmlFor="number">휴대폰 번호</Label>
+                    <div className="flex space-x-2">
+                      {/* 국가 코드 선택 */}
+                      <div className="w-28">
+                        <select
+                          value={countryCode}
+                          onChange={(e) => setCountryCode(e.target.value)}
+                          className="border rounded-md text-sm h-10 px-2"
+                        >
+                          <option value="+82">🇰🇷 +82</option>
+                          <option value="+1">🇺🇸 +1</option>
+                          <option value="+81">🇯🇵 +81</option>
+                          <option value="+86">🇨🇳 +86</option>
+                          <option value="+44">🇬🇧 +44</option>
+                        </select>
+                      </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="register-password">비밀번호</Label>
-                <Input
-                  id="register-password"
-                  type="password"
-                  placeholder="비밀번호를 입력하세요 (특수 문자 포함 6자 이상)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                />
-              </div>
+                      {/* 번호 입력 */}
+                      <Input
+                        id="number"
+                        placeholder="번호만 입력"
+                        value={number}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSendCode}
+                        disabled={sendingCode || !number || phoneVerified}
+                      >
+                        {sendingCode ? "전송중..." : phoneVerified ? "인증완료" : "인증번호 발송"}
+                      </Button>
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="register-password-confirm">비밀번호 확인</Label>
-                <Input
-                  id="register-password-confirm"
-                  type="password"
-                  placeholder="비밀번호를 한 번 더 입력하세요"
-                  value={passwordConfirm}
-                  onChange={(e) => setPasswordConfirm(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                />
-              </div>
+                  {codeSent && !phoneVerified && (
+                    <div className="space-y-2">
+                      <Label htmlFor="smscode">인증번호</Label>
+                      <div className="flex space-x-2">
+                        <Input
+                          id="smscode"
+                          placeholder="6자리 코드"
+                          value={verificationCode}
+                          onChange={(e) => setVerificationCode(e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleVerifyCode}
+                          disabled={confirmingCode || verificationCode.length < 4}
+                        >
+                          {confirmingCode ? "확인중..." : "확인"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
-              <div className="flex items-center space-x-2 mt-4">
-                <Checkbox
-                  id="terms"
-                  checked={terms}
-                  onCheckedChange={(checked) => setTerms(checked as boolean)}
-                />
-                <label
-                  htmlFor="terms"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  <a
-                    href="https://chambray-midnight-e7f.notion.site/22c78708053f80998563d392eadb9152?pvs=74"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline text-blue-600 hover:text-blue-800"
+                  <div id="recaptcha-container" />
+
+                  {/* 이메일 입력 */}
+                  <div className="space-y-2">
+                    <Label htmlFor="register-email">이메일</Label>
+                    <Input
+                      id="register-email"
+                      type="email"
+                      placeholder="이메일을 입력하세요"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password">비밀번호</Label>
+                    <Input
+                      id="register-password"
+                      type="password"
+                      placeholder="비밀번호를 입력하세요 (특수 문자 포함 6자 이상)"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password-confirm">비밀번호 확인</Label>
+                    <Input
+                      id="register-password-confirm"
+                      type="password"
+                      placeholder="비밀번호를 한 번 더 입력하세요"
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2 mt-4">
+                    <Checkbox
+                      id="terms"
+                      checked={terms}
+                      onCheckedChange={(checked) => setTerms(checked as boolean)}
+                    />
+                    <label
+                      htmlFor="terms"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      <a
+                        href="https://chambray-midnight-e7f.notion.site/22c78708053f80998563d392eadb9152?pvs=74"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline text-blue-600 hover:text-blue-800"
+                      >
+                        이용약관
+                      </a>
+                      에 동의합니다
+                    </label>
+                  </div>
+
+                  <div className="flex items-center space-x-2 mt-4">
+                    <Checkbox
+                      id="privacy"
+                      checked={privacy}
+                      onCheckedChange={(checked) => setPrivacy(checked as boolean)}
+                    />
+                    <label
+                      htmlFor="privacy"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      <a
+                        href="https://chambray-midnight-e7f.notion.site/18678708053f806a9955f0f5375cdbdd"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline text-blue-600 hover:text-blue-800"
+                      >
+                        개인정보처리방침
+                      </a>
+                      에 동의합니다
+                    </label>
+                  </div>
+
+                  <Button
+                    onClick={handleSignUp}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 mt-4"
+                    disabled={
+                      signUpProcessing ||
+                      !email ||
+                      !password ||
+                      !fullName ||
+                      !number ||
+                      !terms ||
+                      !privacy || !phoneVerified
+                    }
                   >
-                    이용약관
-                  </a>
-                  에 동의합니다
-                </label>
-              </div>
-
-              <div className="flex items-center space-x-2 mt-4">
-                <Checkbox
-                  id="privacy"
-                  checked={privacy}
-                  onCheckedChange={(checked) => setPrivacy(checked as boolean)}
-                />
-                <label
-                  htmlFor="privacy"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  <a
-                    href="https://chambray-midnight-e7f.notion.site/18678708053f806a9955f0f5375cdbdd"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline text-blue-600 hover:text-blue-800"
-                  >
-                    개인정보처리방침
-                  </a>
-                  에 동의합니다
-                </label>
-              </div>
-
-              <Button
-                onClick={handleSignUp}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 mt-4"
-                disabled={
-                  signUpProcessing ||
-                  !email ||
-                  !password ||
-                  !fullName ||
-                  !number ||
-                  !terms ||
-                  !privacy || !phoneVerified
-                }
-              >
-                {signUpProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    회원가입 중...
-                  </>
-                ) : (
-                  "회원가입"
-                )}
-              </Button>
+                    {signUpProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        간편 회원가입 중...
+                      </>
+                    ) : (
+                      "간편 회원가입"
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           </TabsContent>
         </Tabs>

@@ -2,9 +2,12 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { sendVerificationEmail } from "./email";
 import crypto from "crypto";
+// fetch: Node 18+ 전역 지원 (node-fetch 불필요)
 import cors from "cors";
 
-
+// ===== 네이버 간편 로그인 =====
+// 메모리 기반 state 저장 (재시작 시 초기화)
+const naverOAuthStates: Map<string, { popup?: boolean }> = new Map();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS 설정 추가
@@ -443,6 +446,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error('[keyword-analysis] unexpected error', err);
       res.status(500).json({ error: 'internal server error', detail: err?.message || 'unknown' });
+    }
+  });
+
+  /* ------------------------------------------------------------------
+   * 네이버 OAuth 2.0 로그인
+   * ------------------------------------------------------------------ */
+
+  // 1) 인가 코드 요청 (302 redirect)
+  app.get("/api/auth/naver", (req, res) => {
+    const popup = req.query.popup === "1";
+    const clientId = process.env.NAVER_CLIENT_ID;
+    const redirectUri = process.env.NAVER_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/naver/callback`;
+    
+    if (!clientId || !redirectUri) {
+      console.error("[NAVER-OAUTH] Missing env NAVER_CLIENT_ID or NAVER_REDIRECT_URI");
+      return res.status(500).send("naver oauth env not set");
+    }
+
+    const state = crypto.randomUUID();
+    naverOAuthStates.set(state, { popup });
+
+    const authUrl =
+      "https://nid.naver.com/oauth2.0/authorize?response_type=code" +
+      `&client_id=${clientId}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&state=${state}`;
+
+    console.log("[NAVER-OAUTH] Redirecting to:", authUrl);
+    return res.redirect(authUrl);
+  });
+
+  // 2) 콜백 – 토큰 교환 후 프로필 조회
+  app.get("/api/auth/naver/callback", async (req, res) => {
+    const { code, state } = req.query as { code?: string; state?: string };
+
+    console.log("[NAVER-OAUTH] Callback query:", req.query);
+
+    if (!code || !state || !naverOAuthStates.has(state)) {
+      console.error("[NAVER-OAUTH] Invalid state or missing code");
+      return res.status(400).send("invalid state or code");
+    }
+
+    // state 일회성 사용 후 제거
+    naverOAuthStates.delete(state);
+
+    try {
+      const clientId = process.env.NAVER_CLIENT_ID!;
+      const clientSecret = process.env.NAVER_CLIENT_SECRET!;
+      const redirectUri = process.env.NAVER_REDIRECT_URI!;
+
+      const tokenURL =
+        "https://nid.naver.com/oauth2.0/token" +
+        `?grant_type=authorization_code` +
+        `&client_id=${clientId}` +
+        `&client_secret=${clientSecret}` +
+        `&code=${code}` +
+        `&state=${state}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+      console.log("[NAVER-OAUTH] Token URL:", tokenURL);
+
+      const tokenRes = await fetch(tokenURL, { method: "GET" });
+      console.log("[NAVER-OAUTH] Token res status:", tokenRes.status);
+      const tokenJson = await tokenRes.json();
+      console.log("[NAVER-OAUTH] Token JSON:", tokenJson);
+
+      if (!tokenJson.access_token) {
+        return res.status(500).send("failed to get access token");
+      }
+
+      const profileRes = await fetch("https://openapi.naver.com/v1/nid/me", {
+        headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+      });
+      console.log("[NAVER-OAUTH] Profile res status:", profileRes.status);
+      const profileJson = await profileRes.json();
+      console.log("[NAVER-OAUTH] Profile JSON:", profileJson);
+
+      // TODO: 이곳에서 사용자 인증 세션/토큰 발급 처리
+
+      // 데모 용: 프로필 정보를 쿼리스트링으로 프런트에 전달
+      const stateInfo = { email: profileJson.response?.email || "" };
+
+      const popupFlag = naverOAuthStates.get(state)?.popup;
+
+      if (popupFlag) {
+        // 팝업: 부모 창에 메시지 전달 후 창 닫기
+        return res.send(`<!DOCTYPE html><html><body><script>
+          window.opener && window.opener.postMessage({ type: 'NAVER_LOGIN', data: ${JSON.stringify(stateInfo)} }, '*');
+          window.close();
+        </script></body></html>`);
+      }
+
+      // 전체창: 리다이렉트
+      const redirectUrl = `/login?tab=login&naverLogin=email:${encodeURIComponent(stateInfo.email)}`;
+      return res.redirect(redirectUrl);
+    } catch (err) {
+      console.error("[NAVER-OAUTH] Callback error:", err);
+      return res.status(500).send("naver oauth error");
     }
   });
 
