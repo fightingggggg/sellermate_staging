@@ -439,16 +439,13 @@ export default function LoginPage({
                     <div className="flex space-x-2">
                       {/* 국가 코드 선택 */}
                       <div className="w-28">
+                        {/* 한국(+82)만 선택 가능하도록 드롭다운을 읽기 전용으로 고정 */}
                         <select
                           value={countryCode}
-                          onChange={(e) => setCountryCode(e.target.value)}
-                          className="border rounded-md text-sm h-10 px-2"
+                          disabled
+                          className="border rounded-md text-sm h-10 px-2 bg-gray-100 cursor-not-allowed"
                         >
                           <option value="+82">🇰🇷 +82</option>
-                          <option value="+1">🇺🇸 +1</option>
-                          <option value="+81">🇯🇵 +81</option>
-                          <option value="+86">🇨🇳 +86</option>
-                          <option value="+44">🇬🇧 +44</option>
                         </select>
                       </div>
 

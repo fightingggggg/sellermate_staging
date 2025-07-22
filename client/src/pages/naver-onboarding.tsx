@@ -185,9 +185,13 @@ export default function NaverOnboarding() {
 
       <Label htmlFor="phone" className="self-start">휴대폰 번호</Label>
       <div className="flex space-x-2 w-full">
-        <select value={countryCode} onChange={(e)=>setCountryCode(e.target.value)} className="border rounded-md text-sm h-10 px-2">
+        {/* 국가 코드는 한국(+82)만 지원하도록 읽기 전용으로 고정 */}
+        <select
+          value={countryCode}
+          disabled
+          className="border rounded-md text-sm h-10 px-2 bg-gray-100 cursor-not-allowed"
+        >
           <option value="+82">🇰🇷 +82</option>
-          <option value="+1">🇺🇸 +1</option>
         </select>
         <Input id="phone" className="flex-1" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="번호만 입력" />
       </div>
