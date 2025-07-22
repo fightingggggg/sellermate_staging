@@ -11,11 +11,14 @@ service cloud.firestore {
 
     // ✅ 로그인한 사용자가 자신의 userinfo 접근 가능
     match /usersInfo/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      // 휴대폰 번호 중복 체크 등을 위해 읽기는 공개, 쓰기는 본인만
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
     }
-    
-    // ✅ 로그인한 사용자가 자신의 accountDeletions 문서에 접근 가능
+
+    // 계정 삭제 기록: 읽기는 공개(재가입 제한 체크), 쓰기는 본인만
     match /accountDeletions/{userId} {
+      allow read: if true;
       allow write: if request.auth != null && request.auth.uid == userId;
     }
     
@@ -26,6 +29,11 @@ service cloud.firestore {
     
     match /productLogs/{userEmail}/{document=**} {
       allow read, write: if request.auth != null && request.auth.token.email == userEmail;
+    }
+
+    // 소셜 액세스 토큰 (본인만 읽기/쓰기)
+    match /socialTokens/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
     // 사용자 문서 및 히스토리 서브컬렉션 규칙  

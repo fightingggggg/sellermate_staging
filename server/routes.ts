@@ -572,6 +572,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn("[NAVER-OAUTH] Firestore read error", err);
       }
 
+      // --- Save Naver access token for future unlink ---
+      try {
+        await db.collection("socialTokens").doc(uid).set({
+          provider: "naver",
+          accessToken: tokenJson.access_token,
+          refreshToken: tokenJson.refresh_token || "",
+          naverId,
+          savedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      } catch (tokenErr) {
+        console.warn("[NAVER-OAUTH] Failed to store social token", tokenErr);
+      }
+
       const customToken = await admin.auth().createCustomToken(uid);
 
       // phoneVerified 여부에 따라 skip 플래그 결정
@@ -672,6 +685,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn("[KAKAO-OAUTH] Firestore read error", err);
       }
 
+      // --- Save Kakao token for future unlink ---
+      try {
+        await db.collection("socialTokens").doc(uid).set({
+          provider: "kakao",
+          accessToken: tokenJson.access_token,
+          refreshToken: tokenJson.refresh_token || "",
+          kakaoId,
+          savedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      } catch (tokenErr) {
+        console.warn("[KAKAO-OAUTH] Failed to store social token", tokenErr);
+      }
+
       const cToken = await admin.auth().createCustomToken(uid);
       const params: Record<string,string> = { token: cToken, email, name, provider: "kakao" };
       if (phoneVerified) params.skip = "1";
@@ -680,6 +706,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch(err){
       console.error(err);
       res.status(500).send("kakao error");
+    }
+  });
+
+  /* -------------------------- 소셜 연결 해제 -------------------------- */
+  app.post("/api/auth/naver/unlink", async (req, res) => {
+    try {
+      const { uid } = req.body as { uid?: string };
+      if (!uid) return res.status(400).json({ error: "uid required" });
+      const docSnap = await admin.firestore().doc(`socialTokens/${uid}`).get();
+      if (!docSnap.exists) return res.status(404).json({ error: "not found" });
+      const data = docSnap.data() as any;
+      const accessToken = data?.accessToken;
+      if (!accessToken) return res.status(400).json({ error: "no token" });
+
+      const clientId = process.env.NAVER_CLIENT_ID;
+      const clientSecret = process.env.NAVER_CLIENT_SECRET;
+      const url = `https://nid.naver.com/oauth2.0/token?grant_type=delete&client_id=${clientId}&client_secret=${clientSecret}&access_token=${accessToken}&service_provider=NAVER`;
+      const resp = await fetch(url);
+      console.log("[NAVER UNLINK] status", resp.status);
+      return res.json({ success: resp.ok });
+    } catch (e:any) {
+      console.error("[NAVER UNLINK] error", e);
+      res.status(500).json({ error: "unlink error", detail: e?.message });
+    }
+  });
+
+  app.post("/api/auth/kakao/unlink", async (req, res) => {
+    try {
+      const { uid } = req.body as { uid?: string };
+      if (!uid) return res.status(400).json({ error: "uid required" });
+      const docSnap = await admin.firestore().doc(`socialTokens/${uid}`).get();
+      if (!docSnap.exists) return res.status(404).json({ error: "not found" });
+      const data = docSnap.data() as any;
+      const kakaoId = data?.kakaoId;
+      if (!kakaoId) return res.status(400).json({ error: "no kakaoId" });
+      const adminKey = process.env.KAKAO_ADMIN_KEY;
+      const resp = await fetch("https://kapi.kakao.com/v1/user/unlink", {
+        method: "POST",
+        headers: {
+          Authorization: `KakaoAK ${adminKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `target_id_type=user_id&target_id=${kakaoId}`,
+      });
+      console.log("[KAKAO UNLINK] status", resp.status);
+      return res.json({ success: resp.ok });
+    } catch (e:any) {
+      console.error("[KAKAO UNLINK] error", e);
+      res.status(500).json({ error: "unlink error", detail: e?.message });
     }
   });
 

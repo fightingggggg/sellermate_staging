@@ -42,7 +42,7 @@ interface AuthContextProps {
     currentPassword: string,
     newPassword: string,
   ) => Promise<boolean>;
-  deleteUserAccount: (password: string) => Promise<boolean>;
+  deleteUserAccount: () => Promise<boolean>;
   sendPasswordReset: (email: string) => Promise<boolean>;
   verifyEmail: () => Promise<boolean>;
   error: string | null;
@@ -91,6 +91,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ) {
     setError(null);
     try {
+      // 최근 탈퇴한 계정(이메일/휴대폰) 재가입 제한 (30일)
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      const deletionsRef = collection(db, "accountDeletions");
+
+      // 이메일로 최근 탈퇴 확인
+      let recentDeletionFound = false;
+      if (email) {
+        const qEmail = query(deletionsRef, where("email", "==", email));
+        const emailSnaps = await getDocs(qEmail);
+        emailSnaps.forEach((d) => {
+          const data = d.data() as any;
+          const ts: any = data.timestamp;
+          if (ts) {
+            const deletedAt = ts.toMillis ? ts.toMillis() : new Date(ts).getTime();
+            if (Date.now() - deletedAt < THIRTY_DAYS_MS) {
+              recentDeletionFound = true;
+            }
+          }
+        });
+      }
+
+      // 휴대폰 번호로 최근 탈퇴 확인
+      if (!recentDeletionFound && number) {
+        const qPhone = query(deletionsRef, where("number", "==", number));
+        const phoneSnaps = await getDocs(qPhone);
+        phoneSnaps.forEach((d) => {
+          const data = d.data() as any;
+          const ts: any = data.timestamp;
+          if (ts) {
+            const deletedAt = ts.toMillis ? ts.toMillis() : new Date(ts).getTime();
+            if (Date.now() - deletedAt < THIRTY_DAYS_MS) {
+              recentDeletionFound = true;
+            }
+          }
+        });
+      }
+
+      if (recentDeletionFound) {
+        const err: any = new Error("최근 탈퇴한 계정은 30일 이후에 재가입할 수 있습니다.");
+        err.code = "auth/recent-account-deletion";
+        throw err;
+      }
+
       // 휴대폰 인증 후 이메일/비밀번호를 연결하는 경우에는 중복 체크 불필요
       const isPhoneOnlyUser = auth.currentUser &&
         auth.currentUser.providerData.length === 1 &&
@@ -184,6 +227,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError("올바른 이메일 형식이 아닙니다.");
       } else if (error.code === "auth/weak-password") {
         setError("비밀번호는 최소 6자 이상이어야 합니다.");
+      } else if (error.code === "auth/recent-account-deletion") {
+        setError("최근 탈퇴한 계정은 30일 이후에 재가입할 수 있습니다.");
       } else if (error.code === "auth/phone-already-in-use") {
         setError("이미 가입된 휴대폰 번호입니다.");
       } else if (error.code === "auth/credential-already-in-use") {
@@ -388,7 +433,7 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
   }
 
   //탈퇴
-  async function deleteUserAccount(password: string): Promise<boolean> {
+  async function deleteUserAccount(password?: string): Promise<boolean> {
     setError(null);
     if (!auth.currentUser || !currentUser) {
       setError("로그인이 필요합니다.");
@@ -396,12 +441,34 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
     }
 
     try {
-      // 사용자 재인증
-      const credential = EmailAuthProvider.credential(
-        currentUser.email || "",
-        password,
-      );
-      await reauthenticateWithCredential(auth.currentUser, credential);
+      // 이메일/비밀번호 로그인 사용자가 비밀번호를 입력한 경우에만 재인증을 수행합니다.
+      if (password) {
+        const credential = EmailAuthProvider.credential(
+          currentUser.email || "",
+          password,
+        );
+        await reauthenticateWithCredential(auth.currentUser, credential);
+      }
+
+      // 소셜 계정 연결 해제 (네이버/카카오)
+      try {
+        const socialProvider = (userProfile as any)?.provider;
+        if (socialProvider === "naver") {
+          await fetch("/api/auth/naver/unlink", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uid: currentUser.uid }),
+          });
+        } else if (socialProvider === "kakao") {
+          await fetch("/api/auth/kakao/unlink", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uid: currentUser.uid }),
+          });
+        }
+      } catch (unlinkErr) {
+        console.warn("[SOCIAL-UNLINK] warning", unlinkErr);
+      }
 
       // Firestore에서 사용자 정보 삭제
       await deleteDoc(doc(db, "usersInfo", currentUser.uid));
@@ -481,6 +548,8 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        // 로그인 상태가 확인되면 이전 오류 메시지를 초기화합니다.
+        setError(null);
         const userData: User = {
           uid: user.uid,
           email: user.email,

@@ -32,6 +32,7 @@ import {
   DialogHeader, 
   DialogTitle
 } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 // 프로필 업데이트 스키마
 const profileSchema = z.object({
@@ -40,9 +41,8 @@ const profileSchema = z.object({
   number: z.string().min(1, "휴대폰 번호를 입력해주세요"),
 });
 
-// 회원탈퇴 스키마
+// 회원탈퇴 스키마 (비밀번호 입력 제거)
 const deleteAccountSchema = z.object({
-  password: z.string().min(1, "비밀번호를 입력해주세요"),
   reason: z.string().min(10, "탈퇴 사유를 10자 이상 입력해주세요"),
 });
 
@@ -66,6 +66,7 @@ export default function ProfilePage() {
   const isSocial = provider === "naver" || provider === "kakao";
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteWarnOpen, setDeleteWarnOpen] = useState(false); // 30일 재가입 제한 안내용
   const { toast } = useToast();
 
   // 프로필 폼
@@ -82,7 +83,6 @@ export default function ProfilePage() {
   const deleteAccountForm = useForm<DeleteAccountFormValues>({
     resolver: zodResolver(deleteAccountSchema),
     defaultValues: {
-      password: "",
       reason: "",
     },
   });
@@ -115,16 +115,20 @@ export default function ProfilePage() {
     try {
 
        // 1. 탈퇴 사유 저장
-       await setDoc(doc(db, "accountDeletions", userProfile?.uid ?? Math.random().toString(36).substr(2, 9)), {
-        reason: data.reason,
-        email: userProfile?.email,
-        link: userProfile?.businessLink,
-        name: userProfile?.businessName,
-        timestamp: new Date(),
-      });
+       const deletionRefId = auth.currentUser?.uid ?? userProfile?.uid ?? Math.random().toString(36).substr(2, 9);
+       const deletionData: Record<string, any> = {
+         reason: data.reason,
+         timestamp: serverTimestamp(),
+       };
+       if (userProfile?.email) deletionData.email = userProfile.email;
+       if (userProfile?.number) deletionData.number = userProfile.number;
+       if (userProfile?.businessLink) deletionData.link = userProfile.businessLink;
+       if (userProfile?.businessName) deletionData.name = userProfile.businessName;
+
+       await setDoc(doc(db, "accountDeletions", deletionRefId), deletionData);
       
     
-      const success = await deleteUserAccount(data.password);
+      const success = await deleteUserAccount();
       if (success) {
         toast({
           title: "회원 탈퇴 완료",
@@ -394,98 +398,112 @@ export default function ProfilePage() {
                     </Button>
                   </div>
 
-                  <div>
-                    <h3 className="text-lg font-medium text-red-600 mb-2">계정 삭제</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      계정을 삭제하면 모든 정보가 영구적으로 제거됩니다. 이 작업은 되돌릴 수 없습니다.
-                    </p>
-                    <div className="pt-4">
-                      <Button 
-                        variant="destructive" 
-                        className="bg-red-500 hover:bg-red-600"
-                        onClick={() => setDeleteDialogOpen(true)}
-                      >
-                        계정 삭제
+                  {/* 계정 삭제 - Collapsible 로 감추기 */}
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="text-sm text-muted-foreground px-0 hover:bg-transparent underline">
+                        계정 삭제 옵션 보기
                       </Button>
-                    </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="mt-4">
+                        <p className="text-sm text-muted-foreground mb-4">
+                          계정을 삭제하면 모든 정보가 영구적으로 제거됩니다. 이 작업은 되돌릴 수 없습니다.
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          className="border-red-300 text-red-500 hover:bg-red-50"
+                          onClick={() => setDeleteWarnOpen(true)}
+                        >
+                          계정 삭제
+                        </Button>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
-                    <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                      <DialogContent className="border-none shadow-md">
-                        <DialogHeader>
-                          <DialogTitle>계정 삭제 확인</DialogTitle>
-                          <DialogDescription>
-                            계정을 삭제하시면 모든 데이터가 영구적으로 삭제되며, 이 작업은 되돌릴 수 없습니다.
-                          </DialogDescription>
-                        </DialogHeader>
+                  {/* 30일 재가입 제한 경고 다이얼로그 */}
+                  <Dialog open={deleteWarnOpen} onOpenChange={setDeleteWarnOpen}>
+                    <DialogContent className="border-none shadow-md">
+                      <DialogHeader>
+                        <DialogTitle>정말 탈퇴하시겠어요?</DialogTitle>
+                        <DialogDescription>
+                          계정을 삭제하면 모든 데이터가 영구적으로 삭제되고,
+                          같은 이메일 또는 휴대폰 번호로 한 달(30일) 동안 재가입이 불가능합니다.
+                          그래도 탈퇴를 진행하시겠습니까?
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" type="button" onClick={() => setDeleteWarnOpen(false)}>
+                          취소
+                        </Button>
+                        <Button variant="destructive" className="bg-red-500 hover:bg-red-600" type="button" onClick={() => {
+                          setDeleteWarnOpen(false);
+                          setDeleteDialogOpen(true);
+                        }}>
+                          계속 진행
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
 
-                        <Form {...deleteAccountForm}>
-                          <form onSubmit={deleteAccountForm.handleSubmit(onDeleteSubmit)} className="space-y-4">
-                            <FormField
-                              control={deleteAccountForm.control}
-                              name="password"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-[#555] font-bold text-sm">비밀번호</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      type="password" 
-                                      placeholder="보안을 위해 현재 비밀번호를 입력하세요" 
-                                      className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
-                                      {...field} 
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
+                  {/* 삭제 확인 다이얼로그 */}
+                  <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                    <DialogContent className="border-none shadow-md">
+                      <DialogHeader>
+                        <DialogTitle>계정 삭제 확인</DialogTitle>
+                        <DialogDescription>
+                          계정을 삭제하시면 모든 데이터가 영구적으로 삭제되며, 이 작업은 되돌릴 수 없습니다.
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <Form {...deleteAccountForm}>
+                        <form onSubmit={deleteAccountForm.handleSubmit(onDeleteSubmit)} className="space-y-4">
+
+                          <FormField
+                            control={deleteAccountForm.control}
+                            name="reason"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[#555] font-bold text-sm">탈퇴 사유</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="탈퇴 사유를 입력해주세요 (10자 이상)"
+                                    className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <DialogFooter className="gap-2 sm:gap-0">
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              onClick={() => setDeleteDialogOpen(false)}
+                            >
+                              취소
+                            </Button>
+                            <Button 
+                              type="submit" 
+                              variant="destructive"
+                              className="bg-red-500 hover:bg-red-600"
+                              disabled={isDeleteLoading}
+                            >
+                              {isDeleteLoading ? (
+                                <>
+                                  <span className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 처리 중...
+                                </>
+                              ) : (
+                                "계정 삭제"
                               )}
-                            />
-
-<FormField
-  control={deleteAccountForm.control}
-  name="reason"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel className="text-[#555] font-bold text-sm">탈퇴 사유</FormLabel>
-      <FormControl>
-        <Input
-          placeholder="탈퇴 사유를 입력해주세요 (10자 이상)"
-          className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
-          {...field}
-        />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
-
-
-                            <DialogFooter className="gap-2 sm:gap-0">
-                              <Button 
-                                type="button" 
-                                variant="outline" 
-                                onClick={() => setDeleteDialogOpen(false)}
-                              >
-                                취소
-                              </Button>
-                              <Button 
-                                type="submit" 
-                                variant="destructive"
-                                className="bg-red-500 hover:bg-red-600"
-                                disabled={isDeleteLoading}
-                              >
-                                {isDeleteLoading ? (
-                                  <>
-                                    <span className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 처리 중...
-                                  </>
-                                ) : (
-                                  "계정 삭제"
-                                )}
-                              </Button>
-                            </DialogFooter>
-                          </form>
-                        </Form>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             </TabsContent>

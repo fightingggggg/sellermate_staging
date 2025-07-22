@@ -58,6 +58,9 @@ export default function LoginPage({
   const [, navigate] = useLocation();
   const [signUpProcessing, setSignUpProcessing] = useState(false);
 
+  // 기능 재활성화를 대비해 Kakao 로그인/회원가입 버튼 표시 여부를 토글합니다.
+  const ENABLE_KAKAO = false;
+
   // RecaptchaVerifier는 SMS 코드 발송 시점에 동적으로 초기화
 
   useEffect(() => {
@@ -224,6 +227,11 @@ export default function LoginPage({
           message: "이미 가입된 휴대폰 번호입니다.",
           type: "error",
         });
+      } else if (error.code === "auth/recent-account-deletion") {
+        setAlertMessage({
+          message: "최근 탈퇴한 계정은 30일 이후에 재가입할 수 있습니다.",
+          type: "error",
+        });
       } else {
         setAlertMessage({
           message:
@@ -361,26 +369,28 @@ export default function LoginPage({
                     네이버로 간편 회원가입
                   </Button>
 
-                  {/* 카카오톡 간편 로그인/회원가입 */}
-                  <Button
-                    className="w-full bg-[#FEE500] hover:bg-[#ffd400] text-black"
-                    onClick={async () => {
-                      console.log("[KAKAO-SIGNUP] /api/auth/kakao 요청 시작");
-                      try {
-                        const res = await fetch("/api/auth/kakao", { method: "GET" });
-                        console.log("[KAKAO-SIGNUP] 응답 status:", res.status);
-                        if (!res.ok) {
-                          const txt = await res.text();
-                          console.error("[KAKAO-SIGNUP] 오류 응답 본문:", txt);
+                  {/* 카카오톡 간편 로그인/회원가입 (현재 비활성화) */}
+                  {ENABLE_KAKAO && (
+                    <Button
+                      className="w-full bg-[#FEE500] hover:bg-[#ffd400] text-black"
+                      onClick={async () => {
+                        console.log("[KAKAO-SIGNUP] /api/auth/kakao 요청 시작");
+                        try {
+                          const res = await fetch("/api/auth/kakao", { method: "GET" });
+                          console.log("[KAKAO-SIGNUP] 응답 status:", res.status);
+                          if (!res.ok) {
+                            const txt = await res.text();
+                            console.error("[KAKAO-SIGNUP] 오류 응답 본문:", txt);
+                          }
+                        } catch (err) {
+                          console.error("[KAKAO-SIGNUP] 네트워크 오류", err);
                         }
-                      } catch (err) {
-                        console.error("[KAKAO-SIGNUP] 네트워크 오류", err);
-                      }
-                      window.location.href = "/api/auth/kakao";
-                    }}
-                  >
-                   카카오톡으로 간편 회원가입
-                   </Button>
+                        window.location.href = "/api/auth/kakao";
+                      }}
+                    >
+                     카카오톡으로 간편 회원가입
+                    </Button>
+                  )}
                 </div>
               )}
               {showSimpleSignup && (
@@ -588,14 +598,16 @@ export default function LoginPage({
               >
                 네이버로 로그인
               </Button>
-              <Button
-                className="w-full bg-[#FEE500] hover:bg-[#ffd400] text-black"
-                onClick={() => {
-                  window.location.href = "/api/auth/kakao";
-                }}
-              >
-                카카오톡으로 로그인
-              </Button>
+              {ENABLE_KAKAO && (
+                <Button
+                  className="w-full bg-[#FEE500] hover:bg-[#ffd400] text-black"
+                  onClick={() => {
+                    window.location.href = "/api/auth/kakao";
+                  }}
+                >
+                  카카오톡으로 로그인
+                </Button>
+              )}
 
               {/* 비밀번호 찾기 링크 */}
               <div className="text-center mt-4">
