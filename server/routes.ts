@@ -508,7 +508,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const clientId = process.env.NAVER_CLIENT_ID!;
       const clientSecret = process.env.NAVER_CLIENT_SECRET!;
-      const redirectUri = process.env.NAVER_REDIRECT_URI!;
+      // token 교환 시에도 인가 요청에 사용했던 redirect_uri 와 동일해야 함
+      // 스테이징/로컬 등 멀티 도메인 환경을 고려해 고정 env 값 대신 동적으로 계산한다.
+      const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/naver/callback`;
 
       const tokenURL =
         "https://nid.naver.com/oauth2.0/token" +
