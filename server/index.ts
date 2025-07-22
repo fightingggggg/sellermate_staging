@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
+// reverse proxy (Cloudtype 등) 뒤에서 실행 시 X-Forwarded-Proto 헤더를 신뢰하도록 설정
+app.set("trust proxy", true);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
