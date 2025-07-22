@@ -550,9 +550,11 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
       if (user) {
         // 로그인 상태가 확인되면 이전 오류 메시지를 초기화합니다.
         setError(null);
+        // 사용자 계정에 이메일 정보가 없는(소셜 간편가입 등) 경우 UID 값을 대신 사용하여
+        // 이후 로직(히스토리/사용량 등)이 동일하게 동작하도록 합니다.
         const userData: User = {
           uid: user.uid,
-          email: user.email,
+          email: user.email ?? user.uid, // ✅ 이메일이 없으면 UID를 대체 식별자로 사용
           displayName: user.displayName,
           photoURL: user.photoURL,
         };
