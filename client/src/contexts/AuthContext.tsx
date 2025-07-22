@@ -19,7 +19,7 @@ import {
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { User, UserProfile } from "@/types";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 
 interface AuthContextProps {
   currentUser: User | null;
@@ -79,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 직전에 확장 프로그램으로 전달한 idToken 을 기억하여, 같은 내용을 반복 전송하지 않도록 합니다.
   const lastSentIdTokenRef = useRef<string | null>(null);
+  const profileUnsubRef = useRef<()=>void>();
 
   // 회원가입 함수
   async function signUp(
@@ -489,27 +490,16 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
         setCurrentUser(userData);
   
         try {
-          // Firestore에서 프로필 정보 불러오기
+          // Firestore 실시간 구독으로 프로필 동기화
+          profileUnsubRef.current?.(); // 이전 구독 해제
           const userDocRef = doc(db, "usersInfo", user.uid);
-          const docSnap = await getDoc(userDocRef);
-  
-          if (docSnap.exists()) {
-            const userData = docSnap.data() as UserProfile;
-            setUserProfile(userData);
-          } else {
-            // Firestore에 프로필이 없다면 기본 정보로 설정
-            setUserProfile({
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName,
-              photoURL: user.photoURL,
-              businessName: "",
-              businessLink: "",
-              number: "",
-              emailVerified: user.emailVerified,
-              createdAt: new Date().toISOString(),
-            });
-          }
+          profileUnsubRef.current = onSnapshot(userDocRef, (snap) => {
+            if (snap.exists()) {
+              setUserProfile(snap.data() as UserProfile);
+            } else {
+              setUserProfile(null);
+            }
+          });
 
 
         } catch (error) {
@@ -541,6 +531,10 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
       } else {
         setCurrentUser(null);
         setUserProfile(null);
+
+        // 프로필 리스너 해제
+        profileUnsubRef.current?.();
+        profileUnsubRef.current = undefined;
 
         // 이전에 로그인 상태였던 경우에만 로그아웃 메시지를 1회 전송합니다.
         if (typeof window !== "undefined" && lastSentIdTokenRef.current !== null) {
