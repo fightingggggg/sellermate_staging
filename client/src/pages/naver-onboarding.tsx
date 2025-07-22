@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { auth, db } from "@/lib/firebase";
 import { signInWithCustomToken, RecaptchaVerifier, signInWithPhoneNumber, updateEmail, updateProfile, PhoneAuthProvider, linkWithCredential, ConfirmationResult } from "firebase/auth";
@@ -90,8 +91,20 @@ export default function NaverOnboarding() {
       (window as any).confirmationResult = result;
       verificationIdRef.current = result.verificationId;
       setCodeSent(true);
-    } catch (err) {
+      toast({
+        title: "인증번호 발송 📱",
+        description: "입력하신 번호로 인증번호를 전송했어요. 5분 안에 입력해주세요!",
+      });
+    } catch (err: any) {
       console.error(err);
+      const description = err?.code === "auth/too-many-requests"
+        ? "너무 많이 시도했습니다. 잠시 후 재시도해 주세요."
+        : err?.message || "인증번호를 보내지 못했어요. 잠시 후 다시 시도해주세요.";
+      toast({
+        variant: "destructive",
+        title: "인증번호 발송 실패",
+        description,
+      });
     } finally {
       setLoading(false);
     }
@@ -126,7 +139,14 @@ export default function NaverOnboarding() {
       setStep("done");
     } catch (err: any) {
       console.error(err);
-      alert(err?.message || "인증 실패. 코드를 확인해주세요.");
+      const description = err?.code === "auth/too-many-requests"
+        ? "너무 많은 시도가 감지되었습니다. 잠시 후 다시 인증을 시도해 주세요."
+        : err?.message || "인증번호가 올바르지 않아요. 다시 시도해주세요.";
+      toast({
+        variant: "destructive",
+        title: "인증 실패",
+        description,
+      });
     } finally {
       setLoading(false);
     }
@@ -246,7 +266,10 @@ export default function NaverOnboarding() {
 
               await setDoc(doc(db, "usersInfo", auth.currentUser!.uid), profileData, { merge: true });
               navigate("/");
-            }catch(err){console.error(err);}finally{setLoading(false);}
+            }catch(err){
+              console.error(err);
+              toast({ variant: "destructive", title: "가입 실패", description: (err as any)?.message || "알 수 없는 오류가 발생했어요. 다시 시도해주세요."});
+            }finally{setLoading(false);} 
         }}>가입 완료</Button>
       </div>
     </div>
