@@ -123,7 +123,8 @@ export default function ProfilePage() {
        if (userProfile?.email) deletionData.email = userProfile.email;
        if (userProfile?.number) deletionData.number = userProfile.number;
        if (userProfile?.businessLink) deletionData.link = userProfile.businessLink;
-       if (userProfile?.businessName) deletionData.name = userProfile.businessName;
+       if (userProfile?.name) deletionData.name = userProfile.name;
+       else if (userProfile?.businessName) deletionData.name = userProfile.businessName;
 
        await setDoc(doc(db, "accountDeletions", deletionRefId), deletionData);
       

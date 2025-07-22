@@ -29,8 +29,7 @@ interface AuthContextProps {
   signUp: (
     email: string,
     password: string,
-    businessName?: string,
-    businessLink?: string,
+    name?: string,
     number?: string,
   ) => Promise<void>;
   signIn: (email: string, password: string) => Promise<boolean>;
@@ -85,8 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signUp(
     email: string,
     password: string,
-    businessName?: string,
-    businessLink?: string,
+    name?: string,
     number?: string,
   ) {
     setError(null);
@@ -176,7 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userProfile = {
             uid: user.uid,
             email: user.email,
-            name: businessName || "", // store name
+            name: name || "", // store name
             number: number || "",
             provider: "email",
             createdAt: new Date(),

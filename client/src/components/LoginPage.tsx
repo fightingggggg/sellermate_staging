@@ -194,7 +194,7 @@ export default function LoginPage({
     setSignUpProcessing(true);
 
     try {
-      await signUp(email, password, fullName, "", number);
+      await signUp(email, password, fullName, number);
       if (!isModal) {
         navigate("/login");
       }

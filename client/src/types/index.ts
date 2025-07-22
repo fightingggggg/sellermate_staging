@@ -53,6 +53,7 @@ export interface UserProfile extends User {
   businessName?: string;
   businessLink?: string;
   number?: string;
+  name?: string; // 사용자의 실제 이름 (이메일 회원가입 시)
   emailVerified?: boolean;
   createdAt?: string;
   membershipType?: 'basic' | 'booster'; // 멤버십 타입 추가
