@@ -230,16 +230,11 @@ export default function ProfilePage() {
                 <CardContent>
                   {/* Replace the blue info box with readonly fields */}
                   <div className="mb-6 space-y-4">
-                    {/* Determine which fields to show */}
-                    {provider === "naver" || provider === "kakao" ? (
-                      // 소셜 로그인: 이름 포함
-                      <>
-                        <div>
-                          <label className="text-[#555] font-bold text-sm block mb-2">이름</label>
-                          <Input value={(userProfile as any)?.name || userProfile?.displayName || ""} readOnly className="bg-gray-50" />
-                        </div>
-                      </>
-                    ) : null}
+                    {/* 이름 표시 - 모든 가입자 */}
+                    <div>
+                      <label className="text-[#555] font-bold text-sm block mb-2">이름</label>
+                      <Input value={(userProfile as any)?.name || userProfile?.displayName || ""} readOnly className="bg-gray-50" />
+                    </div>
 
                     {/* 이메일은 항상 표시 */}
                     <div>
@@ -247,11 +242,7 @@ export default function ProfilePage() {
                       <Input value={userProfile?.email || ""} readOnly className="bg-gray-50" />
                     </div>
 
-                    {/* 휴대폰 */}
-                    <div>
-                      <label className="text-[#555] font-bold text-sm block mb-2">휴대폰</label>
-                      <Input value={userProfile?.number || (auth.currentUser?.phoneNumber ?? "")} readOnly className="bg-gray-50" />
-                    </div>
+                    {/* 휴대폰 번호 입력란 제거 (이메일 가입 시 중복 표시 해결) */}
 
                     {/* 가입 경로 */}
                     <div>
@@ -316,24 +307,7 @@ export default function ProfilePage() {
                         )}
                       /> )}
 
-                      {!isSocial && (
-                      <FormField
-                        control={profileForm.control}
-                        name="number"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[#555] font-bold text-sm">휴대폰 번호</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="연락 가능한 번호를 입력하세요" 
-                                className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />)}
+                      {/* 휴대폰 번호 입력란 제거 (이메일 가입 시 중복 표시 해결) */}
 
                       <div className="pt-4">
                         <Button 
@@ -367,6 +341,7 @@ export default function ProfilePage() {
                 </CardHeader>
 
                 <CardContent className="space-y-6">
+                 {!isSocial && (
                   <div className="border-b pb-6">
                     <h3 className="text-lg font-medium mb-2">비밀번호 재설정</h3>
                     <p className="text-sm text-muted-foreground mb-4">
@@ -397,6 +372,7 @@ export default function ProfilePage() {
                       비밀번호 재설정 이메일 받기
                     </Button>
                   </div>
+                 )}
 
                   {/* 계정 삭제 - Collapsible 로 감추기 */}
                   <Collapsible>
