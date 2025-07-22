@@ -256,7 +256,7 @@ export default function LoginPage({
           <img src="/logo.png" alt="스토어부스터" style={{ height: '1.5em', margin: 0, display: 'inline-block', verticalAlign: 'middle' }} />
         </CardTitle>
         <CardDescription>
-          스마트스토어 상위 노출 최적화를 위한 완벽한 솔루션
+          스마트스토어 SEO를 위한 완벽한 솔루션
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -308,7 +308,7 @@ export default function LoginPage({
 
               <Button
                 onClick={handleLogin}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 mb-2"
                 disabled={loading || !email || !password}
               >
                 {loading ? (
@@ -317,46 +317,10 @@ export default function LoginPage({
                     로그인 중...
                   </>
                 ) : (
-                  "로그인"
+                  "이메일로 로그인"
                 )}
               </Button>
-              <div className="text-center mt-4">
-                <button 
-                  onClick={async () => {
-                    const emailInput = document.getElementById('email');
-                    if (!email) {
-                      emailInput?.setAttribute('data-highlight', 'true');
-                      setTimeout(() => {
-                        emailInput?.setAttribute('data-highlight', 'false');
-                      }, 2000);
-                      toast({
-                        title: "이메일 필요",
-                        description: "비밀번호를 재설정할 이메일을 입력해주세요.",
-                        variant: "destructive"
-                      });
-                      return;
-                    }
-                    try {
-                      const success = await sendPasswordReset(email);
-                      if (success) {
-                        toast({
-                          title: "이메일 발송 완료",
-                          description: "비밀번호 재설정 링크가 이메일로 발송되었습니다."
-                        });
-                      }
-                    } catch (error: any) {
-                      toast({
-                        title: "발송 실패",
-                        description: error.message || "비밀번호 재설정 이메일 발송에 실패했습니다.",
-                        variant: "destructive"
-                      });
-                    }
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  비밀번호를 잊으셨나요?
-                </button>
-              </div>
+              {/* 비밀번호 재설정 링크는 소셜 버튼 아래로 이동 */}
             </div>
           </TabsContent>
 
@@ -364,7 +328,7 @@ export default function LoginPage({
           <TabsContent value="register">
             <div className="space-y-2">
               <p className="text-sm text-center text-gray-600 mb-4">
-                회원가입 후 스마트스토어 상품 분석 기능을 이용하세요.
+                회원가입 후 모든 기능을 무료로 이용해보세요!
               </p>
 
               {/* === 간편 회원가입 방식 선택 === */}
@@ -384,31 +348,14 @@ export default function LoginPage({
                       }, 50);
                     }}
                   >
-                    간편 회원가입
+                    이메일로 회원가입
                   </Button>
 
                   {/* 네이버 간편 로그인/회원가입 */}
                   <Button
                     className="w-full bg-[#03C75A] hover:bg-[#02b152] text-white"
                     onClick={() => {
-                      console.log("[NAVER-SIGNUP] 팝업 로그인 시작");
-                      const popup = window.open(
-                        "/api/auth/naver?popup=1",
-                        "naverLogin",
-                        "width=500,height=650"
-                      );
-
-                      const listener = (event: MessageEvent) => {
-                        if (event.data?.type === "NAVER_LOGIN") {
-                          console.log("[NAVER-SIGNUP] 로그인 성공 데이터", event.data);
-                          // TODO: 로그인 세션 동기화(필요 시) 후 UI 업데이트
-                          popup?.close();
-                          window.removeEventListener("message", listener);
-                          // 예: 성공 알림 토스트
-                          toast({ title: "네이버 로그인 완료" });
-                        }
-                      };
-                      window.addEventListener("message", listener);
+                      window.location.href = "/api/auth/naver";
                     }}
                   >
                     네이버로 간편 회원가입
@@ -417,13 +364,23 @@ export default function LoginPage({
                   {/* 카카오톡 간편 로그인/회원가입 */}
                   <Button
                     className="w-full bg-[#FEE500] hover:bg-[#ffd400] text-black"
-                    onClick={() => {
-                      console.log("[KAKAO-SIGNUP] 버튼 클릭 – /api/auth/kakao 리디렉션");
+                    onClick={async () => {
+                      console.log("[KAKAO-SIGNUP] /api/auth/kakao 요청 시작");
+                      try {
+                        const res = await fetch("/api/auth/kakao", { method: "GET" });
+                        console.log("[KAKAO-SIGNUP] 응답 status:", res.status);
+                        if (!res.ok) {
+                          const txt = await res.text();
+                          console.error("[KAKAO-SIGNUP] 오류 응답 본문:", txt);
+                        }
+                      } catch (err) {
+                        console.error("[KAKAO-SIGNUP] 네트워크 오류", err);
+                      }
                       window.location.href = "/api/auth/kakao";
                     }}
                   >
-                    카카오톡으로 간편 회원가입
-                  </Button>
+                   카카오톡으로 간편 회원가입
+                   </Button>
                 </div>
               )}
               {showSimpleSignup && (
@@ -617,6 +574,67 @@ export default function LoginPage({
                   </Button>
                 </>
               )}
+            </div>
+          </TabsContent>
+
+          {/* 로그인 탭 소셜 버튼 + 비밀번호 링크 */}
+          <TabsContent value="login" role="tabpanel" className="mt-2">
+            <div className="grid gap-2">
+              <Button
+                className="w-full bg-[#03C75A] hover:bg-[#02b152] text-white"
+                onClick={() => {
+                  window.location.href = "/api/auth/naver";
+                }}
+              >
+                네이버로 로그인
+              </Button>
+              <Button
+                className="w-full bg-[#FEE500] hover:bg-[#ffd400] text-black"
+                onClick={() => {
+                  window.location.href = "/api/auth/kakao";
+                }}
+              >
+                카카오톡으로 로그인
+              </Button>
+
+              {/* 비밀번호 찾기 링크 */}
+              <div className="text-center mt-4">
+                <button
+                  onClick={async () => {
+                    const emailInput = document.getElementById('email');
+                    if (!email) {
+                      emailInput?.setAttribute('data-highlight', 'true');
+                      setTimeout(() => {
+                        emailInput?.setAttribute('data-highlight', 'false');
+                      }, 2000);
+                      toast({
+                        title: "이메일 필요",
+                        description: "비밀번호를 재설정할 이메일을 입력해주세요.",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    try {
+                      const success = await sendPasswordReset(email);
+                      if (success) {
+                        toast({
+                          title: "이메일 발송 완료",
+                          description: "비밀번호 재설정 링크가 이메일로 발송되었습니다."
+                        });
+                      }
+                    } catch (error: any) {
+                      toast({
+                        title: "발송 실패",
+                        description: error.message || "비밀번호 재설정 이메일 발송에 실패했습니다.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  비밀번호를 잊으셨나요?
+                </button>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

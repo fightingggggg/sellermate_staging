@@ -15,6 +15,7 @@ import CompleteProductOptimizerPage from "./pages/complete-product-optimizer";
 import QuickProductOptimizerPage from "./pages/quick-product-optimizer";
 import KeywordCompetitionAnalysisPage from "@/pages/keyword-competition-analysis";
 import MembershipPage from "@/pages/membership";
+import NaverOnboarding from "@/pages/naver-onboarding";
 
 function Router() {
   return (
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/product-optimizer/quick" component={QuickProductOptimizerPage} />
       <Route path="/keyword-competition-analysis" component={KeywordCompetitionAnalysisPage} />
       <Route path="/profile" component={Profile} />
+      <Route path="/naver-onboarding" component={NaverOnboarding} />
       <Route path="/membership" component={MembershipPage} />
       <Route component={NotFound} />
     </Switch>

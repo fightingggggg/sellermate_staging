@@ -132,9 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userProfile = {
             uid: user.uid,
             email: user.email,
-            businessName: businessName || "",
-            businessLink: businessLink || "",
+            name: businessName || "", // store name
             number: number || "",
+            provider: "email",
             createdAt: new Date(),
             emailVerified: false,
           };

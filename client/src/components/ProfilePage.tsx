@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/types";
-import { db } from "@/lib/firebase"; // db는 initializeApp 후에 만든 Firestore 인스턴스
+import { db, auth } from "@/lib/firebase"; // db는 initializeApp 후에 만든 Firestore 인스턴스
 import { collection, addDoc, serverTimestamp, setDoc, doc } from "firebase/firestore";
 
 // UI 컴포넌트 import
@@ -62,6 +62,8 @@ export default function ProfilePage() {
   } = useAuth();
 
   const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const provider = (userProfile as any)?.provider;
+  const isSocial = provider === "naver" || provider === "kakao";
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -222,14 +224,57 @@ export default function ProfilePage() {
                 </CardHeader>
 
                 <CardContent>
-                  <div className="mb-6 p-4 bg-blue-50 rounded-md text-blue-800">
+                  {/* Replace the blue info box with readonly fields */}
+                  <div className="mb-6 space-y-4">
+                    {/* Determine which fields to show */}
+                    {provider === "naver" || provider === "kakao" ? (
+                      // 소셜 로그인: 이름 포함
+                      <>
+                        <div>
+                          <label className="text-[#555] font-bold text-sm block mb-2">이름</label>
+                          <Input value={(userProfile as any)?.name || userProfile?.displayName || ""} readOnly className="bg-gray-50" />
+                        </div>
+                      </>
+                    ) : null}
 
-                    <p className="text-sm">이메일: {userProfile?.email}</p>
+                    {/* 이메일은 항상 표시 */}
+                    <div>
+                      <label className="text-[#555] font-bold text-sm block mb-2">이메일</label>
+                      <Input value={userProfile?.email || ""} readOnly className="bg-gray-50" />
+                    </div>
 
+                    {/* 휴대폰 */}
+                    <div>
+                      <label className="text-[#555] font-bold text-sm block mb-2">휴대폰</label>
+                      <Input value={userProfile?.number || (auth.currentUser?.phoneNumber ?? "")} readOnly className="bg-gray-50" />
+                    </div>
+
+                    {/* 가입 경로 */}
+                    <div>
+                      <label className="text-[#555] font-bold text-sm block mb-2">가입 경로</label>
+                      <Input 
+                        value={
+                          provider === "naver" ? "네이버 간편 회원가입" :
+                          provider === "kakao" ? "카카오 간편 회원가입" :
+                          "이메일 회원가입"
+                        }
+                        readOnly
+                        className={
+                          provider === "naver"
+                            ? "bg-green-50 border-green-200 text-green-700 font-medium"
+                            : provider === "kakao"
+                              ? "bg-yellow-50 border-yellow-200 text-yellow-700 font-medium"
+                              : "bg-gray-50"
+                        }
+                      />
+                    </div>
+
+                    {/* readonly store info removed per requirement */}
                   </div>
 
                   <Form {...profileForm}>
                     <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
+                      {!isSocial && (
                       <FormField
                         control={profileForm.control}
                         name="businessName"
@@ -246,8 +291,9 @@ export default function ProfilePage() {
                             <FormMessage />
                           </FormItem>
                         )}
-                      />
+                      /> )}
 
+                      {!isSocial && (
                       <FormField
                         control={profileForm.control}
                         name="businessLink"
@@ -264,8 +310,9 @@ export default function ProfilePage() {
                             <FormMessage />
                           </FormItem>
                         )}
-                      />
+                      /> )}
 
+                      {!isSocial && (
                       <FormField
                         control={profileForm.control}
                         name="number"
@@ -282,7 +329,7 @@ export default function ProfilePage() {
                             <FormMessage />
                           </FormItem>
                         )}
-                      />
+                      />)}
 
                       <div className="pt-4">
                         <Button 

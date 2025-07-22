@@ -2,6 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { sendVerificationEmail } from "./email";
 import crypto from "crypto";
+import admin from "firebase-admin";
+// ensure admin initialized via email.ts or here fallback
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 // fetch: Node 18+ 전역 지원 (node-fetch 불필요)
 import cors from "cors";
 
@@ -453,19 +458,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * 네이버 OAuth 2.0 로그인
    * ------------------------------------------------------------------ */
 
-  // 1) 인가 코드 요청 (302 redirect)
-  app.get("/api/auth/naver", (req, res) => {
-    const popup = req.query.popup === "1";
+  // 1) 인가 코드 요청 (302 redirect)  
+  //    * 혹시 네이버 측 redirect_uri 가 잘못 등록돼 콜백이 이 경로로 다시 오더라도
+  //      query.code 가 있으면 콜백 처리로 넘긴다.
+  app.get("/api/auth/naver", (req, res, next) => {
+    if (req.query.code) {
+      // 잘못된 redirect_uri 로 인해 /api/auth/naver 로 콜백된 경우
+      console.log("[NAVER-OAUTH] Callback received on /api/auth/naver – forwarding to /api/auth/naver/callback");
+      const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
+      return res.redirect(`/api/auth/naver/callback${queryString}`);
+    }
+
     const clientId = process.env.NAVER_CLIENT_ID;
-    const redirectUri = process.env.NAVER_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/naver/callback`;
+    // redirectUri: 항상 /callback 으로 고정 (env 무시)
+    const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/naver/callback`;
     
     if (!clientId || !redirectUri) {
-      console.error("[NAVER-OAUTH] Missing env NAVER_CLIENT_ID or NAVER_REDIRECT_URI");
+      console.error("[NAVER-OAUTH] Missing env NAVER_CLIENT_ID");
       return res.status(500).send("naver oauth env not set");
     }
 
     const state = crypto.randomUUID();
-    naverOAuthStates.set(state, { popup });
+    naverOAuthStates.set(state, {});
 
     const authUrl =
       "https://nid.naver.com/oauth2.0/authorize?response_type=code" +
@@ -523,27 +537,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profileJson = await profileRes.json();
       console.log("[NAVER-OAUTH] Profile JSON:", profileJson);
 
-      // TODO: 이곳에서 사용자 인증 세션/토큰 발급 처리
+      const { id: naverId, email, nickname, name, mobile_e164, mobile } = profileJson.response || {};
+      const phoneFromProfile = mobile_e164 || mobile || "";
 
-      // 데모 용: 프로필 정보를 쿼리스트링으로 프런트에 전달
-      const stateInfo = { email: profileJson.response?.email || "" };
-
-      const popupFlag = naverOAuthStates.get(state)?.popup;
-
-      if (popupFlag) {
-        // 팝업: 부모 창에 메시지 전달 후 창 닫기
-        return res.send(`<!DOCTYPE html><html><body><script>
-          window.opener && window.opener.postMessage({ type: 'NAVER_LOGIN', data: ${JSON.stringify(stateInfo)} }, '*');
-          window.close();
-        </script></body></html>`);
+      if (!naverId || !email) {
+        console.error("[NAVER-OAUTH] Missing id/email from profile");
+        return res.status(500).send("naver profile missing id/email");
       }
 
-      // 전체창: 리다이렉트
-      const redirectUrl = `/login?tab=login&naverLogin=email:${encodeURIComponent(stateInfo.email)}`;
+      /* ----------------------------------------------
+       * Firebase 계정은 휴대폰 본인 인증 완료 후 생성하도록 지연합니다.
+       * 따라서 여기서는 사용자 레코드를 사전 생성하지 않고 Custom Token 만 발급합니다.
+       * 만약 이미 존재하는 UID 라면 getUser 가 성공하겠지만, 존재하지 않더라도
+       * createCustomToken 은 문제없이 동작하며 최초 signIn 시 계정이 자동으로 생성됩니다.
+       * ------------------------------------------- */
+      const uid = `naver_${naverId}`;
+
+      // 이미 존재하는 사용자인지만 확인 (없어도 무시)
+      try {
+        await admin.auth().getUser(uid);
+      } catch (e: any) {
+        if (e?.code !== "auth/user-not-found") {
+          throw e;
+        }
+        // user-not-found인 경우에는 계정을 미리 만들지 않는다.
+      }
+
+      const db = admin.firestore();
+      let phoneVerified = false;
+      try {
+        const snap = await db.collection("usersInfo").doc(uid).get();
+        phoneVerified = snap.exists && !!snap.data()?.number;
+      } catch (err) {
+        console.warn("[NAVER-OAUTH] Firestore read error", err);
+      }
+
+      const customToken = await admin.auth().createCustomToken(uid);
+
+      // phoneVerified 여부에 따라 skip 플래그 결정
+      const params: Record<string,string> = {
+        token: customToken,
+        email,
+        name: name || "",
+        provider: "naver",
+      };
+      if (phoneVerified) params.skip = "1";
+
+      const qs = new URLSearchParams(params).toString();
+      const redirectUrl = `/naver-onboarding?${qs}`;
       return res.redirect(redirectUrl);
     } catch (err) {
       console.error("[NAVER-OAUTH] Callback error:", err);
       return res.status(500).send("naver oauth error");
+    }
+  });
+
+  // ===== Kakao 간편 로그인 =====
+  const kakaoOAuthStates: Map<string, true> = new Map();
+
+  // Kakao auth request
+  app.get("/api/auth/kakao", (req, res) => {
+    if (req.query.code) {
+      // redirect misuse
+      return res.redirect(`/api/auth/kakao/callback${req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""}`);
+    }
+
+    const clientId = process.env.KAKAO_CLIENT_ID;
+    if (!clientId) return res.status(500).send("kakao env");
+
+    const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/kakao/callback`;
+    const state = crypto.randomUUID();
+    kakaoOAuthStates.set(state, true);
+
+    const authUrl =
+      `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+    console.log("[KAKAO-OAUTH] Redirecting to", authUrl);
+    res.redirect(authUrl);
+  });
+
+  // Kakao callback
+  app.get("/api/auth/kakao/callback", async (req, res) => {
+    const { code, state } = req.query as { code?: string; state?: string };
+    if (!code || !state || !kakaoOAuthStates.has(state)) return res.status(400).send("invalid");
+    kakaoOAuthStates.delete(state);
+
+    try {
+      const clientId = process.env.KAKAO_CLIENT_ID!;
+      const clientSecret = process.env.KAKAO_CLIENT_SECRET;
+      const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/kakao/callback`;
+
+      const body = new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        code: code as string,
+      });
+      if (clientSecret) body.append("client_secret", clientSecret);
+
+      const tokenRes = await fetch("https://kauth.kakao.com/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+      const tokenJson = await tokenRes.json();
+      console.log("[KAKAO-OAUTH] token", tokenJson);
+      if (!tokenJson.access_token) return res.status(500).send("no access token");
+
+      const profRes = await fetch("https://kapi.kakao.com/v2/user/me", {
+        headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+      });
+      const prof = await profRes.json();
+      console.log("[KAKAO-OAUTH] profile", prof);
+
+      const kakaoId = prof.id;
+      const kakaoAcc = prof.kakao_account || {};
+      const email = kakaoAcc.email || "";
+      const nickname = kakaoAcc.profile?.nickname || "";
+      const name = kakaoAcc.name || nickname;
+      const phoneNumber = kakaoAcc.phone_number || "";
+
+      if (!kakaoId) return res.status(500).send("missing id");
+      const uid = `kakao_${kakaoId}`;
+
+      // 사전 계정 생성 없이 존재 여부만 확인
+      try { await admin.auth().getUser(uid);} catch(e:any){ if(e?.code!=="auth/user-not-found") throw e; }
+
+      // phone verify 여부 확인
+      const db = admin.firestore();
+      let phoneVerified = false;
+      try {
+        const snap = await db.collection("usersInfo").doc(uid).get();
+        phoneVerified = snap.exists && !!snap.data()?.number;
+      } catch (err) {
+        console.warn("[KAKAO-OAUTH] Firestore read error", err);
+      }
+
+      const cToken = await admin.auth().createCustomToken(uid);
+      const params: Record<string,string> = { token: cToken, email, name, provider: "kakao" };
+      if (phoneVerified) params.skip = "1";
+      const qs = new URLSearchParams(params).toString();
+      res.redirect(`/naver-onboarding?${qs}`);
+    } catch(err){
+      console.error(err);
+      res.status(500).send("kakao error");
     }
   });
 
