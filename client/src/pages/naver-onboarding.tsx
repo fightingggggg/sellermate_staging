@@ -97,9 +97,21 @@ export default function NaverOnboarding() {
       });
     } catch (err: any) {
       console.error(err);
-      const description = err?.code === "auth/too-many-requests"
-        ? "너무 많이 시도했습니다. 잠시 후 재시도해 주세요."
-        : err?.message || "인증번호를 보내지 못했어요. 잠시 후 다시 시도해주세요.";
+      let description: string;
+      if (err?.code === "auth/too-many-requests") {
+        description = "너무 많이 시도했습니다. 잠시 후 재시도해 주세요.";
+      } else if (err?.code === "auth/invalid-phone-number") {
+        const msg = err?.message || "";
+        if (msg.includes("Invalid format")) {
+          description = "전화번호가 아닌 것 같아요. 번호 숫자를 입력해주세요.";
+        } else if (msg.includes("TOO_LONG")) {
+          description = "번호가 너무 길어요. 올바른 번호를 입력해주세요.";
+        } else {
+          description = "휴대폰 번호 형식이 올바르지 않습니다.";
+        }
+      } else {
+        description = err?.message || "인증번호를 보내지 못했어요. 잠시 후 다시 시도해주세요.";
+      }
       toast({
         variant: "destructive",
         title: "인증번호 발송 실패",

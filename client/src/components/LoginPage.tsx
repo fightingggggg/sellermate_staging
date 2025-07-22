@@ -136,7 +136,22 @@ export default function LoginPage({
       setAlertMessage({ message: "인증번호가 전송되었습니다.", type: "success" });
     } catch (err: any) {
       console.error("send sms error", err?.code, err?.message, err);
-      setAlertMessage({ message: err?.message || "SMS 발송 중 오류가 발생했습니다.", type: "error" });
+      let msg: string;
+      if (err?.code === "auth/too-many-requests") {
+        msg = "너무 많이 시도했습니다. 잠시 후 재시도해 주세요.";
+      } else if (err?.code === "auth/invalid-phone-number") {
+        const detail = err?.message || "";
+        if (detail.includes("Invalid format")) {
+          msg = "전화번호가 아닌 것 같아요. 번호 숫자를 입력해주세요.";
+        } else if (detail.includes("TOO_LONG")) {
+          msg = "번호가 너무 길어요. 올바른 번호를 입력해주세요.";
+        } else {
+          msg = "휴대폰 번호 형식이 올바르지 않습니다.";
+        }
+      } else {
+        msg = err?.message || "SMS 발송 중 오류가 발생했습니다.";
+      }
+      setAlertMessage({ message: msg, type: "error" });
     } finally {
       setSendingCode(false);
     }
