@@ -508,8 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const clientId = process.env.NAVER_CLIENT_ID!;
       const clientSecret = process.env.NAVER_CLIENT_SECRET!;
-      // redirectUri: 인가 단계와 동일하게 현재 요청의 프로토콜/호스트 기준으로 계산
-      const redirectUri = `${req.protocol}://${req.get("host")}/api/auth/naver/callback`;
+      const redirectUri = process.env.NAVER_REDIRECT_URI!;
 
       const tokenURL =
         "https://nid.naver.com/oauth2.0/token" +
