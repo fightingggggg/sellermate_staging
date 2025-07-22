@@ -151,9 +151,15 @@ export default function NaverOnboarding() {
       setStep("done");
     } catch (err: any) {
       console.error(err);
-      const description = err?.code === "auth/too-many-requests"
-        ? "너무 많은 시도가 감지되었습니다. 잠시 후 다시 인증을 시도해 주세요."
-        : err?.message || "인증번호가 올바르지 않아요. 다시 시도해주세요.";
+      // 에러 코드를 확인하여 사용자에게 더 친절한 안내 메시지를 제공합니다.
+      let description: string;
+      if (err?.code === "auth/too-many-requests") {
+        description = "너무 많은 시도가 감지되었습니다. 잠시 후 다시 인증을 시도해 주세요.";
+      } else if (err?.code === "auth/invalid-verification-code") {
+        description = "인증번호가 올바르지 않아요. 다시 입력해주세요.";
+      } else {
+        description = err?.message || "인증번호가 올바르지 않아요. 다시 시도해주세요.";
+      }
       toast({
         variant: "destructive",
         title: "인증 실패",

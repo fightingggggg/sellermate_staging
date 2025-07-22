@@ -167,7 +167,13 @@ export default function LoginPage({
       // 휴대폰 인증 후에는 현재 사용자를 유지하여 이후 이메일/비밀번호 자격 증명을 연결합니다.
     } catch (err: any) {
       console.error("verify code error", err);
-      setAlertMessage({ message: err?.message || "인증번호가 올바르지 않습니다.", type: "error" });
+      let msg: string;
+      if (err?.code === "auth/invalid-verification-code") {
+        msg = "인증번호가 올바르지 않아요. 다시 입력해주세요.";
+      } else {
+        msg = err?.message || "인증번호가 올바르지 않습니다.";
+      }
+      setAlertMessage({ message: msg, type: "error" });
     } finally {
       setConfirmingCode(false);
     }
