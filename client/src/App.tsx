@@ -16,7 +16,6 @@ import QuickProductOptimizerPage from "./pages/quick-product-optimizer";
 import KeywordCompetitionAnalysisPage from "@/pages/keyword-competition-analysis";
 import MembershipPage from "@/pages/membership";
 import NaverOnboarding from "@/pages/naver-onboarding";
-import ClientOnly from "@/components/ClientOnly";
 
 function Router() {
   return (
@@ -40,13 +39,11 @@ function App() {
       <AuthProvider>
         <UsageProvider>
           <HistoryProvider>
-            <ClientOnly>
-              <TooltipProvider>
-                <Toaster />
-                <NaverTabActivationHandler />
-                <Router />
-              </TooltipProvider>
-            </ClientOnly>
+            <TooltipProvider>
+              <Toaster />
+              <NaverTabActivationHandler />
+              <Router />
+            </TooltipProvider>
           </HistoryProvider>
         </UsageProvider>
       </AuthProvider>
