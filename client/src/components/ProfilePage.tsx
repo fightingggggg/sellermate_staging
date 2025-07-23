@@ -243,8 +243,14 @@ export default function ProfilePage() {
                       <Input value={userProfile?.email || ""} readOnly className="bg-gray-50" />
                     </div>
 
-                    {/* 휴대폰 번호 입력란 제거 (이메일 가입 시 중복 표시 해결) */}
+                    {/* 휴대폰 번호 */}
+                    <div>
+                      <label className="text-[#555] font-bold text-sm block mb-2">휴대폰 번호</label>
+                      <Input value={userProfile?.number || ""} readOnly className="bg-gray-50" />
+                    </div>
 
+                    {/* End 휴대폰 번호 */}
+                    
                     {/* 가입 경로 */}
                     <div>
                       <label className="text-[#555] font-bold text-sm block mb-2">가입 경로</label>

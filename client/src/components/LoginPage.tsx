@@ -16,7 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
@@ -110,6 +111,20 @@ export default function LoginPage({
     try {
       const phoneNumber = buildE164Number(countryCode, number);
 
+      // 휴대폰 번호 중복 여부 확인
+      try {
+        const usersRef = collection(db, "usersInfo");
+        const q = query(usersRef, where("number", "==", phoneNumber));
+        const existing = await getDocs(q);
+        if (!existing.empty) {
+          setAlertMessage({ message: "이미 가입된 휴대폰 번호입니다.", type: "error" });
+          setSendingCode(false);
+          return;
+        }
+      } catch (err) {
+        console.error("[DUP_CHECK] 휴대폰 번호 중복 확인 실패", err);
+      }
+
       console.log("[DEBUG] 요청 전화번호(E164):", phoneNumber);
 
       // RecaptchaVerifier 초기화 (필요 시)
@@ -148,6 +163,8 @@ export default function LoginPage({
         } else {
           msg = "휴대폰 번호 형식이 올바르지 않습니다.";
         }
+      } else if (err?.code === "auth/invalid-app-credential") {
+        msg = "인증번호 전송에 실패했어요. 잠시후 다시 시도해주세요.";
       } else {
         msg = err?.message || "SMS 발송 중 오류가 발생했습니다.";
       }
@@ -429,7 +446,9 @@ export default function LoginPage({
 
                   {/* 이름 입력 */}
                   <div className="space-y-2">
-                    <Label htmlFor="fullName">이름</Label>
+                    <Label htmlFor="fullName">
+                      이름 <span className="text-gray-400">(필수)</span>
+                    </Label>
                     <Input
                       id="fullName"
                       placeholder="이름을 입력하세요"
@@ -441,7 +460,9 @@ export default function LoginPage({
 
                   {/* 국가 코드 + 휴대폰 번호 */}
                   <div className="space-y-2">
-                    <Label htmlFor="number">휴대폰 번호</Label>
+                    <Label htmlFor="number">
+                      휴대폰 번호 <span className="text-gray-400">(필수)</span>
+                    </Label>
                     <div className="flex space-x-2">
                       {/* 국가 코드 선택 */}
                       <div className="w-28">
@@ -499,7 +520,9 @@ export default function LoginPage({
 
                   {/* 이메일 입력 */}
                   <div className="space-y-2">
-                    <Label htmlFor="register-email">이메일</Label>
+                    <Label htmlFor="register-email">
+                      이메일 <span className="text-gray-400">(필수)</span>
+                    </Label>
                     <Input
                       id="register-email"
                       type="email"

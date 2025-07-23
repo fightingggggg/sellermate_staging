@@ -3,7 +3,7 @@ import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { auth, db } from "@/lib/firebase";
 import { signInWithCustomToken, RecaptchaVerifier, signInWithPhoneNumber, updateEmail, updateProfile, PhoneAuthProvider, linkWithCredential, ConfirmationResult } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,7 @@ export default function NaverOnboarding() {
   const [codeSent, setCodeSent] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const [, navigate] = useLocation();
 
@@ -87,6 +88,25 @@ export default function NaverOnboarding() {
         await recaptchaRef.current.render();
       }
       const phoneNumber = buildE164(countryCode, number);
+
+      // 휴대폰 번호 중복 여부 확인
+      try {
+        const usersRef = collection(db, "usersInfo");
+        const q = query(usersRef, where("number", "==", phoneNumber));
+        const existing = await getDocs(q);
+        if (!existing.empty) {
+          toast({
+            variant: "destructive",
+            title: "가입 불가",
+            description: "이미 가입된 휴대폰 번호입니다.",
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.error("[DUP_CHECK] 휴대폰 번호 중복 확인 실패", err);
+      }
+
       const result = await signInWithPhoneNumber(auth, phoneNumber, recaptchaRef.current!);
       (window as any).confirmationResult = result;
       verificationIdRef.current = result.verificationId;
@@ -100,6 +120,8 @@ export default function NaverOnboarding() {
       let description: string;
       if (err?.code === "auth/too-many-requests") {
         description = "너무 많이 시도했습니다. 잠시 후 재시도해 주세요.";
+      } else if (err?.code === "auth/invalid-app-credential") {
+        description = "인증번호 전송에 실패했어요. 잠시후 다시 시도해주세요.";
       } else if (err?.code === "auth/invalid-phone-number") {
         const msg = err?.message || "";
         if (msg.includes("Invalid format")) {
@@ -253,9 +275,9 @@ export default function NaverOnboarding() {
             <a href="https://chambray-midnight-e7f.notion.site/18678708053f806a9955f0f5375cdbdd" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800">개인정보 처리방침</a>에 동의합니다
           </label>
         </div>
-        <Button className="w-full bg-blue-600 hover:bg-blue-700" disabled={!terms || !privacy || !phoneDone || loading} onClick={async ()=>{
+        <Button className="w-full bg-blue-600 hover:bg-blue-700" disabled={!terms || !privacy || !phoneDone || submitLoading} onClick={async ()=>{
             try{
-              setLoading(true);
+              setSubmitLoading(true);
               await signInWithCustomToken(auth, token);
 
               // Auth 사용자 프로필에 이메일/이름 반영 (식별자 누락 방지)
@@ -291,8 +313,8 @@ export default function NaverOnboarding() {
             }catch(err){
               console.error(err);
               toast({ variant: "destructive", title: "가입 실패", description: (err as any)?.message || "알 수 없는 오류가 발생했어요. 다시 시도해주세요."});
-            }finally{setLoading(false);} 
-        }}>가입 완료</Button>
+            }finally{setSubmitLoading(false);} 
+        }}>{submitLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 가입 완료 중...</>) : "가입 완료"}</Button>
       </div>
     </div>
   );
