@@ -15,6 +15,7 @@ import { trackEvent, trackTimeSpent } from "@/lib/analytics";
 import { useEffect, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
+import ClientOnly from "@/components/ClientOnly";
 
 export default function Home() {
   const { currentUser, loading } = useAuth();
@@ -399,10 +400,12 @@ export default function Home() {
       <FooterSection />
       
       {/* PC 전용 모달 */}
-      <PcOnlyModal 
-        open={showPcOnlyModal} 
-        onOpenChange={setShowPcOnlyModal} 
-      />
+      <ClientOnly>
+        <PcOnlyModal 
+          open={showPcOnlyModal} 
+          onOpenChange={setShowPcOnlyModal} 
+        />
+      </ClientOnly>
       </div>
     </DashboardLayout>
   );

@@ -8,7 +8,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "vite build && vite build --ssr client/src/entry-server.tsx && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "build:staging": "NODE_ENV=staging vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "start:staging": "NODE_ENV=staging node dist/index.js",
