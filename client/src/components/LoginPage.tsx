@@ -58,6 +58,11 @@ export default function LoginPage({
   const [showSimpleSignup, setShowSimpleSignup] = useState(false); // 간편 회원가입 폼 표시 여부
   const [, navigate] = useLocation();
   const [signUpProcessing, setSignUpProcessing] = useState(false);
+  // 소셜 로그인/회원가입 로딩 상태 추가
+  const [naverLoginLoading, setNaverLoginLoading] = useState(false);
+  const [kakaoLoginLoading, setKakaoLoginLoading] = useState(false);
+  const [naverSignupLoading, setNaverSignupLoading] = useState(false);
+  const [kakaoSignupLoading, setKakaoSignupLoading] = useState(false);
 
   // 기능 재활성화를 대비해 Kakao 로그인/회원가입 버튼 표시 여부를 토글합니다.
   const ENABLE_KAKAO = true;
@@ -401,10 +406,19 @@ export default function LoginPage({
                   <Button
                     className="w-full bg-[#03C75A] hover:bg-[#02b152] text-white"
                     onClick={() => {
+                      setNaverSignupLoading(true);
                       window.location.href = "/api/auth/naver";
                     }}
+                    disabled={naverSignupLoading}
                   >
-                    네이버로 간편 회원가입
+                    {naverSignupLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        네이버로 간편 회원가입 중...
+                      </>
+                    ) : (
+                      "네이버로 간편 회원가입"
+                    )}
                   </Button>
 
                   {/* 카카오톡 간편 로그인/회원가입 (현재 비활성화) */}
@@ -412,10 +426,9 @@ export default function LoginPage({
                     <Button
                       className="w-full bg-[#FEE500] hover:bg-[#ffd400] text-black"
                       onClick={async () => {
-                        console.log("[KAKAO-SIGNUP] /api/auth/kakao 요청 시작");
+                        setKakaoSignupLoading(true);
                         try {
                           const res = await fetch("/api/auth/kakao", { method: "GET" });
-                          console.log("[KAKAO-SIGNUP] 응답 status:", res.status);
                           if (!res.ok) {
                             const txt = await res.text();
                             console.error("[KAKAO-SIGNUP] 오류 응답 본문:", txt);
@@ -425,8 +438,16 @@ export default function LoginPage({
                         }
                         window.location.href = "/api/auth/kakao";
                       }}
+                      disabled={kakaoSignupLoading}
                     >
-                     카카오톡으로 간편 회원가입
+                      {kakaoSignupLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          카카오톡으로 간편 회원가입 중...
+                        </>
+                      ) : (
+                        "카카오톡으로 간편 회원가입"
+                      )}
                     </Button>
                   )}
                 </div>
@@ -634,19 +655,37 @@ export default function LoginPage({
               <Button
                 className="w-full bg-[#03C75A] hover:bg-[#02b152] text-white"
                 onClick={() => {
+                  setNaverLoginLoading(true);
                   window.location.href = "/api/auth/naver";
                 }}
+                disabled={naverLoginLoading}
               >
-                네이버로 로그인
+                {naverLoginLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    네이버로 로그인 중...
+                  </>
+                ) : (
+                  "네이버로 로그인"
+                )}
               </Button>
               {ENABLE_KAKAO && (
                 <Button
                   className="w-full bg-[#FEE500] hover:bg-[#ffd400] text-black"
                   onClick={() => {
+                    setKakaoLoginLoading(true);
                     window.location.href = "/api/auth/kakao";
                   }}
+                  disabled={kakaoLoginLoading}
                 >
-                  카카오톡으로 로그인
+                  {kakaoLoginLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      카카오톡으로 로그인 중...
+                    </>
+                  ) : (
+                    "카카오톡으로 로그인"
+                  )}
                 </Button>
               )}
 
