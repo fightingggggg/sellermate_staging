@@ -48,21 +48,24 @@ export default function NaverOnboarding() {
     return code + clean;
   };
 
-  // 1) Custom token 로그인
+  // 1) 최초 페이지 진입 시 Custom token 으로 로그인하여
+  //    이후 휴대폰 credential 을 바로 currentUser 에 연결할 수 있도록 합니다.
   useEffect(() => {
     (async () => {
       if (!token) return;
-      if (skip) {
-        try {
-          await signInWithCustomToken(auth, token);
+      try {
+        await signInWithCustomToken(auth, token);
+
+        if (skip) {
           navigate("/");
-        } catch (err) {
-          console.error("[ONBOARDING] auto-login failed", err);
+          return;
         }
-        return;
+
+        // 로그인 성공 후 휴대폰 인증 단계로 진입
+        setStep("phone");
+      } catch (err) {
+        console.error("[ONBOARDING] auto-login failed", err);
       }
-      // Custom token login postponed until 가입 완료
-      setStep("phone");
     })();
   }, [token, skip]);
 
@@ -145,26 +148,58 @@ export default function NaverOnboarding() {
     }
   };
 
-  // verifyCode 단계에서는 SMS 코드 형식만 검증하고, 실제 credential 사용은 가입 완료 단계에서 한 번만 수행합니다.
+  // 인증번호를 실제로 검증하고, 성공 시 현재 소셜 계정에 휴대폰 자격 증명을 즉시 연결합니다.
   const verifyCode = async () => {
-    // 사용자가 입력한 코드 길이만 간단히 확인 (4자리 이상)
     if (verificationCode.length < 4) return;
 
-    // 코드와 verificationId 를 나중에 credential 생성에 재사용하기 위해 보관합니다.
-    const result = (window as any).confirmationResult as ConfirmationResult | undefined;
-    if (!result) {
+    if (!auth.currentUser) {
+      toast({
+        variant: "destructive",
+        title: "로그인 필요",
+        description: "잠시 후 다시 시도해주세요.",
+      });
+      return;
+    }
+
+    const verId =
+      verificationIdRef.current ||
+      (window as any).confirmationResult?.verificationId;
+
+    if (!verId) {
       alert("인증번호를 다시 요청해주세요.");
       return;
     }
 
-    verificationIdRef.current = result.verificationId;
-    verificationCodeRef.current = verificationCode;
+    setLoading(true);
+    try {
+      const phoneCred = PhoneAuthProvider.credential(verId, verificationCode);
 
-    // UI 표시용 – 실제 credential 검증은 가입 완료 단계(linkWithCredential)에서 1회만 수행
-    const phoneNum = buildE164(countryCode, number);
-    setConfirmedPhone(phoneNum);
-    setPhoneDone(true);
-    setStep("done");
+      // 입력한 코드가 올바른지 확인하면서 동시에 휴대폰 번호를 계정에 연결합니다.
+      await linkWithCredential(auth.currentUser, phoneCred);
+
+      verificationIdRef.current = verId;
+      verificationCodeRef.current = verificationCode;
+
+      const phoneNum = buildE164(countryCode, number);
+      setConfirmedPhone(phoneNum);
+      setPhoneDone(true);
+      setStep("done");
+
+      toast({ title: "인증 완료", description: "휴대폰 번호 인증이 완료되었습니다." });
+    } catch (err: any) {
+      console.error("[ONBOARDING] 휴대폰 인증 실패", err);
+      let msg: string;
+      if (err?.code === "auth/invalid-verification-code") {
+        msg = "인증번호가 올바르지 않아요. 다시 입력해주세요.";
+      } else if (err?.code === "auth/credential-already-in-use") {
+        msg = "이미 사용 중인 휴대폰 번호입니다.";
+      } else {
+        msg = err?.message || "휴대폰 인증에 실패했습니다.";
+      }
+      toast({ variant: "destructive", title: "인증 실패", description: msg });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (step === "signin") {
@@ -263,25 +298,7 @@ export default function NaverOnboarding() {
                 console.warn("[ONBOARDING] updateEmail/updateProfile 실패", e);
               }
 
-              // 휴대폰 credential 링크 (식별자용)
-              try {
-                if (verificationIdRef.current && verificationCodeRef.current) {
-                  // verificationId + code 로 credential 을 생성하고, 여기서 최초이자 단 한 번만 사용합니다.
-                  const phoneCred = PhoneAuthProvider.credential(
-                    verificationIdRef.current,
-                    verificationCodeRef.current,
-                  );
-                  await linkWithCredential(auth.currentUser!, phoneCred);
-                }
-              } catch (err) {
-                console.warn("[ONBOARDING] linkWithCredential 실패", err);
-                toast({
-                  variant: "destructive",
-                  title: "휴대폰 번호 연결 실패",
-                  description:
-                    (err as any)?.message || "휴대폰 번호를 계정에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
-                });
-              }
+              // 휴대폰 credential 은 이미 verify 단계에서 연결되었으므로 별도 작업이 필요 없습니다.
 
               // 휴대폰 번호와 함께 이메일/이름/제공처 기록
               const profileData: Record<string, any> = {
