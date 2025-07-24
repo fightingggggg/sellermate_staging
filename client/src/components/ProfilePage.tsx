@@ -236,7 +236,11 @@ export default function ProfilePage() {
                       <label className="text-[#555] font-bold text-sm block mb-2">이름</label>
                       <Input value={(userProfile as any)?.name || userProfile?.displayName || ""} readOnly className="bg-gray-50" />
                     </div>
-
+  {/* 연령대 */}
+  <div>
+                      <label className="text-[#555] font-bold text-sm block mb-2">연령대</label>
+                      <Input value={userProfile?.ageGroup || "-"} readOnly className="bg-gray-50" />
+                    </div>
                     {/* 이메일은 항상 표시 */}
                     <div>
                       <label className="text-[#555] font-bold text-sm block mb-2">이메일</label>
@@ -270,6 +274,8 @@ export default function ProfilePage() {
                         }
                       />
                     </div>
+
+                  
 
                     {/* readonly store info removed per requirement */}
                   </div>
@@ -316,7 +322,7 @@ export default function ProfilePage() {
 
                       {/* 휴대폰 번호 입력란 제거 (이메일 가입 시 중복 표시 해결) */}
 
-                      <div className="pt-4">
+                      <div className="pt-4 flex justify-center">
                         <Button 
                           type="submit" 
                           className="py-2 bg-[#007BFF] hover:bg-[#0056b3] text-white font-bold rounded-md" 

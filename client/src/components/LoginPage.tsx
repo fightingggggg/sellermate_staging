@@ -39,6 +39,7 @@ export default function LoginPage({
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState(""); // 비밀번호 확인 추가
   const [fullName, setFullName] = useState("");
+  const [ageGroup, setAgeGroup] = useState(""); // 연령대 추가
   const [number, setPhoneNumber] = useState("");
   const [countryCode, setCountryCode] = useState("+82");
   const [codeSent, setCodeSent] = useState(false);
@@ -202,7 +203,7 @@ export default function LoginPage({
   };
 
   const handleSignUp = async () => {
-    if (!email || !password || !fullName || !number)
+    if (!email || !password || !fullName || !ageGroup || !number)
       return;
 
     if (password !== passwordConfirm) {
@@ -216,7 +217,7 @@ export default function LoginPage({
     setSignUpProcessing(true);
 
     try {
-      await signUp(email, password, fullName, number);
+      await signUp(email, password, fullName, number, ageGroup);
       if (!isModal) {
         navigate("/login");
       }
@@ -228,6 +229,7 @@ export default function LoginPage({
       setEmail("");
       setPassword("");
       setFullName("");
+      setAgeGroup(""); // 연령대 초기화
       setPhoneNumber("");
       setPasswordConfirm("");
       setTerms(false);
@@ -468,7 +470,7 @@ export default function LoginPage({
                   {/* 이름 입력 */}
                   <div className="space-y-2">
                     <Label htmlFor="fullName">
-                      이름 <span className="text-gray-400">(필수)</span>
+                      이름 <span className="text-gray-400">*</span>
                     </Label>
                     <Input
                       id="fullName"
@@ -479,10 +481,30 @@ export default function LoginPage({
                     />
                   </div>
 
+                  {/* 연령대 입력 */}
+                  <div className="space-y-2">
+                    <Label htmlFor="ageGroup">
+                      연령대 <span className="text-gray-400">*</span>
+                    </Label>
+                    <select
+                      id="ageGroup"
+                      value={ageGroup}
+                      onChange={(e) => setAgeGroup(e.target.value)}
+                      className="border rounded-md text-sm h-10 px-2 w-full bg-white"
+                    >
+                      <option value="">연령대를 선택하세요</option>
+                      <option value="20대">20-29</option>
+                      <option value="30대">30-39</option>
+                      <option value="40대">40-49</option>
+                      <option value="50대">50-51</option>
+                      <option value="60대 이상">60대 이상</option>
+                    </select>
+                  </div>
+
                   {/* 국가 코드 + 휴대폰 번호 */}
                   <div className="space-y-2">
                     <Label htmlFor="number">
-                      휴대폰 번호 <span className="text-gray-400">(필수)</span>
+                      휴대폰 번호 <span className="text-gray-400">*</span>
                     </Label>
                     <div className="flex space-x-2">
                       {/* 국가 코드 선택 */}
@@ -542,7 +564,7 @@ export default function LoginPage({
                   {/* 이메일 입력 */}
                   <div className="space-y-2">
                     <Label htmlFor="register-email">
-                      이메일 <span className="text-gray-400">(필수)</span>
+                      이메일 <span className="text-gray-400">*</span>
                     </Label>
                     <Input
                       id="register-email"
@@ -630,6 +652,7 @@ export default function LoginPage({
                       !email ||
                       !password ||
                       !fullName ||
+                      !ageGroup || // 연령대 필수
                       !number ||
                       !terms ||
                       !privacy || !phoneVerified

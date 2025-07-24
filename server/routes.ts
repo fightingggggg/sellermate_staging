@@ -539,7 +539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profileJson = await profileRes.json();
       console.log("[NAVER-OAUTH] Profile JSON:", profileJson);
 
-      const { id: naverId, email, nickname, name, mobile_e164, mobile } = profileJson.response || {};
+      const { id: naverId, email, nickname, name, mobile_e164, mobile, age } = profileJson.response || {};
       const phoneFromProfile = mobile_e164 || mobile || "";
 
       if (!naverId || !email) {
@@ -597,6 +597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         provider: "naver",
       };
       if (phoneVerified) params.skip = "1";
+      if (age) params.age = age;
 
       const qs = new URLSearchParams(params).toString();
       const redirectUrl = `/naver-onboarding?${qs}`;
@@ -670,6 +671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const nickname = kakaoAcc.profile?.nickname || "";
       const name = kakaoAcc.name || nickname;
       const phoneNumber = kakaoAcc.phone_number || "";
+      const age = kakaoAcc.age_range || "";
 
       if (!kakaoId) return res.status(500).send("missing id");
       const uid = `kakao_${kakaoId}`;
@@ -702,7 +704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const cToken = await admin.auth().createCustomToken(uid);
       const params: Record<string,string> = { token: cToken, email, name, provider: "kakao" };
-      if (phoneVerified) params.skip = "1";
+      if (age) params.age = age;
       const qs = new URLSearchParams(params).toString();
       res.redirect(`/naver-onboarding?${qs}`);
     } catch(err){

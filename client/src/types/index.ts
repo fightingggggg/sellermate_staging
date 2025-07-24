@@ -58,6 +58,7 @@ export interface UserProfile extends User {
   createdAt?: string;
   membershipType?: 'basic' | 'booster'; // 멤버십 타입 추가
   membershipExpiresAt?: string; // 멤버십 만료일
+  ageGroup?: string; // 연령대 추가
 }
 
 // Stats type

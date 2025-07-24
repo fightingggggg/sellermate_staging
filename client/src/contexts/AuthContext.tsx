@@ -31,6 +31,7 @@ interface AuthContextProps {
     password: string,
     name?: string,
     number?: string,
+    ageGroup?: string,
   ) => Promise<void>;
   signIn: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -52,7 +53,7 @@ const AuthContext = createContext<AuthContextProps>({
   userProfile: null,
   loading: true,
   profileLoading: false,
-  signUp: async () => {},
+  signUp: async () => {}, // ageGroup은 선택적이므로 생략 가능
   signIn: async () => false,
   logout: async () => {},
   updateUserProfile: async () => false,
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     name?: string,
     number?: string,
+    ageGroup?: string,
   ) {
     setError(null);
     try {
@@ -176,6 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: user.email,
             name: name || "", // store name
             number: number || "",
+            ageGroup: ageGroup || "",
             provider: "email",
             createdAt: new Date(),
             emailVerified: false,
