@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://storebooster.ai.kr/sitemap.xml
+Sitemap: https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app/sitemap.xml
