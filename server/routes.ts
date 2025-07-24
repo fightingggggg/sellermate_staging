@@ -555,9 +555,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
        * ------------------------------------------- */
       const uid = `naver_${naverId}`;
 
-      // 이미 존재하는 사용자인지만 확인 (없어도 무시)
+      // 이미 존재하는 사용자인지 확인하면서 phoneNumber 도 함께 가져옵니다.
+      let userRecord: admin.auth.UserRecord | null = null;
       try {
-        await admin.auth().getUser(uid);
+        userRecord = await admin.auth().getUser(uid);
       } catch (e: any) {
         if (e?.code !== "auth/user-not-found") {
           throw e;
@@ -566,12 +567,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const db = admin.firestore();
-      let phoneVerified = false;
-      try {
-        const snap = await db.collection("usersInfo").doc(uid).get();
-        phoneVerified = snap.exists && !!snap.data()?.number;
-      } catch (err) {
-        console.warn("[NAVER-OAUTH] Firestore read error", err);
+      let phoneVerified = !!userRecord?.phoneNumber;
+      if (!phoneVerified) {
+        try {
+          const snap = await db.collection("usersInfo").doc(uid).get();
+          phoneVerified = snap.exists && !!snap.data()?.number;
+        } catch (err) {
+          console.warn("[NAVER-OAUTH] Firestore read error", err);
+        }
       }
 
       // --- Save Naver access token for future unlink ---
@@ -679,14 +682,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 사전 계정 생성 없이 존재 여부만 확인
       try { await admin.auth().getUser(uid);} catch(e:any){ if(e?.code!=="auth/user-not-found") throw e; }
 
-      // phone verify 여부 확인
+      // phone verify 여부 확인: Auth 레코드 phoneNumber → Firestore number 순으로 검사
       const db = admin.firestore();
       let phoneVerified = false;
       try {
-        const snap = await db.collection("usersInfo").doc(uid).get();
-        phoneVerified = snap.exists && !!snap.data()?.number;
-      } catch (err) {
-        console.warn("[KAKAO-OAUTH] Firestore read error", err);
+        const userRec = await admin.auth().getUser(uid);
+        phoneVerified = !!userRec.phoneNumber;
+      } catch (e:any) {
+        if (e?.code !== "auth/user-not-found") console.warn("[KAKAO-OAUTH] getUser error", e);
+      }
+      if (!phoneVerified) {
+        try {
+          const snap = await db.collection("usersInfo").doc(uid).get();
+          phoneVerified = snap.exists && !!snap.data()?.number;
+        } catch (err) {
+          console.warn("[KAKAO-OAUTH] Firestore read error", err);
+        }
       }
 
       // --- Save Kakao token for future unlink ---
@@ -704,6 +715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const cToken = await admin.auth().createCustomToken(uid);
       const params: Record<string,string> = { token: cToken, email, name, provider: "kakao" };
+      if (phoneVerified) params.skip = "1";
       if (age) params.age = age;
       const qs = new URLSearchParams(params).toString();
       res.redirect(`/naver-onboarding?${qs}`);

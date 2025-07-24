@@ -48,23 +48,20 @@ export default function NaverOnboarding() {
     return code + clean;
   };
 
-  // 1) 최초 페이지 진입 시 Custom token 으로 로그인하여
-  //    이후 휴대폰 credential 을 바로 currentUser 에 연결할 수 있도록 합니다.
+  // 1) skip=1(이미 휴대폰 인증 완료된 계정)인 경우에만 즉시 로그인 후 홈으로 이동합니다.
   useEffect(() => {
     (async () => {
-      if (!token) return;
+      if (!token || !skip) {
+        // 휴대폰 인증이 필요한 신규 가입자는 로그인 지연
+        setStep("phone");
+        return;
+      }
+
       try {
         await signInWithCustomToken(auth, token);
-
-        if (skip) {
-          navigate("/");
-          return;
-        }
-
-        // 로그인 성공 후 휴대폰 인증 단계로 진입
-        setStep("phone");
+        navigate("/");
       } catch (err) {
-        console.error("[ONBOARDING] auto-login failed", err);
+        console.error("[ONBOARDING] auto-login skipped user failed", err);
       }
     })();
   }, [token, skip]);
@@ -152,13 +149,15 @@ export default function NaverOnboarding() {
   const verifyCode = async () => {
     if (verificationCode.length < 4) return;
 
+    // 아직 로그인되지 않았다면 여기서 custom token 으로 로그인 후 진행
     if (!auth.currentUser) {
-      toast({
-        variant: "destructive",
-        title: "로그인 필요",
-        description: "잠시 후 다시 시도해주세요.",
-      });
-      return;
+      try {
+        await signInWithCustomToken(auth, token);
+      } catch (loginErr) {
+        console.error("[ONBOARDING] custom token login 실패", loginErr);
+        toast({ variant: "destructive", title: "로그인 실패", description: "다시 시도해주세요." });
+        return;
+      }
     }
 
     const verId =
@@ -175,7 +174,7 @@ export default function NaverOnboarding() {
       const phoneCred = PhoneAuthProvider.credential(verId, verificationCode);
 
       // 입력한 코드가 올바른지 확인하면서 동시에 휴대폰 번호를 계정에 연결합니다.
-      await linkWithCredential(auth.currentUser, phoneCred);
+      await linkWithCredential(auth.currentUser!, phoneCred);
 
       verificationIdRef.current = verId;
       verificationCodeRef.current = verificationCode;
