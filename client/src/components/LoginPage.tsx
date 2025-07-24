@@ -317,7 +317,7 @@ export default function LoginPage({
           <img src="/logo.png" alt="스토어부스터" style={{ height: '1.5em', margin: 0, display: 'inline-block', verticalAlign: 'middle' }} />
         </CardTitle>
         <CardDescription>
-          스마트스토어 SEO를 위한 완벽한 솔루션
+          스마트스토어 상위노출 최적화를 위한 완벽한 솔루션
         </CardDescription>
       </CardHeader>
       <CardContent>
