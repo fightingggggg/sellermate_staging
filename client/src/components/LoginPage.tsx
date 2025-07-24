@@ -65,6 +65,14 @@ export default function LoginPage({
   const [naverSignupLoading, setNaverSignupLoading] = useState(false);
   const [kakaoSignupLoading, setKakaoSignupLoading] = useState(false);
 
+  // 페이지 진입 시(마운트 시) 로딩 상태 초기화
+  useEffect(() => {
+    setNaverLoginLoading(false);
+    setKakaoLoginLoading(false);
+    setNaverSignupLoading(false);
+    setKakaoSignupLoading(false);
+  }, []);
+
   // 기능 재활성화를 대비해 Kakao 로그인/회원가입 버튼 표시 여부를 토글합니다.
   const ENABLE_KAKAO = true;
 
