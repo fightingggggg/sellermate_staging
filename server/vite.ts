@@ -68,10 +68,9 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // Vite 빌드 결과물은 프로젝트 루트의 `dist/public` 경로에 생성된다.
-  // 기존에는 `server/public` 을 바라보고 있어 정적 파일을 찾지 못해
-  // `/sitemap.xml` 요청 등에서 `index.html` 이 반환되는 문제가 있었다.
-  // 구글 서치 콘솔이 sitemap 을 HTML 로 인식한 원인이므로 빌드 출력 경로로 수정한다.
+  // Vite에서 빌드된 정적 파일들은 프로젝트 루트의 dist/public 디렉터리에 위치합니다.
+  // 기존 경로가 server/public 을 가리켜 sitemap.xml 같은 파일을 찾지 못하고 index.html 로 폴백되는 문제가 있었습니다.
+  // 실제 빌드 아웃풋 위치로 경로를 수정하여 정적 파일이 올바르게 서빙되도록 합니다.
   const distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
 
   if (!fs.existsSync(distPath)) {

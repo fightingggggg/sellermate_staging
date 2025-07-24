@@ -31,20 +31,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.use(cors(corsOptions));
 
-  /* -----------------------------------------------------------
-   *  정적 서빙/개발 환경의 SPA fallback 에서 sitemap.xml 요청이
-   *  index.html 로 처리되어 <script> 태그가 포함되는 문제가 발생했다.
-   *  이를 방지하기 위해 sitemap.xml 전용 라우트를 가장 먼저 선언하여
-   *  올바른 XML 문자열과 Content-Type 을 명시적으로 응답한다.
-   * ----------------------------------------------------------- */
-
-  const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app/</loc>\n    <lastmod>2025-07-23</lastmod>\n    <priority>1.0</priority>\n  </url>\n</urlset>`;
-
-  app.get('/sitemap.xml', (_req, res) => {
-    res.header('Content-Type', 'application/xml');
-    res.send(sitemapXml);
-  });
-   
   // API Endpoint to check server status
   app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'SEO Dashboard API is running' });
