@@ -4,6 +4,12 @@ import { setupVite, serveStatic, log } from "./vite";
 import dotenv from "dotenv";
 dotenv.config();
 
+// ESM 환경에서 __dirname 대체 선언
+import { fileURLToPath } from "url";
+import path from "path";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 // reverse proxy (Cloudtype 등) 뒤에서 실행 시 X-Forwarded-Proto 헤더를 신뢰하도록 설정
 app.set("trust proxy", true);
@@ -11,7 +17,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // [추가] sitemap.xml, robots.txt 등 정적 파일을 SPA 라우팅보다 먼저 서빙
-import path from "path";
 app.use(express.static(path.join(__dirname, "../client/public")));
 
 app.use((req, res, next) => {
