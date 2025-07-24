@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { hydrateRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
@@ -14,4 +15,12 @@ if (import.meta.env.PROD) {
   console.error = noop;
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+const container = document.getElementById("root")!;
+
+if (container.hasChildNodes()) {
+  // SSR 마크업이 존재하면 하이드레이션
+  hydrateRoot(container, <App />);
+} else {
+  // CSR 환경(개발 모드 등)
+  createRoot(container).render(<App />);
+}

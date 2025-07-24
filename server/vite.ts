@@ -5,6 +5,8 @@ import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
+import ReactDOMServer from "react-dom/server";
+import { pathToFileURL } from "url";
 
 const viteLogger = createLogger();
 
@@ -83,6 +85,30 @@ export function serveStatic(app: Express) {
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    (async () => {
+      try {
+        const template = await fs.promises.readFile(
+          path.resolve(distPath, "index.html"),
+          "utf-8",
+        );
+
+        // SSR 렌더러 동적 임포트
+        const { render } = await import(
+          pathToFileURL(
+            path.resolve(import.meta.dirname, "..", "dist", "server", "entry-server.js"),
+          ).href,
+        );
+
+        const appHtml = ReactDOMServer.renderToString(render(_req.originalUrl));
+        const html = template.replace(
+          '<div id="root"></div>',
+          `<div id="root">${appHtml}</div>`,
+        );
+        res.status(200).set({ "Content-Type": "text/html" }).end(html);
+      } catch (e) {
+        // SSR 빌드가 없거나 오류가 발생하면 CSR 폴백
+        res.sendFile(path.resolve(distPath, "index.html"));
+      }
+    })();
   });
 }
