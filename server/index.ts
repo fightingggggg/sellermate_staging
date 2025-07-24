@@ -10,6 +10,10 @@ app.set("trust proxy", true);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// [추가] sitemap.xml, robots.txt 등 정적 파일을 SPA 라우팅보다 먼저 서빙
+import path from "path";
+app.use(express.static(path.join(__dirname, "../client/public")));
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
