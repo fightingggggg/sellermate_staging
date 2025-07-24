@@ -60,7 +60,7 @@ export default function LoginPage({
   const [signUpProcessing, setSignUpProcessing] = useState(false);
 
   // 기능 재활성화를 대비해 Kakao 로그인/회원가입 버튼 표시 여부를 토글합니다.
-  const ENABLE_KAKAO = false;
+  const ENABLE_KAKAO = true;
 
   // RecaptchaVerifier는 SMS 코드 발송 시점에 동적으로 초기화
 

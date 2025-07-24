@@ -144,52 +144,26 @@ export default function NaverOnboarding() {
     }
   };
 
+  // verifyCode 단계에서는 SMS 코드 형식만 검증하고, 실제 credential 사용은 가입 완료 단계에서 한 번만 수행합니다.
   const verifyCode = async () => {
+    // 사용자가 입력한 코드 길이만 간단히 확인 (4자리 이상)
+    if (verificationCode.length < 4) return;
+
+    // 코드와 verificationId 를 나중에 credential 생성에 재사용하기 위해 보관합니다.
     const result = (window as any).confirmationResult as ConfirmationResult | undefined;
     if (!result) {
       alert("인증번호를 다시 요청해주세요.");
       return;
     }
-    setLoading(true);
-    try {
-      // 1) 코드 확인 및 임시 로그인 (phone-only 계정 생성)
-      await result.confirm(verificationCode);
-      verificationCodeRef.current = verificationCode;
 
-      // 2) 확인된 휴대폰 번호 저장
-      const phoneNum = auth.currentUser?.phoneNumber || buildE164(countryCode, number);
-      setConfirmedPhone(phoneNum);
+    verificationIdRef.current = result.verificationId;
+    verificationCodeRef.current = verificationCode;
 
-      // 3) 임시로 생성된 phone-only 계정 즉시 삭제하여 최종 가입 전까지 Auth에 계정이 남지 않도록 함
-      try {
-        await auth.currentUser?.delete();
-      } catch (err) {
-        console.warn("[ONBOARDING] 임시 phone 계정 삭제 실패", err);
-      }
-
-      // 4) 로그아웃하고 단계 완료 표시
-      await auth.signOut();
-      setPhoneDone(true);
-      setStep("done");
-    } catch (err: any) {
-      console.error(err);
-      // 에러 코드를 확인하여 사용자에게 더 친절한 안내 메시지를 제공합니다.
-      let description: string;
-      if (err?.code === "auth/too-many-requests") {
-        description = "너무 많은 시도가 감지되었습니다. 잠시 후 다시 인증을 시도해 주세요.";
-      } else if (err?.code === "auth/invalid-verification-code") {
-        description = "인증번호가 올바르지 않아요. 다시 입력해주세요.";
-      } else {
-        description = err?.message || "인증번호가 올바르지 않아요. 다시 시도해주세요.";
-      }
-      toast({
-        variant: "destructive",
-        title: "인증 실패",
-        description,
-      });
-    } finally {
-      setLoading(false);
-    }
+    // UI 표시용 – 실제 credential 검증은 가입 완료 단계(linkWithCredential)에서 1회만 수행
+    const phoneNum = buildE164(countryCode, number);
+    setConfirmedPhone(phoneNum);
+    setPhoneDone(true);
+    setStep("done");
   };
 
   if (step === "signin") {
@@ -291,11 +265,21 @@ export default function NaverOnboarding() {
               // 휴대폰 credential 링크 (식별자용)
               try {
                 if (verificationIdRef.current && verificationCodeRef.current) {
-                  const phoneCred = PhoneAuthProvider.credential(verificationIdRef.current, verificationCodeRef.current);
+                  // verificationId + code 로 credential 을 생성하고, 여기서 최초이자 단 한 번만 사용합니다.
+                  const phoneCred = PhoneAuthProvider.credential(
+                    verificationIdRef.current,
+                    verificationCodeRef.current,
+                  );
                   await linkWithCredential(auth.currentUser!, phoneCred);
                 }
               } catch (err) {
                 console.warn("[ONBOARDING] linkWithCredential 실패", err);
+                toast({
+                  variant: "destructive",
+                  title: "휴대폰 번호 연결 실패",
+                  description:
+                    (err as any)?.message || "휴대폰 번호를 계정에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
+                });
               }
 
               // 휴대폰 번호와 함께 이메일/이름/제공처 기록
