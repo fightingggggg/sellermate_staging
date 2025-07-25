@@ -137,7 +137,7 @@ export default function Home() {
                   {/* <p className="text-gray-600">상위 노출 경쟁률을 분석하고, 최적화된 상품명, 태그를 제공합니다.</p> */}
                   
                 </div>
-                <div className="flex gap-2 items-stretch">
+                <div className="flex flex-col gap-2 items-stretch md:flex-row">
                   <input
                     type="text"
                     placeholder="상품의 메인 키워드를 입력해보세요"
@@ -148,11 +148,11 @@ export default function Home() {
                         handleAnalyzeClick();
                       }
                     }}
-                    className="flex-1 px-6 py-4 text-base md:text-lg border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8] transition-all duration-200 text-left md:text-center placeholder:text-left md:placeholder:text-center"
+                    className="flex-1 px-4 py-3 text-sm md:px-6 md:py-4 md:text-lg border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8] transition-all duration-200 text-left md:text-center placeholder:text-left md:placeholder:text-center"
                   />
                   <Button 
                     size="sm"
-                    className="bg-[#1a73e8] hover:bg-[#1a73e8]/90 text-white px-6 py-4 rounded-lg font-semibold transition-all duration-200 hover:scale-105 text-base h-auto"
+                    className="w-full md:w-auto bg-[#1a73e8] hover:bg-[#1a73e8]/90 text-white px-4 py-3 md:px-6 md:py-4 rounded-lg font-semibold transition-all duration-200 hover:scale-105 text-base h-auto"
                     onClick={handleAnalyzeClick}
                   >
                     <Search className="w-4 h-4 mr-0.5" />

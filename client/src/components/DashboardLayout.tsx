@@ -175,12 +175,24 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     멤버십
                   </Link>
 
+                  {/* 모바일(PC에서는 숨김)에서만 보이는 빠른 상품명 최적화 버튼 */}
+                  <Button
+                    onClick={() => {
+                      trackEvent('Navigation', 'mobile_quick_optimizer');
+                      navigate('/product-optimizer/quick');
+                    }}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 sm:hidden"
+                  >
+                    빠른 상품명 최적화
+                  </Button>
+
+                  {/* 로그인 버튼은 PC에서만 보이게 */}
                   <Button 
                     onClick={() => {
                       trackEvent('Navigation', 'menu_login');
                       navigate("/login");
                     }}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hidden sm:inline-flex"
                   >
                     로그인
                   </Button>
