@@ -1690,8 +1690,8 @@ export default function KeywordCompetitionAnalysisPage() {
                       const prefix = idx === 0
                         ? "리뷰가 가장 적은 상품: "
                         : idx === 1
-                        ? "두 번째로 리뷰가 적은 상품: "
-                        : "세 번째로 리뷰가 적은 상품: ";
+                        ? "두 번째 리뷰 적은 상품: "
+                        : "세 번째 리뷰 적은 상품: ";
                       return (
                         <p key={`grid-rev-${p.rank}`}>{prefix}<span className="text-green-700 font-semibold text-base">{p.rankReviewCount.toLocaleString()}개</span>로 <span className="text-green-700 font-semibold text-base">{formatRank(p.rank)}</span></p>
                       );
