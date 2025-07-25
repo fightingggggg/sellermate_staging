@@ -48,7 +48,9 @@ export default function QuickProductOptimizerPage() {
  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8 space-y-6">
         {/* 경험 헤더 */}
         <h2 className="text-center text-base text-gray-700 mb-3 font-semibold">
-          실제 이용자 중 <span className="font-bold text-blue-600">55%가</span> <span className="font-bold text-blue-600">상품명만 바꿔서</span> <span className="font-bold text-blue-600">순위 상승을 경험</span>했어요!
+          실제 이용자 중 <span className="font-bold text-blue-600">55%가</span> <span className="font-bold text-blue-600">상품명만 바꿔서</span>
+          <br className="block sm:hidden" />
+          <span className="font-bold text-blue-600">순위 상승을 경험</span>했어요!
         </h2>
 
 

@@ -264,6 +264,21 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               >
                 사용법
               </button>
+              {/* 로그인/회원가입 버튼: 로그인 상태가 아닐 때만 노출 */}
+              {!currentUser && (
+                <>
+                  <button
+                    onClick={() => {
+                      trackEvent('Navigation', 'mobile_menu_login');
+                      navigate('/login');
+                    }}
+                    className="block w-full text-left px-3 py-2 text-base font-medium text-blue-600 hover:bg-gray-50 hover:text-blue-700"
+                  >
+                    로그인/ 회원가입
+                  </button>
+                
+                </>
+              )}
             </div>
           )}
         </div>
