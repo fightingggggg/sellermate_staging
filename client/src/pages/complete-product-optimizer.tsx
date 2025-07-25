@@ -9,10 +9,32 @@ import KeywordOptimizerWizard from "@/components/KeywordOptimizer/KeywordOptimiz
 import { trackEvent } from "@/lib/analytics";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
+import { useAuth } from "@/contexts/AuthContext";
+import { sampleKeywordRaw, sampleAnalysisData, sampleCompleteOptimizerData } from "@/sample/sampleData";
 
 // 더 이상 마법사 컴포넌트를 렌더하지 않음 (인트로 페이지)
 
 export default function CompleteProductOptimizerPage() {
+  const { currentUser } = useAuth();
+  // 게스트(비회원) 예시 데이터 캐시 주입 (Step2 화면)
+  if (typeof window !== "undefined") {
+    const hasSample = localStorage.getItem("latestKeywordAnalysis");
+    const allow = sessionStorage.getItem("allowPrefill") === "1";
+    if (!currentUser && !hasSample && !allow) {
+      try {
+        localStorage.setItem(
+          "latestKeywordAnalysis",
+          JSON.stringify({
+            keyword: sampleKeywordRaw,
+            data: sampleAnalysisData,
+            completeOptimizerData: sampleCompleteOptimizerData,
+          })
+        );
+        sessionStorage.setItem("allowPrefill", "1");
+        console.log("[GuestSample] Complete optimizer sample data injected");
+      } catch {}
+    }
+  }
   // allowPrefill 플래그 유무를 바로 확인하여, Prefill 의도(=히스토리 복원)가 아니면 즉시 캐시를 제거합니다.
   if (typeof window !== "undefined") {
     const allow = sessionStorage.getItem("allowPrefill") === "1";

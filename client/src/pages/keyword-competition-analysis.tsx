@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import RobotVerificationDialog from "@/components/ui/robot-verification-dialog";
 import { useUsage } from "@/contexts/UsageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
+import { sampleKeywordInput, sampleAnalysisData, sampleStatsData } from "@/sample/sampleData";
 
 interface KeywordItem {
   key: string;
@@ -581,8 +582,13 @@ export default function KeywordCompetitionAnalysisPage() {
 
     // 모바일 체크 - PC 전용 기능
     if (isMobile) {
-      setShowPcOnlyModal(true);
-      return;
+      if (!currentUser) {
+        setShowLoginModal(true);
+        return;
+      } else {
+        setShowPcOnlyModal(true);
+        return;
+      }
     }
 
     // 공백 포함이면 오류 메시지 표시 후 중단
@@ -1038,13 +1044,36 @@ export default function KeywordCompetitionAnalysisPage() {
     } catch {}
   };
 
+  //  게스트(비회원)이며 히스토리가 없는 경우 – 예시 데이터 자동 주입
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (didMountRef.current) return;
+    didMountRef.current = true;
+    // 비회원(guest)일 때만 예시 데이터 자동 주입
+    if (!currentUser && !analysisData && !keyword.trim()) {
+      setKeyword(sampleKeywordInput);
+      setAnalysisData(sampleAnalysisData as any);
+      setPrefillStatsData(sampleStatsData as any);
+      setIsAnalyzing(false);
+    }
+  }, [currentUser]);
+
   return (
     <DashboardLayout>
       <TooltipProvider delayDuration={0}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8 space-y-6">
         {/* 경험 헤더 */}
         <h2 className="text-center text-base text-gray-700 mb-3 font-semibold">
-          실제 이용자 중 <span className="font-bold text-blue-600">55%가</span> <span className="font-bold text-blue-600">상품명만 바꿔서</span> <span className="font-bold text-blue-600">순위 상승을 경험</span>했어요!
+          {isMobile ? (
+            <>
+              실제 이용자 중 <span className="font-bold text-blue-600">55%가</span> <span className="font-bold text-blue-600">상품명만 바꿔서</span><br/>
+              <span className="font-bold text-blue-600">순위 상승을 경험</span>했어요!
+            </>
+          ) : (
+            <>
+              실제 이용자 중 <span className="font-bold text-blue-600">55%가</span> <span className="font-bold text-blue-600">상품명만 바꿔서</span> <span className="font-bold text-blue-600">순위 상승을 경험</span>했어요!
+            </>
+          )}
         </h2>
 
         {/* 상단 메뉴 카드 */}
@@ -1103,32 +1132,52 @@ export default function KeywordCompetitionAnalysisPage() {
           <Card className="border-2 border-green-100 shadow-lg max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
-                <Search className="h-5 w-5 text-green-600" />
+                <Search className={isMobile ? "h-4 w-4 text-green-600" : "h-5 w-5 text-green-600"} />
                 <span>상품 메인 키워드 입력</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4 items-start">
-          <Input
-            placeholder="분석할 키워드를 입력하세요 (예: 토마토)"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-                  className="flex-1 w-full min-w-0 text-lg py-6 border-2 border-gray-200 focus:border-green-500 transition-colors"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSearch();
-            }}
-          />
+              <div className={isMobile ? "flex flex-row gap-2 items-center" : "flex flex-col sm:flex-row gap-4 items-start"}>
+                <Input
+                  placeholder="분석할 키워드를 입력하세요 (예: 토마토)"
+                  value={keyword}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setKeyword(val);
+                    if (val === "") {
+                      setAnalysisData(null);
+                      setPrefillStatsData(null as any);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (keyword === sampleKeywordInput) {
+                      setKeyword("");
+                      setAnalysisData(null);
+                      setPrefillStatsData(null as any);
+                    }
+                  }}
+                  className={isMobile ? "flex-1 w-full min-w-0 text-sm py-3 border-2 border-gray-200 focus:border-green-500 transition-colors" : "flex-1 w-full min-w-0 text-lg py-6 border-2 border-gray-200 focus:border-green-500 transition-colors"}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSearch();
+                  }}
+                />
                 <Button
                   onClick={handleSearch}
                   disabled={isAnalyzing || !keyword.trim()}
-                  className="px-8 py-6 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                  className={isMobile ? "px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold text-sm" : "px-8 py-6 bg-green-600 hover:bg-green-700 text-white font-semibold"}
                 >
                   {isAnalyzing ? "조회 중..." : "분석"}
-          </Button>
-        </div>
+                </Button>
+              </div>
               <p className="text-sm text-gray-500">* 해당 키워드의 월간 검색량과 경쟁률을 분석합니다.</p>
             </CardContent>
           </Card>
+          {/* 예시 데이터 안내 문구 - 카드 밖 */}
+          {!currentUser && keyword === sampleKeywordInput && (
+            <div className="max-w-2xl mx-auto">
+              <p className="text-xs text-blue-500 mt-2 text-center">현재는 예시 화면입니다. 로그인하시면 실제 데이터를 바로 확인하실 수 있어요!</p>
+            </div>
+          )}
 
           {/* 키워드 분석 사용량 제한 메시지 */}
           {keywordAnalysisLimitMessage && (
@@ -1330,6 +1379,15 @@ export default function KeywordCompetitionAnalysisPage() {
              
             if (!resultMsg) return null;
 
+            // 예시 데이터 여부 판별
+            const isSample = (
+              keyword === sampleKeywordInput ||
+              (analysisData && analysisData.keywords && Array.isArray(analysisData.keywords) &&
+                analysisData.keywords.length === sampleAnalysisData.keywords?.length &&
+                analysisData.keywords.every((k: any, i: number) => k.key === sampleAnalysisData.keywords[i].key && k.value === sampleAnalysisData.keywords[i].value)
+              )
+            );
+
                         return (
               <Card className="border-2 border-green-600 bg-green-50 shadow-md">
                 <CardContent className="py-6 text-center space-y-3">
@@ -1355,22 +1413,22 @@ export default function KeywordCompetitionAnalysisPage() {
 
                   {/* 상품명 최적화 버튼 그룹 */}
                   <div className="flex gap-3 justify-center pt-3">
-                  <Link href="/product-optimizer/complete" onClick={(e: any) => handleMenuNavigate(e, "/product-optimizer/complete")}>
+                  <Link href="/product-optimizer/complete" onClick={(e: any) => { if (isSample) { e.preventDefault(); return; } handleMenuNavigate(e, "/product-optimizer/complete"); }}>
                     <Button 
                       variant="default" 
                       size="sm" 
-                      className={`px-4 ${productOptimizationLimit?.canUse ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
-                      disabled={!productOptimizationLimit?.canUse}
+                      className={`px-4 ${productOptimizationLimit?.canUse && !isSample ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
+                      disabled={!productOptimizationLimit?.canUse || isSample}
                     >
                       {`완벽 최적화 (${productOptimizationLimit?.currentCount ?? 0}/${productOptimizationLimit?.maxCount ?? 10})`}
                     </Button>
                 </Link>
-                  <Link href="/product-optimizer/quick" onClick={(e: any) => handleMenuNavigate(e, "/product-optimizer/quick")}>
+                  <Link href="/product-optimizer/quick" onClick={(e: any) => { if (isSample) { e.preventDefault(); return; } handleMenuNavigate(e, "/product-optimizer/quick"); }}>
                     <Button 
                       variant="outline" 
-                      size="sm" 
-                      className={`px-4 ${productOptimizationLimit?.canUse ? 'border-green-600 text-green-700 hover:bg-green-50' : 'border-gray-400 text-gray-500 cursor-not-allowed'}`}
-                      disabled={!productOptimizationLimit?.canUse}
+                      size="sm"
+                      className={`px-4 ${productOptimizationLimit?.canUse && !isSample ? 'border-green-600 text-green-700 hover:bg-green-50' : 'border-gray-400 text-gray-400 cursor-not-allowed'}`}
+                      disabled={!productOptimizationLimit?.canUse || isSample}
                     >
                       {`빠른 최적화 (${productOptimizationLimit?.currentCount ?? 0}/${productOptimizationLimit?.maxCount ?? 10})`}
                     </Button>
@@ -1706,13 +1764,21 @@ export default function KeywordCompetitionAnalysisPage() {
           {hasKeyword && analysisData && (
           <Card>
             <CardHeader>
+              {isMobile ? (
+                <CardTitle className="text-base whitespace-pre-line">경쟁이 높은 키워드는{"\n"}아래 키워드로 시도해보세요!</CardTitle>
+              ) : (
                 <CardTitle>경쟁이 높은 키워드는 아래 키워드로 시도해보세요!</CardTitle>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
                 {/* 메인키워드 연관 키워드 */}
               {analysisData.keywords && (
                 <div>
+                  {isMobile ? (
+                    <h3 className="mb-2 text-xs">싱품명에 자주 쓰인 키워드</h3>
+                  ) : (
                     <h3 className="mb-2">현재 페이지 40개 상품명에서 자주 쓰인 키워드</h3>
+                  )}
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead>
@@ -1757,7 +1823,13 @@ export default function KeywordCompetitionAnalysisPage() {
         {/* 로그인 모달 */}
         <Dialog open={showLoginModal} onOpenChange={setShowLoginModal}>
           <DialogContent className="max-w-md p-0 border-none bg-transparent shadow-none">
-            <LoginPage isModal={true} onLoginSuccess={() => setShowLoginModal(false)} />
+            <LoginPage isModal={true} onLoginSuccess={() => {
+              setShowLoginModal(false);
+              // 모바일 환경에서 로그인 성공 시 PC 전용 모달을 띄움
+              if (isMobile) {
+                setShowPcOnlyModal(true);
+              }
+            }} />
           </DialogContent>
         </Dialog>
 

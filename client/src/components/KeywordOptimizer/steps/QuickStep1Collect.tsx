@@ -34,6 +34,7 @@ import { Link } from "wouter";
 import RobotVerificationDialog from "@/components/ui/robot-verification-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
+import { sampleKeywordInput, sampleKeywordRaw, sampleAnalysisData, sampleQuickAIResult, sampleCategoriesDetailed } from "@/sample/sampleData";
 
 interface Step1CollectProps {
   onDone: () => void;
@@ -100,110 +101,26 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
   // 중복 최적화 요청 방지용
   const optimizationInProgressRef = useRef(false);
 
-  // ctxAnalysisData로부터 categoriesDetailed 복원
+  const didMountRef = useRef(false);
   useEffect(() => {
-    if (ctxAnalysisData?.categoriesDetailed && ctxAnalysisData.categoriesDetailed.length > 0) {
-      // count 내림차순 정렬 후 상태 저장
-      const sorted = [...ctxAnalysisData.categoriesDetailed].sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
-
-      // 카테고리가 2개 이상이면 "전체 카테고리" 집계 객체를 생성해 앞에 삽입
-      let finalCats = sorted;
-      if (sorted.length >= 2) {
-        const arrToObj = (arr: any[]) =>
-          arr.reduce((acc: any, cur: any) => {
-            acc[cur.key] = cur.value;
-            return acc;
-          }, {} as Record<string, number>);
-
-        // keywords / tags 배열이 이미 준비돼 있음 (ctxAnalysisData.* 는 배열 형태)
-        const kwArr: any[] = ctxAnalysisData.keywords || [];
-        const tagArr: any[] = ctxAnalysisData.tags || [];
-
-        // keywordCounts: 배열 또는 객체 → 객체로 변환
-        const kcSrc: any = ctxAnalysisData.keywordCounts;
-        let kwCntObj: Record<string, number> = {};
-        if (Array.isArray(kcSrc)) {
-          kwCntObj = arrToObj(kcSrc);
-        } else if (kcSrc && typeof kcSrc === 'object') {
-          kwCntObj = kcSrc as Record<string, number>;
-        }
-
-        // kcSrc 가 비어 있을 때: 각 카테고리 keywordCounts 합산
-        if (Object.keys(kwCntObj).length === 0) {
-          const agg: Record<string, number> = {};
-          for (const cat of sorted) {
-            const kco = cat.keywordCounts;
-            if (kco && typeof kco === 'object') {
-              for (const [k, v] of Object.entries(kco as Record<string, number>)) {
-                agg[k] = (agg[k] || 0) + (v as number);
-              }
-            }
-          }
-          kwCntObj = agg;
-        }
-
-        // ===== 카테고리별 제외 키워드/태그 합산 =====
-        const aggArr = (key: string) => {
-          const res: string[] = [];
-          for (const cat of sorted) {
-            const arr = (cat as any)[key] as string[] | undefined;
-            if (Array.isArray(arr)) res.push(...arr);
-          }
-          return res;
-        };
-
-        // ===== pairedData 합산 =====
-        const aggregatedPairedData: Record<string, any> = {};
-        sorted.forEach((cat: any) => {
-          if (Array.isArray(cat.pairedData)) {
-            cat.pairedData.forEach((pair: any) => {
-              if (!aggregatedPairedData[pair.attribute]) {
-                aggregatedPairedData[pair.attribute] = {
-                  attribute: pair.attribute,
-                  characters: [],
-                } as any;
-              }
-              pair.characters.forEach((char: any) => {
-                const existing = aggregatedPairedData[pair.attribute].characters.find(
-                  (c: any) => c.character === char.character
-                );
-                if (existing) existing.count += char.count;
-                else aggregatedPairedData[pair.attribute].characters.push({ ...char });
-              });
-            });
-          }
-        });
-        Object.values(aggregatedPairedData).forEach((pair: any) => {
-          pair.characters.sort((a: any, b: any) => b.count - a.count);
-        });
-
-        const allCategory = {
-          categoryPath: '전체 카테고리',
-          count: sorted.reduce((sum, c: any) => sum + (c.count || 0), 0),
-          keywords: arrToObj(kwArr),
-          keywordCounts: kwCntObj,
-          tags: arrToObj(tagArr),
-          pairedData: Object.values(aggregatedPairedData),
-          excludedQuery: aggArr('excludedQuery'),
-          excludedNumbers: aggArr('excludedNumbers'),
-          excludedBrands: aggArr('excludedBrands'),
-          excludedTags: aggArr('excludedTags'),
-        } as any;
-
-        finalCats = [allCategory, ...sorted];
-      }
-
-      setCategoriesDetailed(finalCats);
-      setCurrentCatIdx(0);
-      setSelectedCategoryIndex(0);
+    if (didMountRef.current) return;
+    didMountRef.current = true;
+    // 게스트 대상 예시 데이터 자동 주입
+    if (!currentUser && !ctxAnalysisData) {
+      setProductName(sampleKeywordInput);
+      setMainKeyword(sampleKeywordRaw);
+      setAnalysisData(sampleAnalysisData as any);
+      setCtxAnalysisData(sampleAnalysisData as any);
+      setAnalysisKeyword(sampleKeywordInput);
+      setCategoriesDetailed(sampleCategoriesDetailed as any);
+      setAiResult(sampleQuickAIResult as any);
     }
-  }, [ctxAnalysisData, ctxMainKeyword]);
+  }, []);
 
   // PrefillProvider로 전달된 분석 데이터를 로컬 state에 동기화
   useEffect(() => {
     if (!analysisData && ctxAnalysisData) {
       setAnalysisData(ctxAnalysisData);
-      
       // 키워드 경쟁률 분석에서 온 경우 페이지 인덱스 설정
       if (ctxAnalysisData._pageIndex) {
         setPageIndex(ctxAnalysisData._pageIndex.toString());
@@ -211,8 +128,11 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
       }
     }
     if (ctxMainKeyword && !productName) {
-      setProductName(ctxMainKeyword);
-      setAnalysisKeyword(ctxMainKeyword);
+      // productName이 빈 문자열일 때는 setProductName을 실행하지 않음
+      if (ctxMainKeyword !== "") {
+        setProductName(ctxMainKeyword);
+        setAnalysisKeyword(ctxMainKeyword);
+      }
     }
   }, [ctxAnalysisData]);
 
@@ -226,8 +146,21 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
       if (event.data.type === "SEO_ANALYSIS_RESULT") {
         // 카테고리 정렬 및 데이터 설정
         const data = event.data.data;
-        if (Array.isArray(data.categoriesDetailed)) {
-          data.categoriesDetailed = [...data.categoriesDetailed].sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
+        if (Array.isArray(data.categoriesDetailed) && data.categoriesDetailed.length > 0) {
+          const sorted = [...data.categoriesDetailed].sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
+          setCategoriesDetailed(sorted);
+        } else if (Array.isArray(data.categories) && data.categories.length > 0) {
+          // categoriesDetailed가 없으면 categories를 기반으로 fallback
+          const fallback = data.categories.map((cat: any) => ({
+            categoryPath: cat.key || cat.categoryPath || cat.name || "",
+            count: cat.value || 0,
+            keywords: data.keywords || {},
+            keywordCounts: data.keywordCounts || {},
+            tags: data.tags || {},
+          }));
+          setCategoriesDetailed(fallback);
+        } else {
+          setCategoriesDetailed([]);
         }
         data._keyword = latestQueryRef.current; // attach keyword for matching
         // 분석 요청 시 저장한 페이지 번호 사용
@@ -393,9 +326,18 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
 
     // 모바일 체크 - PC 전용 기능
     if (isMobile) {
-      setShowPcOnlyModal(true);
-      return;
+      if (!currentUser) {
+        setShowLoginModal(true);
+        // 로그인 성공 시 PC모달을 띄우기 위해 플래그를 남김
+        return;
+      } else {
+        setShowPcOnlyModal(true);
+        return;
+      }
     }
+
+    // 분석 시작 시 카테고리 상세 초기화
+    setCategoriesDetailed([]);
 
     // 최초 진입 시 플래그 설정 (이후 오류 시 해제)
     optimizationInProgressRef.current = true;
@@ -735,12 +677,12 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
       <Card className="border-2 border-blue-100 shadow-lg flex-1">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-xl">
-            <Search className="h-5 w-5 text-blue-600" />
+            <Search className={isMobile ? "h-4 w-4 text-blue-600" : "h-5 w-5 text-blue-600"} />
             <span>상품 메인 키워드 입력</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
+          <div className={isMobile ? "flex flex-row gap-2 items-center" : "flex flex-col sm:flex-row gap-4 items-start"}>
               <Input
                 placeholder="최적화할 상품의 메인 키워드를 입력하세요 (예: 고구마, 모자)"
                 value={productName}
@@ -758,14 +700,30 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
                     setCurrentCatIdx(0);
                     setSelectedCategoryIndex(0);
                   }
+                  // sampleKeywordInput(예시) 지우면 예시 데이터도 제거
+                  if (val === "") {
+                    setAnalysisData(undefined);
+                    setCtxAnalysisData(undefined as any);
+                    setCategoriesDetailed([]);
+                    setAiResult(undefined as any);
+                  }
                 }}
-                onKeyDown={handleKeyPress}
-                className="flex-1 w-full min-w-0 text-lg py-6 border-2 border-gray-200 focus:border-blue-400 transition-colors"
+                onFocus={() => {
+                  if (productName === sampleKeywordInput) {
+                    setProductName("");
+                    setMainKeyword("");
+                    setAnalysisData(undefined);
+                    setCtxAnalysisData(undefined as any);
+                    setCategoriesDetailed([]);
+                    setAiResult(undefined as any);
+                  }
+                }}
+                className={isMobile ? "flex-1 w-full min-w-0 text-sm py-3 border-2 border-gray-200 focus:border-blue-400 transition-colors" : "flex-1 w-full min-w-0 text-lg py-6 border-2 border-gray-200 focus:border-blue-400 transition-colors"}
               />
               <Button
                 onClick={handleOptimize}
                 disabled={!productName.trim() || isOptimizing}
-                className="px-8 py-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold"
+                className={isMobile ? "px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm" : "px-8 py-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold"}
               >
                 {isOptimizing ? (
                   <div className="flex items-center space-x-2">
@@ -785,6 +743,22 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         </Card>
 
       </div>
+
+      {/* 안내 문구: 예시 데이터일 때만 노출 */}
+      {!currentUser && (
+        productName === sampleKeywordInput ||
+        productName === sampleKeywordRaw ||
+        (analysisData && analysisData.keywords && Array.isArray(analysisData.keywords) &&
+          analysisData.keywords.length === sampleAnalysisData.keywords?.length &&
+          analysisData.keywords.every((k: any, i: number) => k.key === sampleAnalysisData.keywords[i].key && k.value === sampleAnalysisData.keywords[i].value)
+        )
+      ) && (
+        <div className="max-w-2xl mx-auto">
+          <p className="text-xs text-blue-500 mt-2 text-center">
+            현재는 예시 화면입니다. 로그인하시면 실제 데이터를 바로 확인하실 수 있어요!
+          </p>
+        </div>
+      )}
 
       {/* 사용량 제한 메시지 */}
       {usageLimitMessage && (
@@ -1488,7 +1462,13 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         {/* 로그인 모달 */}
         <Dialog open={showLoginModal} onOpenChange={setShowLoginModal}>
           <DialogContent className="max-w-md p-0 border-none bg-transparent shadow-none">
-            <LoginPage isModal={true} onLoginSuccess={() => setShowLoginModal(false)} />
+            <LoginPage isModal={true} onLoginSuccess={() => {
+              setShowLoginModal(false);
+              // 모바일 환경에서 로그인 성공 시 PC 전용 모달을 띄움
+              if (isMobile) {
+                setShowPcOnlyModal(true);
+              }
+            }} />
           </DialogContent>
         </Dialog>
 

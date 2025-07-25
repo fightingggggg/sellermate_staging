@@ -38,7 +38,9 @@ const FooterSection = () => {
           <div className="mt-4 pt-4 border-t border-gray-700">
             <p className="text-gray-400 text-xs">
               &copy; {new Date().getFullYear()} 셀러메이트. All rights reserved.
-              <p>스토어 부스터의 기능은 상위 노출 최적화를 위한 참고용이며, 상위 노출을 완전히 보장하거나 이에 대해 책임지지 않습니다.</p>
+              <span className="block">
+                스토어 부스터의 기능은 상위 노출 최적화를 위한 참고용이며, 상위 노출을 완전히 보장하거나 이에 대해 책임지지 않습니다.
+              </span>
             </p>
           </div>
         </div>

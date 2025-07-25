@@ -70,8 +70,23 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+const LOCAL_STORAGE_KEY = "lastUser";
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // localStorage에서 초기값을 불러옴
+  const getInitialUser = () => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {}
+      }
+    }
+    return null;
+  };
+
+  const [currentUser, setCurrentUser] = useState<User | null>(getInitialUser());
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -80,6 +95,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 직전에 확장 프로그램으로 전달한 idToken 을 기억하여, 같은 내용을 반복 전송하지 않도록 합니다.
   const lastSentIdTokenRef = useRef<string | null>(null);
   const profileUnsubRef = useRef<()=>void>();
+
+  // currentUser가 바뀔 때마다 localStorage에 저장
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (currentUser) {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+      }
+    }
+  }, [currentUser]);
 
   // 회원가입 함수
   async function signUp(

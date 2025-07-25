@@ -14,6 +14,7 @@ import dynamic from "next/dynamic";
 import { UsageService } from "@/lib/usageService";
 import RobotVerificationDialog from "@/components/ui/robot-verification-dialog";
 import { Link } from "wouter";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // react-wordcloud (CSR only)
 const ReactWordcloud = dynamic(() => import("react-wordcloud"), { ssr: false });
@@ -67,6 +68,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     allCategoriesData,
   } = useOptimizer();
   const { currentUser } = useAuth();
+  const isMobile = useIsMobile();
 
   // ===== 새로운 분석을 위한 상태 (Step1에서 가져온 것들) =====
   const [productName, setProductName] = useState(ctxMainKeyword ?? "");
@@ -2395,7 +2397,12 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       <Card className="mb-8 border-2 border-indigo-500/30 shadow">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="text-indigo-500 w-5 h-5" /> 상위노출 상품명, 태그 제안
+            <Sparkles className="text-indigo-500 w-5 h-5" />
+            {isMobile ? (
+              <span>상위노출 상품명, 태그<br/>제안</span>
+            ) : (
+              <span>상위노출 상품명, 태그 제안</span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
