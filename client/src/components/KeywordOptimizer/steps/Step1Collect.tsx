@@ -170,6 +170,16 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
     }
   }, [ctxAnalysisData]);
 
+  // categoriesDetailed 초기화 - analysisData가 있을 때 즉시 설정
+  useEffect(() => {
+    if (analysisData?.categoriesDetailed && analysisData.categoriesDetailed.length > 0) {
+      const sorted = [...analysisData.categoriesDetailed].sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
+      setCategoriesDetailed(sorted);
+      setCurrentCatIdx(0);
+      setSelectedCategoryIndex(0);
+    }
+  }, [analysisData?.categoriesDetailed]);
+
   // move to next step automatically via button
   const handleNext = () => {
     if (analysisData) {

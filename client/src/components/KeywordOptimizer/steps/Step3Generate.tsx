@@ -995,11 +995,24 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         .map((tag: any) => tag.key);
       
         // 추천 카테고리 생성
-  const recommendedCategories = categoryData 
-    ? [categoryData.categoryName || categoryData.categoryPath || '']
-    : (analysisData && analysisData.categoriesDetailed?.[0]?.categoryName)
+  const recommendedCategories = (() => {
+    // 전체 카테고리가 선택된 경우 가장 빈도가 높은 개별 카테고리 추천
+    if (selectedCategoryIndex === -1 || (categoryData && categoryData.categoryPath === "전체 카테고리")) {
+      return sortedCategoriesDetailed.length > 0 
+        ? [sortedCategoriesDetailed[0].categoryName || sortedCategoriesDetailed[0].categoryPath || '']
+        : [];
+    }
+    
+    // 개별 카테고리가 선택된 경우
+    if (categoryData) {
+      return [categoryData.categoryName || categoryData.categoryPath || ''];
+    }
+    
+    // fallback
+    return (analysisData && analysisData.categoriesDetailed?.[0]?.categoryName)
       ? [analysisData.categoriesDetailed[0].categoryName]
       : [];
+  })();
       
       // Context 상태 업데이트
       setGeneratedProductNames([json.productName]);
@@ -1780,9 +1793,25 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
   // 1단계 없이 접근 시는 이제 제거 (3단계에서 직접 분석 가능하므로)
 
   // 선택된 카테고리와 무관하게 전체 카테고리 상위 목록 (표시용)
-  const topCategories = categoryData
-    ? [{ key: categoryData.categoryPath, value: categoryData.count }]
-    : (analysisData?.categories || []).slice(0,12);
+  const topCategories = (() => {
+    // 전체 카테고리가 선택된 경우 가장 빈도가 높은 1개만 표시
+    if (selectedCategoryIndex === -1 || (categoryData && categoryData.categoryPath === "전체 카테고리")) {
+      return sortedCategoriesDetailed.length > 0 
+        ? [{
+            key: sortedCategoriesDetailed[0].categoryName || sortedCategoriesDetailed[0].categoryPath || '', 
+            value: sortedCategoriesDetailed[0].count || 0 
+          }]
+        : [];
+    }
+    
+    // 개별 카테고리가 선택된 경우
+    if (categoryData) {
+      return [{ key: categoryData.categoryPath, value: categoryData.count }];
+    }
+    
+    // fallback
+    return (analysisData?.categories || []).slice(0, 12);
+  })();
 
   // ===== 제외 키워드/태그 집계 =====
   const excludedSameAgg = useMemo(() => {

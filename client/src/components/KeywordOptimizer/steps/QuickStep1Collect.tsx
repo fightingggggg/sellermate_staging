@@ -136,6 +136,16 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
     }
   }, [ctxAnalysisData]);
 
+  // categoriesDetailed 초기화 - analysisData가 있을 때 즉시 설정
+  useEffect(() => {
+    if (analysisData?.categoriesDetailed && analysisData.categoriesDetailed.length > 0) {
+      const sorted = [...analysisData.categoriesDetailed].sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
+      setCategoriesDetailed(sorted);
+      setCurrentCatIdx(0);
+      setSelectedCategoryIndex(0);
+    }
+  }, [analysisData?.categoriesDetailed]);
+
   // move to next step automatically via button
   const handleNext = () => {
     if (analysisData) onDone();
@@ -149,16 +159,6 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         if (Array.isArray(data.categoriesDetailed) && data.categoriesDetailed.length > 0) {
           const sorted = [...data.categoriesDetailed].sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
           setCategoriesDetailed(sorted);
-        } else if (Array.isArray(data.categories) && data.categories.length > 0) {
-          // categoriesDetailed가 없으면 categories를 기반으로 fallback
-          const fallback = data.categories.map((cat: any) => ({
-            categoryPath: cat.key || cat.categoryPath || cat.name || "",
-            count: cat.value || 0,
-            keywords: data.keywords || {},
-            keywordCounts: data.keywordCounts || {},
-            tags: data.tags || {},
-          }));
-          setCategoriesDetailed(fallback);
         } else {
           setCategoriesDetailed([]);
         }
@@ -170,6 +170,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         setCtxAnalysisData(data);
         // 새 결과가 도착하면, 해당 결과를 생성한 키워드로 동기화
         setAnalysisKeyword(latestQueryRef.current);
+        setProductName(latestQueryRef.current); // productName도 동기화
         setSelectedCategoryIndex(0);
         setIsOptimizing(false);
         optimizationInProgressRef.current = false;
@@ -834,7 +835,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
       <QuickAIResult onLimitMessage={setUsageLimitMessage} />
 
       {/* 결과 및 시각화 섹션 */}
-      {analysisData && productName.trim() === analysisKeyword && (
+      {analysisData && (
         <>
           <div className="space-y-8 w-full">
             <h2 className="text-2xl font-bold text-center text-gray-800 mb-4">
