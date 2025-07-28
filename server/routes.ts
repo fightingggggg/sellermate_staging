@@ -67,8 +67,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.send(sitemap);
   });
 
-  // 동적 robots.txt 생성
-  app.get('/robots.txt', (req, res) => {
+  // 동적 robots.txt 생성 (API 경로로 이동)
+  app.get('/api/robots.txt', (req, res) => {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     
     const robotsTxt = `User-agent: *
@@ -93,6 +93,11 @@ Allow: /`;
     res.set('Content-Type', 'text/plain');
     res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.send(robotsTxt);
+  });
+
+  // 기존 /robots.txt 경로도 유지 (리다이렉트)
+  app.get('/robots.txt', (req, res) => {
+    res.redirect('/api/robots.txt');
   });
 
   // CORS 설정 추가
