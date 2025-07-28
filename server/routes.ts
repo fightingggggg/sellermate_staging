@@ -31,6 +31,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.use(cors(corsOptions));
 
+  // ===== SEO 최적화 엔드포인트 (최우선 처리) =====
+  
+  // 동적 사이트맵 생성
+  app.get('/sitemap.xml', (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${baseUrl}/</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/login</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/product-optimizer/complete</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/product-optimizer/quick</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/keyword-competition-analysis</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/membership</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+</urlset>`;
+
+    res.set('Content-Type', 'application/xml');
+    res.send(sitemap);
+  });
+
+  // 동적 robots.txt 생성
+  app.get('/robots.txt', (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    
+    const robotsTxt = `User-agent: *
+Allow: /
+
+# 사이트맵 위치
+Sitemap: ${baseUrl}/sitemap.xml
+
+# 크롤링 지연 (선택사항)
+Crawl-delay: 1
+
+# 검색엔진별 설정
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Yeti
+Allow: /`;
+
+    res.set('Content-Type', 'text/plain');
+    res.send(robotsTxt);
+  });
+
   // API Endpoint to check server status
   app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'SEO Dashboard API is running' });
@@ -452,84 +530,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('[keyword-analysis] unexpected error', err);
       res.status(500).json({ error: 'internal server error', detail: err?.message || 'unknown' });
     }
-  });
-
-  // ===== SEO 최적화 엔드포인트 =====
-  
-  // 동적 사이트맵 생성
-  app.get('/sitemap.xml', (req, res) => {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const currentDate = new Date().toISOString().split('T')[0];
-    
-    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${baseUrl}/</loc>
-    <lastmod>${currentDate}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/login</loc>
-    <lastmod>${currentDate}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/product-optimizer/complete</loc>
-    <lastmod>${currentDate}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/product-optimizer/quick</loc>
-    <lastmod>${currentDate}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/keyword-competition-analysis</loc>
-    <lastmod>${currentDate}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/membership</loc>
-    <lastmod>${currentDate}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-</urlset>`;
-
-    res.set('Content-Type', 'application/xml');
-    res.send(sitemap);
-  });
-
-  // 동적 robots.txt 생성
-  app.get('/robots.txt', (req, res) => {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    
-    const robotsTxt = `User-agent: *
-Allow: /
-
-# 사이트맵 위치
-Sitemap: ${baseUrl}/sitemap.xml
-
-# 크롤링 지연 (선택사항)
-Crawl-delay: 1
-
-# 검색엔진별 설정
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Yeti
-Allow: /`;
-
-    res.set('Content-Type', 'text/plain');
-    res.send(robotsTxt);
   });
 
   /* ------------------------------------------------------------------
