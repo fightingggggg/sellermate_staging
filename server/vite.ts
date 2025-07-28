@@ -152,7 +152,14 @@ export function serveStatic(app: Express) {
     );
   }
 
-  // 정적 파일 서빙 (sitemap.xml과 robots.txt는 동적 생성되므로 제외)
+  // robots.txt와 sitemap.xml을 제외한 정적 파일 서빙
+  app.use((req, res, next) => {
+    if (req.path === '/robots.txt' || req.path === '/sitemap.xml') {
+      return next(); // 동적 라우트로 넘김
+    }
+    next();
+  });
+
   app.use(express.static(distPath, {
     index: false // index.html 자동 서빙 비활성화
   }));
