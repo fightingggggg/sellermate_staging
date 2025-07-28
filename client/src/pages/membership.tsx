@@ -4,10 +4,14 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { CheckCircle, Lock } from "lucide-react";
 import { useLocation } from "wouter";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import LoginPage from "@/components/LoginPage";
+import { useState } from "react";
 
 export default function MembershipPage() {
   const { currentUser } = useAuth();
   const [, navigate] = useLocation();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const basicFeatures = [
     "키워드 경쟁률 분석 10회/일 – (초기 혜택! 기본 5회)",
@@ -24,6 +28,14 @@ export default function MembershipPage() {
     "확장프로그램 무제한",
     "총 월 1,500회 키워드 분석, 900회 상품 최적화!",
   ];
+
+  const handleSubscribeClick = () => {
+    if (!currentUser) {
+      setShowLoginModal(true);
+    } else {
+      navigate("/subscription");
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -179,9 +191,12 @@ export default function MembershipPage() {
                 </li>
                
               </ul>
-              <div className="w-full py-2 px-4 text-center text-gray-600 font-semibold border border-gray-300 rounded-md bg-gray-50 mt-auto">
-                준비 중! 곧 만나요 🚀
-              </div>
+              <Button
+                onClick={handleSubscribeClick}
+                className="w-full py-2 px-4 text-center text-white font-semibold border border-blue-600 rounded-md bg-blue-600 hover:bg-blue-700 mt-auto"
+              >
+                구독하기
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -195,6 +210,16 @@ export default function MembershipPage() {
           <span className="block md:inline text-blue-600">시작되었습니다.</span>
         </p>
       </div>
+
+      {/* 로그인 모달 */}
+      <Dialog open={showLoginModal} onOpenChange={setShowLoginModal}>
+        <DialogContent className="max-w-md p-0 border-none bg-transparent shadow-none">
+          <LoginPage isModal={true} onLoginSuccess={() => {
+            setShowLoginModal(false);
+            navigate("/subscription");
+          }} />
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 } 

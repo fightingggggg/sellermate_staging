@@ -15,6 +15,7 @@ import CompleteProductOptimizerPage from "./pages/complete-product-optimizer";
 import QuickProductOptimizerPage from "./pages/quick-product-optimizer";
 import KeywordCompetitionAnalysisPage from "@/pages/keyword-competition-analysis";
 import MembershipPage from "@/pages/membership";
+import SubscriptionPage from "@/pages/subscription";
 import NaverOnboarding from "@/pages/naver-onboarding";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/profile" component={Profile} />
       <Route path="/naver-onboarding" component={NaverOnboarding} />
       <Route path="/membership" component={MembershipPage} />
+      <Route path="/subscription" component={SubscriptionPage} />
       <Route component={NotFound} />
     </Switch>
   );
