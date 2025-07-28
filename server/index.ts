@@ -57,7 +57,6 @@ app.use((req, res, next) => {
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
-    // 프로덕션에서는 동적 라우트가 먼저 실행되도록 순서 조정
     serveStatic(app);
   }
 
