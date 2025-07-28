@@ -30,7 +30,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    allowedHosts: ['storebooster.ai.kr', 'localhost', '127.0.0.1'], // 프로덕션 도메인 추가
+    allowedHosts: ['port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app', 'storebooster.ai.kr', 'localhost', '127.0.0.1'], // 스테이징 도메인 추가
     proxy: {
       '/api': {
         target: 'http://localhost:5005', // 웹 개발 서버로 프록시

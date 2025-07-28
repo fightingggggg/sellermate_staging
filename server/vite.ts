@@ -76,7 +76,31 @@ export function serveStatic(app: Express) {
     );
   }
 
+  // 정적 파일 서빙
   app.use(express.static(distPath));
+
+  // 사이트맵과 robots.txt를 명시적으로 처리
+  app.get('/sitemap.xml', (req, res) => {
+    const sitemapPath = path.resolve(distPath, 'sitemap.xml');
+    if (fs.existsSync(sitemapPath)) {
+      res.setHeader('Content-Type', 'application/xml');
+      res.sendFile(sitemapPath);
+    } else {
+      res.status(404).send('Sitemap not found');
+    }
+  });
+
+  app.get('/robots.txt', (req, res) => {
+    const robotsPath = path.resolve(distPath, 'robots.txt');
+    if (fs.existsSync(robotsPath)) {
+      res.setHeader('Content-Type', 'text/plain');
+      res.sendFile(robotsPath);
+    } else {
+      // 기본 robots.txt 생성
+      res.setHeader('Content-Type', 'text/plain');
+      res.send(`User-agent: *\nAllow: /\n\nSitemap: ${req.protocol}://${req.get('host')}/sitemap.xml`);
+    }
+  });
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {

@@ -454,6 +454,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 동적 사이트맵 생성
+  app.get('/api/sitemap', (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    const routes = [
+      { path: '/', priority: '1.0' },
+      { path: '/login', priority: '0.8' },
+      { path: '/product-optimizer/complete', priority: '0.9' },
+      { path: '/product-optimizer/quick', priority: '0.9' },
+      { path: '/keyword-competition-analysis', priority: '0.8' },
+      { path: '/membership', priority: '0.7' },
+      { path: '/naver-onboarding', priority: '0.6' }
+    ];
+
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${routes.map(route => `  <url>
+    <loc>${baseUrl}${route.path}</loc>
+    <lastmod>${currentDate}</lastmod>
+    <priority>${route.priority}</priority>
+  </url>`).join('\n')}
+</urlset>`;
+
+    res.setHeader('Content-Type', 'application/xml');
+    res.send(sitemap);
+  });
+
   /* ------------------------------------------------------------------
    * 네이버 OAuth 2.0 로그인
    * ------------------------------------------------------------------ */
