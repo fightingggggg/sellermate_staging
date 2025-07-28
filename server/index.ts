@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 dotenv.config();
 
 const app = express();
@@ -57,6 +59,23 @@ app.use((req, res, next) => {
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
+    // 프로덕션 환경에서 빌드 디렉토리 확인
+    const distPath = path.resolve(import.meta.dirname, "public");
+    log(`Production mode - checking build directory: ${distPath}`, "startup");
+    
+    if (fs.existsSync(distPath)) {
+      log(`Build directory exists`, "startup");
+      const files = fs.readdirSync(distPath);
+      log(`Files in build directory: ${files.join(', ')}`, "startup");
+      
+      // 사이트맵과 robots.txt 존재 확인
+      const sitemapExists = fs.existsSync(path.resolve(distPath, 'sitemap.xml'));
+      const robotsExists = fs.existsSync(path.resolve(distPath, 'robots.txt'));
+      log(`Sitemap exists: ${sitemapExists}, Robots.txt exists: ${robotsExists}`, "startup");
+    } else {
+      log(`WARNING: Build directory does not exist: ${distPath}`, "startup");
+    }
+    
     serveStatic(app);
   }
 

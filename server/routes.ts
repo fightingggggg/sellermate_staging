@@ -482,6 +482,26 @@ ${routes.map(route => `  <url>
     res.send(sitemap);
   });
 
+  // 동적 robots.txt 생성
+  app.get('/api/robots', (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    
+    const robots = `User-agent: *
+Allow: /
+
+# 사이트맵 위치
+Sitemap: ${baseUrl}/sitemap.xml
+
+# 크롤링 지연 (선택사항)
+Crawl-delay: 1`;
+
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.send(robots);
+  });
+
   /* ------------------------------------------------------------------
    * 네이버 OAuth 2.0 로그인
    * ------------------------------------------------------------------ */

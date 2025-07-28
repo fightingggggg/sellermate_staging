@@ -76,34 +76,67 @@ export function serveStatic(app: Express) {
     );
   }
 
-  // 정적 파일 서빙
-  app.use(express.static(distPath));
+  log(`Serving static files from: ${distPath}`, "static");
 
-  // 사이트맵과 robots.txt를 명시적으로 처리
+  // 사이트맵과 robots.txt를 명시적으로 처리 (정적 파일 서빙보다 먼저)
   app.get('/sitemap.xml', (req, res) => {
+    log(`Sitemap request received from: ${req.ip}`, "sitemap");
+    log(`Request headers: ${JSON.stringify(req.headers)}`, "sitemap");
+    
     const sitemapPath = path.resolve(distPath, 'sitemap.xml');
+    log(`Looking for sitemap at: ${sitemapPath}`, "sitemap");
+    
     if (fs.existsSync(sitemapPath)) {
+      log(`Sitemap found, sending file`, "sitemap");
       res.setHeader('Content-Type', 'application/xml');
-      res.sendFile(sitemapPath);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.sendFile(sitemapPath, (err) => {
+        if (err) {
+          log(`Error sending sitemap: ${err.message}`, "sitemap");
+          res.status(500).send('Error serving sitemap');
+        } else {
+          log(`Sitemap sent successfully`, "sitemap");
+        }
+      });
     } else {
+      log(`Sitemap not found at: ${sitemapPath}`, "sitemap");
+      log(`Available files in distPath: ${fs.readdirSync(distPath).join(', ')}`, "sitemap");
       res.status(404).send('Sitemap not found');
     }
   });
 
   app.get('/robots.txt', (req, res) => {
-    const robotsPath = path.resolve(distPath, 'robots.txt');
-    if (fs.existsSync(robotsPath)) {
-      res.setHeader('Content-Type', 'text/plain');
-      res.sendFile(robotsPath);
-    } else {
-      // 기본 robots.txt 생성
-      res.setHeader('Content-Type', 'text/plain');
-      res.send(`User-agent: *\nAllow: /\n\nSitemap: ${req.protocol}://${req.get('host')}/sitemap.xml`);
-    }
+    log(`Robots.txt request received from: ${req.ip}`, "robots");
+    log(`Request headers: ${JSON.stringify(req.headers)}`, "robots");
+    
+    // 항상 동적으로 올바른 robots.txt 생성
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const robots = `User-agent: *
+Allow: /
+
+# 사이트맵 위치
+Sitemap: ${baseUrl}/sitemap.xml
+
+# 크롤링 지연 (선택사항)
+Crawl-delay: 1`;
+
+    log(`Generating robots.txt dynamically for: ${baseUrl}`, "robots");
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.send(robots);
+    log(`Robots.txt sent successfully`, "robots");
   });
 
+  // 정적 파일 서빙 (robots.txt와 sitemap.xml 라우트 이후)
+  app.use(express.static(distPath));
+
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  app.use("*", (req, res) => {
+    log(`Fallback route accessed: ${req.originalUrl}`, "fallback");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
