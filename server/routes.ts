@@ -15,22 +15,6 @@ import cors from "cors";
 const naverOAuthStates: Map<string, { popup?: boolean }> = new Map();
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // CORS 설정 추가
-  const corsOptions = {
-    origin: [
-      'https://storebooster.ai.kr',
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:3000'
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-  };
-  
-  app.use(cors(corsOptions));
-
   // ===== SEO 최적화 엔드포인트 (최우선 처리) =====
   
   // 동적 사이트맵 생성
@@ -79,6 +63,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 </urlset>`;
 
     res.set('Content-Type', 'application/xml');
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.send(sitemap);
   });
 
@@ -106,8 +91,25 @@ User-agent: Yeti
 Allow: /`;
 
     res.set('Content-Type', 'text/plain');
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.send(robotsTxt);
   });
+
+  // CORS 설정 추가
+  const corsOptions = {
+    origin: [
+      'https://storebooster.ai.kr',
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  };
+  
+  app.use(cors(corsOptions));
 
   // API Endpoint to check server status
   app.get('/api/status', (req, res) => {

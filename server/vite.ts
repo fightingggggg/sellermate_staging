@@ -85,8 +85,16 @@ export function serveStatic(app: Express) {
     next();
   });
 
+  // 정적 파일 서빙 (robots.txt와 sitemap.xml 제외)
   app.use(express.static(distPath, {
-    index: false // index.html 자동 서빙 비활성화
+    index: false, // index.html 자동 서빙 비활성화
+    setHeaders: (res, filePath) => {
+      // robots.txt와 sitemap.xml 파일이 정적으로 서빙되지 않도록 방지
+      if (filePath.endsWith('robots.txt') || filePath.endsWith('sitemap.xml')) {
+        res.status(404).end();
+        return;
+      }
+    }
   }));
 
   // fall through to index.html if the file doesn't exist
