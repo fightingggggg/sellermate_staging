@@ -2,6 +2,6 @@ User-agent: *
 Allow: /
 
 User-agent: Yeti
-Allow:/
+Allow: /
 
 Sitemap: https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app/sitemap.xml
