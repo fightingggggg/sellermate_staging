@@ -125,8 +125,8 @@ export default function SubscriptionPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto py-16 px-4">
-        <div className="text-center mb-8">
+      <div className="max-w-2xl mx-auto py-8 px-4">
+        <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-4">
             부스터 구독하기
           </h1>
