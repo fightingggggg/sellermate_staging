@@ -916,13 +916,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const db = admin.firestore();
       const subscriptionRef = db.collection('subscriptions').doc(orderId);
       
-      await subscriptionRef.update({
-        status: 'active',
-        lastPaymentTid: tid,
-        lastPaymentAmount: amount,
-        lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      try {
+        await subscriptionRef.update({
+          status: 'active',
+          lastPaymentTid: tid,
+          lastPaymentAmount: amount,
+          lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (err: any) {
+        if (err?.code === 5 /* Firestore NOT_FOUND */ || err?.toString().includes('No document')) {
+          await subscriptionRef.set({
+            status: 'active',
+            lastPaymentTid: tid,
+            lastPaymentAmount: amount,
+            lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        } else {
+          throw err;
+        }
+      }
 
       console.log('[nicepay-return] subscription updated successfully');
       

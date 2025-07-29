@@ -26,7 +26,10 @@ const NICEPAY_API_BASE = process.env.NODE_ENV === "production"
   : "https://sandbox-api.nicepay.co.kr/v1";
 
 const CLIENT_ID = process.env.NICEPAY_CLIENT_ID || "";
-const CLIENT_SECRET = process.env.NICEPAY_CLIENT_SECRET || "";
+// 환경에 따라 SECRET 키 명칭이 다를 수 있어 호환 처리
+const CLIENT_SECRET = process.env.NICEPAY_CLIENT_SECRET
+  || process.env.NICEPAY_SECRET_KEY
+  || "";
 
 function basicAuth(): string {
   if (!CLIENT_ID || !CLIENT_SECRET) throw new Error("NICEPAY env not set");
@@ -71,7 +74,7 @@ export async function billingSubscribe(req: BillingRequest): Promise<BillingResu
  * Billing Key 발급 요청
  */
 async function requestBillingKey(req: BillingRequest): Promise<BillingResult> {
-  const url = `${NICEPAY_API_BASE}/payments/subscribe/billing`;
+  const url = `${NICEPAY_API_BASE}/payments/subscribe`;
   
   const payload = {
     method: "card",
@@ -151,10 +154,9 @@ async function requestBillingKey(req: BillingRequest): Promise<BillingResult> {
  * Billing Key로 결제 승인
  */
 async function approveBilling(orderId: string, billingKey: string, amount: number, goodsName: string): Promise<BillingResult> {
-  const url = `${NICEPAY_API_BASE}/payments/approve`;
+  const url = `${NICEPAY_API_BASE}/payments/${billingKey}/approve`;
   
   const payload = {
-    billingKey: billingKey,
     orderId: orderId,
     amount: amount,
     goodsName: goodsName,
