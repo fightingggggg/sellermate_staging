@@ -26,11 +26,11 @@ const NICEPAY_API_BASE = process.env.NODE_ENV === "production"
   : "https://sandbox-api.nicepay.co.kr/v1";
 
 const CLIENT_ID = process.env.NICEPAY_CLIENT_ID || "";
-const SECRET_KEY = process.env.NICEPAY_SECRET_KEY || "";
+const CLIENT_SECRET = process.env.NICEPAY_CLIENT_SECRET || "";
 
 function basicAuth(): string {
-  if (!CLIENT_ID || !SECRET_KEY) throw new Error("NICEPAY env not set");
-  const creds = `${CLIENT_ID}:${SECRET_KEY}`;
+  if (!CLIENT_ID || !CLIENT_SECRET) throw new Error("NICEPAY env not set");
+  const creds = `${CLIENT_ID}:${CLIENT_SECRET}`;
   return Buffer.from(creds).toString("base64");
 }
 
@@ -71,7 +71,7 @@ export async function billingSubscribe(req: BillingRequest): Promise<BillingResu
  * Billing Key 발급 요청
  */
 async function requestBillingKey(req: BillingRequest): Promise<BillingResult> {
-  const url = `${NICEPAY_API_BASE}/payments/subscribe`;
+  const url = `${NICEPAY_API_BASE}/payments/subscribe/billing`;
   
   const payload = {
     method: "card",
@@ -151,9 +151,10 @@ async function requestBillingKey(req: BillingRequest): Promise<BillingResult> {
  * Billing Key로 결제 승인
  */
 async function approveBilling(orderId: string, billingKey: string, amount: number, goodsName: string): Promise<BillingResult> {
-  const url = `${NICEPAY_API_BASE}/payments/${billingKey}/approve`;
+  const url = `${NICEPAY_API_BASE}/payments/approve`;
   
   const payload = {
+    billingKey: billingKey,
     orderId: orderId,
     amount: amount,
     goodsName: goodsName,
@@ -221,9 +222,9 @@ async function approveBilling(orderId: string, billingKey: string, amount: numbe
 
 export function verifyWebhookSignature(params: Record<string,string>, receivedSignature: string): boolean {
   // NICEPAY 웹훅은 모든 파라미터 정렬 후 & 로 연결 + SecretKey 에 대한 SHA-256 해시 (문서 참고)
-  if (!SECRET_KEY) return false;
+  if (!CLIENT_SECRET) return false;
   const sortedKeys = Object.keys(params).sort();
-  const baseString = sortedKeys.map(k => `${k}=${params[k]}`).join('&') + SECRET_KEY;
+  const baseString = sortedKeys.map(k => `${k}=${params[k]}`).join('&') + CLIENT_SECRET;
   const hash = crypto.createHash('sha256').update(baseString, 'utf8').digest('hex');
   return hash === receivedSignature;
 } 
