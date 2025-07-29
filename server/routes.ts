@@ -950,7 +950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { tid, orderId, resultCode, resultMsg, amount } = params;
       if (resultCode !== '0000') {
         console.warn('[nicepay-webhook] 실패 결과', params);
-        return res.json({ success: true }); // 응답 200 으로 종료
+        return res.send('OK'); // 응답 200 으로 종료
       }
 
       const db = admin.firestore();
@@ -963,10 +963,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, { merge: true });
 
       console.log('[nicepay-webhook] updated subscription', orderId);
-      res.json({ success: true });
+      res.send('OK');
     } catch (err) {
       console.error('[nicepay-webhook] error', err);
-      res.status(500).send('error');
+      res.send('OK');
     }
   });
 
