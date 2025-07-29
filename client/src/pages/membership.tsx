@@ -6,12 +6,32 @@ import { CheckCircle, Lock } from "lucide-react";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import LoginPage from "@/components/LoginPage";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function MembershipPage() {
   const { currentUser } = useAuth();
   const [, navigate] = useLocation();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  // 사용자 프로필 로드
+  useEffect(() => {
+    if (currentUser) {
+      const fetchProfile = async () => {
+        try {
+          const { doc, getDoc } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase');
+          const profileDoc = await getDoc(doc(db, 'usersInfo', currentUser.uid));
+          if (profileDoc.exists()) {
+            setUserProfile(profileDoc.data());
+          }
+        } catch (err) {
+          console.error('프로필 로드 실패:', err);
+        }
+      };
+      fetchProfile();
+    }
+  }, [currentUser]);
 
   const basicFeatures = [
     "키워드 경쟁률 분석 10회/일 – (초기 혜택! 기본 5회)",
@@ -48,7 +68,7 @@ export default function MembershipPage() {
           <span className="block md:inline"> 독자적 기능으로 강화하세요</span>
         </h1>
         <p className="text-lg text-center text-gray-600 mb-12">
-          키워드 경쟁률 분석, 네이버 SEO 맞춤 상품 최적화는 오직 스토어 부스터만 제공하고 있습니다.  
+          월 100원으로 더 많은 기능을 이용해보세요
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -122,7 +142,7 @@ export default function MembershipPage() {
               </ul>
               {currentUser ? (
                 <div className="w-full py-2 px-4 text-center text-blue-600 font-semibold border border-blue-300 rounded-md bg-blue-50 mt-auto">
-                  현재 이용 중
+                  {userProfile?.membershipType === 'booster' ? '부스터 이용 중' : '현재 이용 중'}
                 </div>
               ) : (
                 <div className="w-full py-2 px-4 text-center text-blue-600 font-semibold border border-blue-300 rounded-md bg-blue-50 mt-auto">
@@ -137,7 +157,7 @@ export default function MembershipPage() {
             <CardHeader className="bg-blue-50 border-b border-blue-100 py-6">
               <div className="flex items-center justify-between w-full">
                 <CardTitle className="text-2xl font-bold text-blue-600">부스터</CardTitle>
-                <span className="text-2xl md:text-3xl font-extrabold text-blue-600 whitespace-nowrap">월 14,900원</span>
+                <span className="text-2xl md:text-3xl font-extrabold text-blue-600 whitespace-nowrap">월 100원</span>
               </div>
               <CardDescription className="text-gray-500 mt-1">
               합리적인 가격, 믿을 수 없는 사용 횟수!
