@@ -68,7 +68,7 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "dist", "public");
+  const distPath = path.resolve(import.meta.dirname, "public");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
@@ -79,18 +79,18 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
 // ✅ robots.txt 및 sitemap.xml 명시적 서빙
-app.get("/robots.txt", (_req, res) => {
-  res.type("text/plain");
-  res.sendFile(path.resolve(distPath, "robots.txt"));
-});
+  app.get("/robots.txt", (_req, res) => {
+    res.type("text/plain");
+    res.sendFile(path.resolve(distPath, "robots.txt"));
+  });
 
-app.get("/sitemap.xml", (_req, res) => {
-  res.type("application/xml");
-  res.sendFile(path.resolve(distPath, "sitemap.xml"));
-});
+  app.get("/sitemap.xml", (_req, res) => {
+    res.type("application/xml");
+    res.sendFile(path.resolve(distPath, "sitemap.xml"));
+  });
 
-// ❗ 나머지는 React SPA 대응
-app.use("*", (_req, res) => {
-  res.sendFile(path.resolve(distPath, "index.html"));
+  // ❗ 나머지는 React SPA 대응
+  app.use("*", (_req, res) => {
+    res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
