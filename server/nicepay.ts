@@ -77,7 +77,6 @@ async function requestBillingKey(req: BillingRequest): Promise<BillingResult> {
   const url = `${NICEPAY_API_BASE}/payments/subscribe`;
   
   const payload = {
-    method: "card",
     orderId: req.orderId,
     amount: req.amount,
     goodsName: req.goodsName,
@@ -87,7 +86,6 @@ async function requestBillingKey(req: BillingRequest): Promise<BillingResult> {
     idNo: req.idNumber,
     buyerName: req.buyerName || "",
     buyerEmail: req.buyerEmail || "",
-    returnUrl: process.env.NICEPAY_CALLBACK_URL || "https://storebooster.ai.kr/api/nicepay/return",
   };
 
   console.log('[nicepay] Billing Key 요청 URL:', url);
