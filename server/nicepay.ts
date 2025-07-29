@@ -154,9 +154,10 @@ async function requestBillingKey(req: BillingRequest): Promise<BillingResult> {
  * Billing Key로 결제 승인
  */
 async function approveBilling(orderId: string, billingKey: string, amount: number, goodsName: string): Promise<BillingResult> {
-  const url = `${NICEPAY_API_BASE}/payments/${billingKey}/approve`;
+  const url = `${NICEPAY_API_BASE}/payments/billing`;
   
   const payload = {
+    billingKey: billingKey,
     orderId: orderId,
     amount: amount,
     goodsName: goodsName,
