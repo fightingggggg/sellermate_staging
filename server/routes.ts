@@ -611,6 +611,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (phoneVerified) params.skip = "1";
       if (age) params.age = age;
       if (birthDate) params.birthDate = birthDate;
+      // 소셜에서 가져온 전화번호 정보 전달
+      if (phoneFromProfile) params.socialPhone = phoneFromProfile;
 
       const qs = new URLSearchParams(params).toString();
       const redirectUrl = `/naver-onboarding?${qs}`;
@@ -740,6 +742,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (phoneVerified) params.skip = "1";
       if (age) params.age = age;
       if (birthDate) params.birthDate = birthDate;
+      // 소셜에서 가져온 전화번호 정보 전달
+      if (phoneNumber) params.socialPhone = phoneNumber;
       const qs = new URLSearchParams(params).toString();
       res.redirect(`/naver-onboarding?${qs}`);
     } catch(err){

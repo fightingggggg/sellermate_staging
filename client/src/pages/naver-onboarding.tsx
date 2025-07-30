@@ -22,6 +22,7 @@ export default function NaverOnboarding() {
   const age = searchParams.get("age") || "";
   const birthDate = searchParams.get("birthDate") || "";
   const skip = searchParams.get("skip") === "1";
+  const socialPhone = searchParams.get("socialPhone") || ""; // 소셜에서 가져온 전화번호
 
   const [step, setStep] = useState<"signin" | "phone" | "done">("signin");
   const [countryCode, setCountryCode] = useState("+82");
@@ -47,6 +48,51 @@ export default function NaverOnboarding() {
     const clean = raw.replace(/[^0-9]/g, "");
     if (code === "+82" && clean.startsWith("0")) return code + clean.slice(1);
     return code + clean;
+  };
+
+  // 전화번호 정규화 함수 (소셜 전화번호와 입력 전화번호 비교용)
+  const normalizePhoneNumber = (phone: string): string => {
+    // 모든 공백, 하이픈, 괄호 제거하고 숫자만 추출
+    const clean = phone.replace(/[\s\-\(\)]/g, "");
+    
+    // +82로 시작하면 한국 번호로 처리
+    if (clean.startsWith("+82")) {
+      const number = clean.substring(3); // +82 제거
+      // 10으로 시작하면 010으로 변환
+      if (number.startsWith("10")) {
+        return `010${number.substring(2)}`;
+      }
+      return number;
+    }
+    
+    // 010으로 시작하는 경우
+    if (clean.startsWith("010")) {
+      return clean;
+    }
+    
+    // 10으로 시작하는 경우 010 추가
+    if (clean.startsWith("10")) {
+      return `010${clean.substring(2)}`;
+    }
+    
+    return clean;
+  };
+
+  // 전화번호 비교 함수 (더 정확한 비교를 위해)
+  const comparePhoneNumbers = (phone1: string, phone2: string): boolean => {
+    const normalized1 = normalizePhoneNumber(phone1);
+    const normalized2 = normalizePhoneNumber(phone2);
+    
+    // 디버그용 로그
+    console.log("[PHONE_COMPARE]", {
+      original1: phone1,
+      original2: phone2,
+      normalized1,
+      normalized2,
+      match: normalized1 === normalized2
+    });
+    
+    return normalized1 === normalized2;
   };
 
   // 1) skip=1(이미 휴대폰 인증 완료된 계정)인 경우에만 즉시 로그인 후 홈으로 이동합니다.
@@ -90,6 +136,19 @@ export default function NaverOnboarding() {
         await recaptchaRef.current.render();
       }
       const phoneNumber = buildE164(countryCode, number);
+
+      // 소셜에서 가져온 전화번호와 입력한 전화번호 비교
+      if (socialPhone) {
+        if (!comparePhoneNumbers(socialPhone, number)) {
+          toast({
+            variant: "destructive",
+            title: "전화번호 불일치",
+            description: `${provider === "naver" ? "네이버" : "카카오"}에 등록된 전화번호와 입력하신 전화번호가 다릅니다. 동일한 휴대폰 번호를 입력해주세요.`,
+          });
+          setLoading(false);
+          return;
+        }
+      }
 
       // 휴대폰 번호 중복 여부 확인
       try {
