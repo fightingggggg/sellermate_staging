@@ -20,6 +20,7 @@ export default function NaverOnboarding() {
   const name = searchParams.get("name") || "";
   const provider = searchParams.get("provider") || "";
   const age = searchParams.get("age") || "";
+  const birthDate = searchParams.get("birthDate") || "";
   const skip = searchParams.get("skip") === "1";
 
   const [step, setStep] = useState<"signin" | "phone" | "done">("signin");
@@ -306,7 +307,7 @@ export default function NaverOnboarding() {
               if (email) profileData.email = email;
               if (name) profileData.name = name;
               if (provider) profileData.provider = provider;
-              if (age) profileData.ageGroup = age;
+              if (birthDate) profileData.birthDate = birthDate;
               profileData.emailVerified = true;
               profileData.createdAt = serverTimestamp();
 

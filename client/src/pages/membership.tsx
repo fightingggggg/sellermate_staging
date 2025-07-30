@@ -6,32 +6,12 @@ import { CheckCircle, Lock } from "lucide-react";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import LoginPage from "@/components/LoginPage";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export default function MembershipPage() {
   const { currentUser } = useAuth();
   const [, navigate] = useLocation();
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
-
-  // 사용자 프로필 로드
-  useEffect(() => {
-    if (currentUser) {
-      const fetchProfile = async () => {
-        try {
-          const { doc, getDoc } = await import('firebase/firestore');
-          const { db } = await import('@/lib/firebase');
-          const profileDoc = await getDoc(doc(db, 'usersInfo', currentUser.uid));
-          if (profileDoc.exists()) {
-            setUserProfile(profileDoc.data());
-          }
-        } catch (err) {
-          console.error('프로필 로드 실패:', err);
-        }
-      };
-      fetchProfile();
-    }
-  }, [currentUser]);
 
   const basicFeatures = [
     "키워드 경쟁률 분석 10회/일 – (초기 혜택! 기본 5회)",
@@ -68,7 +48,7 @@ export default function MembershipPage() {
           <span className="block md:inline"> 독자적 기능으로 강화하세요</span>
         </h1>
         <p className="text-lg text-center text-gray-600 mb-12">
-          월 100원으로 더 많은 기능을 이용해보세요
+          키워드 경쟁률 분석, 네이버 SEO 맞춤 상품 최적화는 오직 스토어 부스터만 제공하고 있습니다.  
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -142,7 +122,7 @@ export default function MembershipPage() {
               </ul>
               {currentUser ? (
                 <div className="w-full py-2 px-4 text-center text-blue-600 font-semibold border border-blue-300 rounded-md bg-blue-50 mt-auto">
-                  {userProfile?.membershipType === 'booster' ? '부스터 이용 중' : '현재 이용 중'}
+                  현재 이용 중
                 </div>
               ) : (
                 <div className="w-full py-2 px-4 text-center text-blue-600 font-semibold border border-blue-300 rounded-md bg-blue-50 mt-auto">
@@ -157,7 +137,7 @@ export default function MembershipPage() {
             <CardHeader className="bg-blue-50 border-b border-blue-100 py-6">
               <div className="flex items-center justify-between w-full">
                 <CardTitle className="text-2xl font-bold text-blue-600">부스터</CardTitle>
-                <span className="text-2xl md:text-3xl font-extrabold text-blue-600 whitespace-nowrap">월 100원</span>
+                <span className="text-2xl md:text-3xl font-extrabold text-blue-600 whitespace-nowrap">월 14,900원</span>
               </div>
               <CardDescription className="text-gray-500 mt-1">
               합리적인 가격, 믿을 수 없는 사용 횟수!
@@ -229,6 +209,29 @@ export default function MembershipPage() {
           <span className="block md:inline text-blue-600">진심으로 바라는 마음에서 </span>
           <span className="block md:inline text-blue-600">시작되었습니다.</span>
         </p>
+
+        {/* 유의사항 */}
+        <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-800 mb-2">유의사항</h3>
+          <ul className="space-y-1 text-xs text-gray-600">
+            <li className="flex items-start space-x-2">
+              <span className="text-gray-400 mt-0.5">•</span>
+              <span>구독 구매 후 바로 사용하실 수 있습니다</span>
+            </li>
+            <li className="flex items-start space-x-2">
+              <span className="text-gray-400 mt-0.5">•</span>
+              <span>결제 주기는 30일 입니다</span>
+            </li>
+            <li className="flex items-start space-x-2">
+              <span className="text-gray-400 mt-0.5">•</span>
+              <span>환불은 7일 내 미사용자일 경우에만 가능하며, 전액환불됩니다</span>
+            </li>
+            <li className="flex items-start space-x-2">
+              <span className="text-gray-400 mt-0.5">•</span>
+              <span>해지는 언제든 가능하며, 해지 시 남은 기간 동안 사용가능하며 다음 결제일에 자동 결제가 이루어지지 않습니다</span>
+            </li>
+          </ul>
+        </div>
       </div>
 
       {/* 로그인 모달 */}

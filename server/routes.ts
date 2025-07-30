@@ -539,8 +539,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profileJson = await profileRes.json();
       console.log("[NAVER-OAUTH] Profile JSON:", profileJson);
 
-      const { id: naverId, email, nickname, name, mobile_e164, mobile, age } = profileJson.response || {};
+      const { id: naverId, email, nickname, name, mobile_e164, mobile, age, birthday, birthyear } = profileJson.response || {};
       const phoneFromProfile = mobile_e164 || mobile || "";
+      
+      // 생년월일 정보 처리
+      let birthDate = "";
+      if (birthday && birthyear) {
+        // birthday: '06-01', birthyear: '1995' -> '950601'
+        const [month, day] = birthday.split('-');
+        const year = birthyear.slice(-2); // 1995 -> 95
+        birthDate = `${year}${month}${day}`;
+      }
 
       if (!naverId || !email) {
         console.error("[NAVER-OAUTH] Missing id/email from profile");
@@ -601,6 +610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       if (phoneVerified) params.skip = "1";
       if (age) params.age = age;
+      if (birthDate) params.birthDate = birthDate;
 
       const qs = new URLSearchParams(params).toString();
       const redirectUrl = `/naver-onboarding?${qs}`;
@@ -675,6 +685,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const name = kakaoAcc.name || nickname;
       const phoneNumber = kakaoAcc.phone_number || "";
       const age = kakaoAcc.age_range || "";
+      const birthday = kakaoAcc.birthday || "";
+      const birthyear = kakaoAcc.birthyear || "";
+      
+      // 생년월일 정보 처리 (카카오)
+      let birthDate = "";
+      if (birthday && birthyear) {
+        // birthday: '0601', birthyear: '1995' -> '950601'
+        const month = birthday.slice(0, 2); // '06'
+        const day = birthday.slice(2, 4); // '01'
+        const year = birthyear.slice(-2); // 1995 -> 95
+        birthDate = `${year}${month}${day}`;
+      }
 
       if (!kakaoId) return res.status(500).send("missing id");
       const uid = `kakao_${kakaoId}`;
@@ -717,6 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const params: Record<string,string> = { token: cToken, email, name, provider: "kakao" };
       if (phoneVerified) params.skip = "1";
       if (age) params.age = age;
+      if (birthDate) params.birthDate = birthDate;
       const qs = new URLSearchParams(params).toString();
       res.redirect(`/naver-onboarding?${qs}`);
     } catch(err){
@@ -771,216 +794,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e:any) {
       console.error("[KAKAO UNLINK] error", e);
       res.status(500).json({ error: "unlink error", detail: e?.message });
-    }
-  });
-
-  // [정기구독] NICEPAY Billing
-  app.post('/api/subscribe', async (req, res) => {
-    try {
-      console.log('[subscribe] 요청 시작:', { body: req.body, headers: req.headers });
-      
-      // Firebase ID 토큰 검증
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        console.error('[subscribe] 인증 헤더 없음');
-        return res.status(401).json({ error: 'unauthorized' });
-      }
-
-      const idToken = authHeader.split('Bearer ')[1];
-      let decodedToken;
-      try {
-        decodedToken = await admin.auth().verifyIdToken(idToken);
-        console.log('[subscribe] 토큰 검증 성공:', decodedToken.uid);
-      } catch (err) {
-        console.error('[subscribe] 토큰 검증 실패:', err);
-        return res.status(401).json({ error: 'invalid token' });
-      }
-
-      const {
-        cardNumber,
-        expiryDate, // MM/YY
-        birthDate,
-        businessNumber,
-        passwordPrefix,
-        amount = 100,
-        goodsName = '스토어부스터 부스터 플랜',
-        orderId,
-        buyerName = '',
-        buyerEmail = '',
-      } = req.body || {};
-
-      console.log('[subscribe] 파싱된 데이터:', { 
-        hasCardNumber: !!cardNumber, 
-        hasExpiry: !!expiryDate, 
-        hasPassword: !!passwordPrefix,
-        hasIdNumber: !!(birthDate || businessNumber),
-        amount 
-      });
-
-      if (!cardNumber || !expiryDate || !passwordPrefix || !(birthDate || businessNumber)) {
-        console.error('[subscribe] 필수 필드 누락');
-        return res.status(400).json({ error: 'missing required card fields' });
-      }
-
-      const idNumber = birthDate || businessNumber;
-      const exp = expiryDate.replace('/', ''); // MMYY -> MMYY, 빌링 API는 YYMM 요구, 변환 필요
-      const expYYMM = exp.length === 4 ? `${exp.substring(2,4)}${exp.substring(0,2)}` : exp; // MMYY -> YYMM
-
-      // 고유 주문번호 생성 (없을 경우)
-      const oid = orderId || `sub_${Date.now()}`;
-
-      console.log('[subscribe] NICEPAY API 호출 준비:', { oid, expYYMM, idNumber });
-
-      const { billingSubscribe } = await import('./nicepay');
-
-      const result = await billingSubscribe({
-        cardNumber: cardNumber.replace(/\s+/g, ''),
-        cardExpiry: expYYMM,
-        idNumber,
-        cardPassword: passwordPrefix,
-        orderId: oid,
-        amount: Number(amount),
-        goodsName,
-        buyerName,
-        buyerEmail,
-      });
-
-      console.log('[subscribe] NICEPAY API 결과:', result);
-
-      if (!result.success) {
-        console.error('[subscribe] NICEPAY API 실패:', result);
-        return res.status(500).json({ success: false, message: result.resultMsg, code: result.resultCode });
-      }
-
-      // Firestore 에 billingKey 저장 (+ 첫 결제 내역)
-      const db = admin.firestore();
-      const subscriptionData = {
-        uid: decodedToken.uid,
-        billingKey: result.billingKey,
-        tid: result.tid,
-        orderId: oid,
-        amount: amount,
-        goodsName: goodsName,
-        status: 'active',
-        membershipType: 'booster',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후
-        cardInfo: {
-          last4: cardNumber.slice(-4),
-          expiry: expiryDate,
-          type: birthDate ? 'personal' : 'business',
-        },
-      };
-
-      console.log('[subscribe] Firestore 저장 시작');
-      await db.collection('subscriptions').doc(oid).set(subscriptionData);
-
-      // 사용자 프로필 업데이트
-      await db.collection('usersInfo').doc(decodedToken.uid).update({
-        membershipType: 'booster',
-        membershipExpiresAt: subscriptionData.nextBillingDate,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      console.log('[subscribe] 성공 완료');
-      return res.json({ success: true, billingKey: result.billingKey, tid: result.tid });
-    } catch (err: any) {
-      console.error('[subscribe] 예외 발생:', err);
-      console.error('[subscribe] 스택 트레이스:', err.stack);
-      res.status(500).json({ error: 'internal', detail: err?.message || 'unknown' });
-    }
-  });
-
-  // [정기구독] NICEPAY 결제 결과 리턴 URL
-  app.post('/api/nicepay/return', async (req, res) => {
-    try {
-      const {
-        resultCode,
-        resultMsg,
-        tid,
-        orderId,
-        amount,
-        billingKey,
-        signature,
-      } = req.body || {};
-
-      console.log('[nicepay-return] received:', req.body);
-
-      // 위변조 검증 (실제 구현에서는 signature 검증 필요)
-      if (resultCode !== '0000') {
-        console.error('[nicepay-return] payment failed:', resultMsg);
-        return res.status(400).json({ error: 'payment failed', message: resultMsg });
-      }
-
-      // Firestore 구독 정보 업데이트
-      const db = admin.firestore();
-      const subscriptionRef = db.collection('subscriptions').doc(orderId);
-      
-      try {
-        await subscriptionRef.update({
-          status: 'active',
-          lastPaymentTid: tid,
-          lastPaymentAmount: amount,
-          lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      } catch (err: any) {
-        if (err?.code === 5 /* Firestore NOT_FOUND */ || err?.toString().includes('No document')) {
-          await subscriptionRef.set({
-            status: 'active',
-            lastPaymentTid: tid,
-            lastPaymentAmount: amount,
-            lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          }, { merge: true });
-        } else {
-          throw err;
-        }
-      }
-
-      console.log('[nicepay-return] subscription updated successfully');
-      
-      // 성공 응답
-      res.json({ success: true, message: 'Payment processed successfully' });
-    } catch (err: any) {
-      console.error('[nicepay-return] error:', err);
-      res.status(500).json({ error: 'internal error', detail: err?.message });
-    }
-  });
-
-  // NICEPAY 웹훅
-  app.post('/api/nicepay/webhook', async (req, res) => {
-    try {
-      // NICEPAY 웹훅은 application/x-www-form-urlencoded 기본
-      const params = req.body as Record<string, string>;
-      const signature = params.signature || params.Signature || '';
-
-      const { verifyWebhookSignature } = await import('./nicepay');
-      if (!verifyWebhookSignature(params, signature)) {
-        console.error('[nicepay-webhook] invalid signature');
-        return res.status(400).send('invalid signature');
-      }
-
-      const { tid, orderId, resultCode, resultMsg, amount } = params;
-      if (resultCode !== '0000') {
-        console.warn('[nicepay-webhook] 실패 결과', params);
-        return res.send('OK'); // 응답 200 으로 종료
-      }
-
-      const db = admin.firestore();
-      await db.collection('subscriptions').doc(orderId).set({
-        lastPaymentTid: tid,
-        lastPaymentAmount: Number(amount),
-        lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
-        status: 'active',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-
-      console.log('[nicepay-webhook] updated subscription', orderId);
-      res.send('OK');
-    } catch (err) {
-      console.error('[nicepay-webhook] error', err);
-      res.send('OK');
     }
   });
 

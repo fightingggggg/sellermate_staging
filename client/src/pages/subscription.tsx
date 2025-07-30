@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CreditCard, Calendar, User, Building, UserCheck, CheckSquare } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { auth } from "@/lib/firebase";
 
 export default function SubscriptionPage() {
   const { currentUser } = useAuth();
@@ -90,43 +89,8 @@ export default function SubscriptionPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) return;
-
-    try {
-      setIsSubmitting(true);
-      const idToken = await auth.currentUser?.getIdToken();
-
-      const resp = await fetch("/api/subscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
-        body: JSON.stringify({
-          cardNumber: formData.cardNumber.replace(/\s+/g, ""),
-          expiryDate: formData.expiryDate,
-          birthDate: cardType === "personal" ? formData.birthDate : undefined,
-          businessNumber: cardType === "business" ? formData.businessNumber : undefined,
-          passwordPrefix: formData.passwordPrefix,
-          amount: 100,
-          goodsName: "스토어부스터 부스터 플랜",
-        }),
-      });
-
-      const json = await resp.json();
-      if (!resp.ok) {
-        throw new Error(json.message || json.error || "결제 실패");
-      }
-
-      // 성공 처리 – 이후 페이지 이동 또는 알림
-      alert("구독이 완료되었습니다! 결제 TID: " + json.tid);
-      navigate("/membership");
-    } catch (err: any) {
-      setErrors({ submit: err?.message || "결제 중 오류가 발생했습니다" });
-    } finally {
-      setIsSubmitting(false);
-    }
+    // 구독 기능은 현재 비활성화됨
+    return;
   };
 
   const formatCardNumber = (value: string) => {
@@ -370,12 +334,15 @@ export default function SubscriptionPage() {
                <div className="pt-4">
                  <Button
                    type="submit"
-                   className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg font-semibold"
-                   disabled={isSubmitting}
+                   className="w-full bg-gray-400 text-white py-3 text-lg font-semibold cursor-not-allowed"
+                   disabled={true}
                  >
-                   {isSubmitting ? "처리 중..." : "월 100원으로 구독하기"}
+                   월 14,900원으로 구독하기
                  </Button>
-                </div>
+                 <p className="text-center text-sm text-gray-500 mt-2">
+                   구현 준비 중입니다!
+                 </p>
+               </div>
 
               {/* 취소 버튼 */}
               <div className="text-center">

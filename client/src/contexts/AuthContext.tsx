@@ -31,7 +31,7 @@ interface AuthContextProps {
     password: string,
     name?: string,
     number?: string,
-    ageGroup?: string,
+    birthDate?: string,
   ) => Promise<void>;
   signIn: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     name?: string,
     number?: string,
-    ageGroup?: string,
+    birthDate?: string,
   ) {
     setError(null);
     try {
@@ -204,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: user.email,
             name: name || "", // store name
             number: number || "",
-            ageGroup: ageGroup || "",
+            birthDate: birthDate || "", // 생년월일 추가
             provider: "email",
             createdAt: new Date(),
             emailVerified: false,

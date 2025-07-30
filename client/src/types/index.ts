@@ -54,11 +54,11 @@ export interface UserProfile extends User {
   businessLink?: string;
   number?: string;
   name?: string; // 사용자의 실제 이름 (이메일 회원가입 시)
+  birthDate?: string; // 생년월일 추가
   emailVerified?: boolean;
   createdAt?: string;
   membershipType?: 'basic' | 'booster'; // 멤버십 타입 추가
   membershipExpiresAt?: string; // 멤버십 만료일
-  ageGroup?: string; // 연령대 추가
 }
 
 // Stats type

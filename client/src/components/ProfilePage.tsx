@@ -236,11 +236,21 @@ export default function ProfilePage() {
                       <label className="text-[#555] font-bold text-sm block mb-2">이름</label>
                       <Input value={(userProfile as any)?.name || userProfile?.displayName || ""} readOnly className="bg-gray-50" />
                     </div>
-  {/* 연령대 */}
-  <div>
-                      <label className="text-[#555] font-bold text-sm block mb-2">연령대</label>
-                      <Input value={userProfile?.ageGroup || "-"} readOnly className="bg-gray-50" />
+
+                    {/* 생년월일 표시 */}
+                    <div>
+                      <label className="text-[#555] font-bold text-sm block mb-2">생년월일</label>
+                      <Input 
+                        value={
+                          userProfile?.birthDate 
+                            ? `${userProfile.birthDate.slice(0, 2)}년 ${userProfile.birthDate.slice(2, 4)}월 ${userProfile.birthDate.slice(4, 6)}일`
+                            : "-"
+                        } 
+                        readOnly 
+                        className="bg-gray-50" 
+                      />
                     </div>
+
                     {/* 이메일은 항상 표시 */}
                     <div>
                       <label className="text-[#555] font-bold text-sm block mb-2">이메일</label>

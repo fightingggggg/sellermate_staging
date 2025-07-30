@@ -39,7 +39,8 @@ export default function LoginPage({
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState(""); // 비밀번호 확인 추가
   const [fullName, setFullName] = useState("");
-  const [ageGroup, setAgeGroup] = useState(""); // 연령대 추가
+  const [birthDate, setBirthDate] = useState(""); // 생년월일 추가
+  const [birthDateError, setBirthDateError] = useState(""); // 생년월일 오류 메시지
   const [number, setPhoneNumber] = useState("");
   const [countryCode, setCountryCode] = useState("+82");
   const [codeSent, setCodeSent] = useState(false);
@@ -102,6 +103,46 @@ export default function LoginPage({
     } catch {
       return false;
     }
+  };
+
+  // 생년월일 유효성 검사 함수
+  const validateBirthDate = (date: string) => {
+    if (date.length !== 6) {
+      return "생년월일은 6자리로 입력해주세요.";
+    }
+    
+    const year = parseInt(date.substring(0, 2));
+    const month = parseInt(date.substring(2, 4));
+    const day = parseInt(date.substring(4, 6));
+    
+    // 현재 연도 기준으로 유효한 연도인지 확인 (1900년대 또는 2000년대)
+    const currentYear = new Date().getFullYear();
+    const currentYearLastTwo = currentYear % 100;
+    
+    let fullYear;
+    if (year > currentYearLastTwo) {
+      fullYear = 1900 + year;
+    } else {
+      fullYear = 2000 + year;
+    }
+    
+    // 연도 범위 확인 (1900년 ~ 현재 연도)
+    if (fullYear < 1900 || fullYear > currentYear) {
+      return "유효하지 않은 연도입니다.";
+    }
+    
+    // 월 범위 확인
+    if (month < 1 || month > 12) {
+      return "유효하지 않은 월입니다.";
+    }
+    
+    // 일 범위 확인
+    const daysInMonth = new Date(fullYear, month, 0).getDate();
+    if (day < 1 || day > daysInMonth) {
+      return "유효하지 않은 일입니다.";
+    }
+    
+    return "";
   };
 
   // 입력값을 국제전화번호(E.164) 형식으로 변환
@@ -211,7 +252,7 @@ export default function LoginPage({
   };
 
   const handleSignUp = async () => {
-    if (!email || !password || !fullName || !ageGroup || !number)
+    if (!email || !password || !fullName || !birthDate || !number)
       return;
 
     if (password !== passwordConfirm) {
@@ -225,7 +266,7 @@ export default function LoginPage({
     setSignUpProcessing(true);
 
     try {
-      await signUp(email, password, fullName, number, ageGroup);
+      await signUp(email, password, fullName, number, birthDate);
       if (!isModal) {
         navigate("/login");
       }
@@ -237,7 +278,8 @@ export default function LoginPage({
       setEmail("");
       setPassword("");
       setFullName("");
-      setAgeGroup(""); // 연령대 초기화
+      setBirthDate(""); // 생년월일 초기화
+      setBirthDateError(""); // 생년월일 오류 초기화
       setPhoneNumber("");
       setPasswordConfirm("");
       setTerms(false);
@@ -489,24 +531,37 @@ export default function LoginPage({
                     />
                   </div>
 
-                  {/* 연령대 입력 */}
+                  {/* 생년월일 입력 */}
                   <div className="space-y-2">
-                    <Label htmlFor="ageGroup">
-                      연령대 <span className="text-gray-400">*</span>
+                    <Label htmlFor="birthDate">
+                      생년월일 <span className="text-gray-400">*</span>
                     </Label>
-                    <select
-                      id="ageGroup"
-                      value={ageGroup}
-                      onChange={(e) => setAgeGroup(e.target.value)}
-                      className="border rounded-md text-sm h-10 px-2 w-full bg-white"
-                    >
-                      <option value="">연령대를 선택하세요</option>
-                      <option value="20대">20-29</option>
-                      <option value="30대">30-39</option>
-                      <option value="40대">40-49</option>
-                      <option value="50대">50-51</option>
-                      <option value="60대 이상">60대 이상</option>
-                    </select>
+                    <Input
+                      id="birthDate"
+                      placeholder="생년월일 6자리 (예: 901231)"
+                      value={birthDate}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
+                        setBirthDate(value);
+                        // 유효성 검사
+                        if (value.length === 6) {
+                          const error = validateBirthDate(value);
+                          setBirthDateError(error);
+                        } else {
+                          setBirthDateError("");
+                        }
+                      }}
+                      onKeyPress={handleKeyPress}
+                      maxLength={6}
+                      className={birthDateError ? "border-red-500" : ""}
+                    />
+                    {birthDateError ? (
+                      <p className="text-xs text-red-500">{birthDateError}</p>
+                    ) : (
+                      <p className="text-xs text-gray-500">
+                        생년월일을 6자리로 입력해주세요 (예: 901231)
+                      </p>
+                    )}
                   </div>
 
                   {/* 국가 코드 + 휴대폰 번호 */}
@@ -660,7 +715,8 @@ export default function LoginPage({
                       !email ||
                       !password ||
                       !fullName ||
-                      !ageGroup || // 연령대 필수
+                      !birthDate || // 생년월일 필수
+                      !!birthDateError || // 생년월일 오류가 있으면 비활성화
                       !number ||
                       !terms ||
                       !privacy || !phoneVerified
