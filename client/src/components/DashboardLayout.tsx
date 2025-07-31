@@ -284,7 +284,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       </nav>
 
-      <main className="w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8">
+      <main className="w-full">
         {children}
       </main>
 

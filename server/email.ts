@@ -68,12 +68,12 @@ export async function sendVerificationEmail(email: string): Promise<void> {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
         <h2 style="color: #4169E1; text-align: center;">스토어 부스터 이메일 인증</h2>
-        <p>안녕하세요! 스토어 부스터에 가입해 주셔서 감사합니다.</p>
-        <p>아래 버튼을 클릭하여 이메일 인증을 완료해주세요:</p>
+        <p style="text-align: center;">안녕하세요! 스토어 부스터에 가입해 주셔서 감사합니다.</p>
+        <p style="text-align: center;">아래 버튼을 클릭하여 이메일 인증을 완료해주세요:</p>
         <div style="text-align: center; margin: 20px 0;">
           <a href="${link}" style="background-color: #4169E1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">이메일 인증하기</a>
         </div>
-        <p>스토어 부스터 회원가입을 하지 않으셨다면, 해당 메일을 무시해주세요.</p>
+        <p style="text-align: center;">스토어 부스터 회원가입을 하지 않으셨다면, 해당 메일을 무시해주세요.</p>
         <p style="margin-top: 20px; text-align: center; color: #666; font-size: 12px;">© 스토어 부스터 팀</p>
       </div>
     `,

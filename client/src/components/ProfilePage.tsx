@@ -4,6 +4,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUsage } from "@/contexts/UsageContext";
+import { useHistoryLimit } from "@/hooks/useHistoryLimit";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/types";
 import { db, auth } from "@/lib/firebase"; // db는 initializeApp 후에 만든 Firestore 인스턴스
@@ -23,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, UserRound } from "lucide-react";
+import { Loader2, UserRound, Search, Sparkles, Crown, CreditCard, BarChart3, History } from "lucide-react";
 import { 
   Dialog, 
   DialogContent, 
@@ -33,6 +35,8 @@ import {
   DialogTitle
 } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 // 프로필 업데이트 스키마
 const profileSchema = z.object({
@@ -60,6 +64,8 @@ export default function ProfilePage() {
     error: authError,
     sendPasswordReset // Added sendPasswordReset function
   } = useAuth();
+  const { usageInfo, isLoading: usageLoading } = useUsage();
+  const { currentCount: historyCurrent, maxCount: historyMax, isLoading: historyLoading } = useHistoryLimit();
 
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const provider = (userProfile as any)?.provider;
@@ -67,6 +73,8 @@ export default function ProfilePage() {
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteWarnOpen, setDeleteWarnOpen] = useState(false); // 30일 재가입 제한 안내용
+  const [cancelMembershipOpen, setCancelMembershipOpen] = useState(false);
+  const [isCancellingMembership, setIsCancellingMembership] = useState(false);
   const { toast } = useToast();
 
   // 프로필 폼
@@ -141,7 +149,7 @@ export default function ProfilePage() {
         // success가 false인 경우도 처리
         toast({
           title: "회원 탈퇴 실패",
-          description: "계정 삭제에 실패했습니다. 다시 시도해주세요.",
+          description: "계정 탈퇴에 실패했습니다. 다시 시도해주세요.",
           variant: "destructive",
         });
       }
@@ -178,6 +186,30 @@ export default function ProfilePage() {
     }
   };
 
+  // 멤버십 해지 처리
+  const handleCancelMembership = async () => {
+    setIsCancellingMembership(true);
+    try {
+      // 여기에 실제 멤버십 해지 로직을 구현할 수 있습니다
+      // 예: API 호출, Firebase 함수 호출 등
+      
+      // 임시로 성공 메시지만 표시
+      toast({
+        title: "멤버십 해지 요청",
+        description: "멤버십 해지 요청이 접수되었습니다. 처리까지 1-2일이 소요될 수 있습니다.",
+      });
+      setCancelMembershipOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "멤버십 해지 실패",
+        description: error.message || "멤버십 해지 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCancellingMembership(false);
+    }
+  };
+
   // 프로필 로딩 시 폼 초기값 업데이트
   useEffect(() => {
     if (userProfile) {
@@ -190,180 +222,310 @@ export default function ProfilePage() {
   }, [userProfile]);
 
   return (
-    <div className="container py-10" style={{backgroundColor: '#f4f4f9'}}>
-      <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-sm">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">내 계정</h1>
-          <Button variant="outline" onClick={handleLogout}>로그아웃</Button>
-        </div>
-
-        {authError && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>{authError}</AlertDescription>
-          </Alert>
-        )}
-
-        {profileLoading ? (
-          <div className="flex justify-center items-center h-32">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="min-h-screen flex items-center justify-center" style={{backgroundColor: '#f4f4f9'}}>
+      <div className="w-full max-w-4xl mx-auto px-4 py-10">
+        <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">내 계정</h1>
+            <Button variant="outline" onClick={handleLogout}>로그아웃</Button>
           </div>
-        ) : (
-          <Tabs defaultValue="profile">
-            <TabsList className="mb-6 w-full">
-              <TabsTrigger value="profile" className="flex-1">
-                <UserRound className="h-4 w-4 mr-2" /> 내 정보
-              </TabsTrigger>
-              <TabsTrigger value="danger" className="flex-1">
-                계정 관리
-              </TabsTrigger>
-            </TabsList>
 
-            {/* 기본 정보 탭 */}
-            <TabsContent value="profile">
-              <Card className="border-none shadow-sm">
-                <CardHeader>
-                  <CardTitle>프로필 정보</CardTitle>
-                  <CardDescription>
-                    스마트스토어 관련 정보와 연락처를 관리합니다.
-                  </CardDescription>
-                </CardHeader>
+          {authError && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertDescription>{authError}</AlertDescription>
+            </Alert>
+          )}
 
-                <CardContent>
-                  {/* Replace the blue info box with readonly fields */}
-                  <div className="mb-6 space-y-4">
-                    {/* 이름 표시 - 모든 가입자 */}
-                    <div>
-                      <label className="text-[#555] font-bold text-sm block mb-2">이름</label>
-                      <Input value={(userProfile as any)?.name || userProfile?.displayName || ""} readOnly className="bg-gray-50" />
-                    </div>
+          {profileLoading ? (
+            <div className="flex justify-center items-center h-32">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <Tabs defaultValue="profile">
+              <TabsList className="mb-6 w-full">
+                <TabsTrigger value="profile" className="flex-1">
+                  <UserRound className="h-4 w-4 mr-2" /> 내 정보
+                </TabsTrigger>
+                <TabsTrigger value="danger" className="flex-1">
+                  계정 관리
+                </TabsTrigger>
+              </TabsList>
 
-                    {/* 생년월일 표시 */}
-                    <div>
-                      <label className="text-[#555] font-bold text-sm block mb-2">생년월일</label>
-                      <Input 
-                        value={
-                          userProfile?.birthDate 
-                            ? `${userProfile.birthDate.slice(0, 2)}년 ${userProfile.birthDate.slice(2, 4)}월 ${userProfile.birthDate.slice(4, 6)}일`
-                            : "-"
-                        } 
-                        readOnly 
-                        className="bg-gray-50" 
-                      />
-                    </div>
+              {/* 기본 정보 탭 */}
+              <TabsContent value="profile">
+                <Card className="border-none shadow-sm">
+                  <CardHeader>
+                    <CardTitle>프로필 정보</CardTitle>
+                    <CardDescription>
+                      스마트스토어 관련 정보와 연락처를 관리합니다.
+                    </CardDescription>
+                  </CardHeader>
 
-                    {/* 이메일은 항상 표시 */}
-                    <div>
-                      <label className="text-[#555] font-bold text-sm block mb-2">이메일</label>
-                      <Input value={userProfile?.email || ""} readOnly className="bg-gray-50" />
-                    </div>
+                  <CardContent>
+                    {/* Replace the blue info box with readonly fields */}
+                    <div className="mb-6 space-y-4">
+                      {/* 이름 표시 - 모든 가입자 */}
+                      <div>
+                        <label className="text-[#555] font-bold text-sm block mb-2">이름</label>
+                        <Input value={(userProfile as any)?.name || userProfile?.displayName || ""} readOnly className="bg-gray-50" />
+                      </div>
 
-                    {/* 휴대폰 번호 */}
-                    <div>
-                      <label className="text-[#555] font-bold text-sm block mb-2">휴대폰 번호</label>
-                      <Input value={userProfile?.number || ""} readOnly className="bg-gray-50" />
-                    </div>
+                      {/* 생년월일 표시 */}
+                      <div>
+                        <label className="text-[#555] font-bold text-sm block mb-2">생년월일</label>
+                        <Input 
+                          value={
+                            userProfile?.birthDate 
+                              ? `${userProfile.birthDate.slice(0, 2)}년 ${userProfile.birthDate.slice(2, 4)}월 ${userProfile.birthDate.slice(4, 6)}일`
+                              : "-"
+                          } 
+                          readOnly 
+                          className="bg-gray-50" 
+                        />
+                      </div>
 
-                    {/* End 휴대폰 번호 */}
+                      {/* 이메일은 항상 표시 */}
+                      <div>
+                        <label className="text-[#555] font-bold text-sm block mb-2">이메일</label>
+                        <Input value={userProfile?.email || ""} readOnly className="bg-gray-50" />
+                      </div>
+
+                      {/* 휴대폰 번호 */}
+                      <div>
+                        <label className="text-[#555] font-bold text-sm block mb-2">휴대폰 번호</label>
+                        <Input value={userProfile?.number || ""} readOnly className="bg-gray-50" />
+                      </div>
+
+                      {/* End 휴대폰 번호 */}
+                      
+                      {/* 가입 경로 */}
+                      <div>
+                        <label className="text-[#555] font-bold text-sm block mb-2">가입 경로</label>
+                        <Input 
+                          value={
+                            provider === "naver" ? "네이버 간편 회원가입" :
+                            provider === "kakao" ? "카카오 간편 회원가입" :
+                            "이메일 회원가입"
+                          }
+                          readOnly
+                          className={
+                            provider === "naver"
+                              ? "bg-green-50 border-green-200 text-green-700 font-medium"
+                              : provider === "kakao"
+                                ? "bg-yellow-50 border-yellow-200 text-yellow-700 font-medium"
+                                : "bg-gray-50"
+                          }
+                        />
+                      </div>
+
                     
-                    {/* 가입 경로 */}
-                    <div>
-                      <label className="text-[#555] font-bold text-sm block mb-2">가입 경로</label>
-                      <Input 
-                        value={
-                          provider === "naver" ? "네이버 간편 회원가입" :
-                          provider === "kakao" ? "카카오 간편 회원가입" :
-                          "이메일 회원가입"
-                        }
-                        readOnly
-                        className={
-                          provider === "naver"
-                            ? "bg-green-50 border-green-200 text-green-700 font-medium"
-                            : provider === "kakao"
-                              ? "bg-yellow-50 border-yellow-200 text-yellow-700 font-medium"
-                              : "bg-gray-50"
-                        }
-                      />
+
+                      {/* readonly store info removed per requirement */}
                     </div>
 
-                  
+                    <Form {...profileForm}>
+                      <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
+                        {!isSocial && (
+                        <FormField
+                          control={profileForm.control}
+                          name="businessName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[#555] font-bold text-sm">스마트스토어 상호</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="상호명을 입력하세요" 
+                                  className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        /> )}
 
-                    {/* readonly store info removed per requirement */}
+                        {!isSocial && (
+                        <FormField
+                          control={profileForm.control}
+                          name="businessLink"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[#555] font-bold text-sm">스마트스토어 홈 링크</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="https://smartstore.naver.com/..." 
+                                  className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        /> )}
+
+                        {/* 휴대폰 번호 입력란 제거 (이메일 가입 시 중복 표시 해결) */}
+
+                        <div className="pt-4 flex justify-center">
+                          <Button 
+                            type="submit" 
+                            className="py-2 bg-[#007BFF] hover:bg-[#0056b3] text-white font-bold rounded-md" 
+                            disabled={isProfileLoading || !profileForm.formState.isDirty}
+                          >
+                            {isProfileLoading ? (
+                              <>
+                                <span className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 업데이트 중...
+                              </>
+                            ) : (
+                              "정보 저장"
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* 계정 관리 탭 */}
+              <TabsContent value="danger">
+                <Card className="border-none shadow-sm">
+                  <CardHeader>
+                    <CardTitle>계정 관리</CardTitle>
+                    <CardDescription>
+                      {/* 비밀번호 재설정 및 계정 삭제와 같은 계정 관련 작업을 수행할 수 있습니다. */}
+                    </CardDescription>
+                  </CardHeader>
+
+                                  <CardContent className="space-y-6">
+                  {/* 사용량 조회 섹션 */}
+                  <div className="border-b pb-6">
+                    <h3 className="text-lg font-medium mb-4 flex items-center">
+                      <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+                      사용량 조회
+                    </h3>
+                    {usageLoading ? (
+                      <div className="flex justify-center items-center h-20">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    ) : usageInfo ? (
+                      <div className="space-y-4">
+                        {/* 키워드 분석 사용량 */}
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center">
+                              <Search className="h-4 w-4 mr-2 text-green-600" />
+                              <span className="font-medium">키워드 경쟁률 분석</span>
+                            </div>
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              {usageInfo.keywordAnalysis.current}/{usageInfo.keywordAnalysis.max}
+                            </Badge>
+                          </div>
+                          <Progress 
+                            value={(usageInfo.keywordAnalysis.current / usageInfo.keywordAnalysis.max) * 100} 
+                            className="h-2"
+                          />
+                          <p className="text-sm text-gray-600 mt-1">
+                            남은 횟수: {usageInfo.keywordAnalysis.remaining}회
+                          </p>
+                        </div>
+
+                        {/* 상품 최적화 사용량 */}
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center">
+                              <Sparkles className="h-4 w-4 mr-2 text-blue-600" />
+                              <span className="font-medium">상품명 최적화</span>
+                            </div>
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              {usageInfo.productOptimization.current}/{usageInfo.productOptimization.max}
+                            </Badge>
+                          </div>
+                          <Progress 
+                            value={(usageInfo.productOptimization.current / usageInfo.productOptimization.max) * 100} 
+                            className="h-2"
+                          />
+                          <p className="text-sm text-gray-600 mt-1">
+                            남은 횟수: {usageInfo.productOptimization.remaining}회
+                          </p>
+                        </div>
+
+                        {/* 히스토리 저장 개수 */}
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center">
+                              <History className="h-4 w-4 mr-2 text-purple-600" />
+                              <span className="font-medium">히스토리 저장</span>
+                            </div>
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                              {historyCurrent}/{historyMax}
+                            </Badge>
+                          </div>
+                          <Progress 
+                            value={(historyCurrent / historyMax) * 100} 
+                            className="h-2"
+                          />
+                          <p className="text-sm text-gray-600 mt-1">
+                            남은 개수: {historyMax - historyCurrent}개
+                          </p>
+                        </div>
+                      </div>
+                                         ) : (
+                       <p className="text-sm text-gray-500">사용량 정보를 불러올 수 없습니다.</p>
+                     )}
+                     <p className="text-xs text-gray-500 mt-2 text-center">
+                       사용량은 매일 새벽에 초기화돼요!
+                     </p>
+                   </div>
+
+                  {/* 멤버십 관리 섹션 */}
+                  <div className="border-b pb-6">
+                    <h3 className="text-lg font-medium mb-4 flex items-center">
+                      <CreditCard className="h-5 w-5 mr-2 text-purple-600" />
+                      멤버십 관리
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <h4 className="font-semibold text-gray-800">현재 플랜</h4>
+                            <p className="text-sm text-gray-600">베이직 (무료)</p>
+                          </div>
+                          <Badge className="bg-blue-100 text-blue-800">무료</Badge>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">
+                          키워드 분석 10회/일, 상품 최적화 10회/일, 최근 내역 10개 저장, 확장 프로그램 무제한 사용 제공
+                        </p>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => navigate("/membership")}
+                          >
+                            플랜 변경
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            disabled={true}
+                            className="opacity-50 cursor-not-allowed"
+                            onClick={() => navigate("/subscription")}
+                          >
+                            결제 내역
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            disabled={true}
+                            className="opacity-50 cursor-not-allowed border-gray-300 text-gray-500"
+                            onClick={() => setCancelMembershipOpen(true)}
+                          >
+                            멤버십 해지
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <Form {...profileForm}>
-                    <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
-                      {!isSocial && (
-                      <FormField
-                        control={profileForm.control}
-                        name="businessName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[#555] font-bold text-sm">스마트스토어 상호</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="상호명을 입력하세요" 
-                                className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      /> )}
-
-                      {!isSocial && (
-                      <FormField
-                        control={profileForm.control}
-                        name="businessLink"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[#555] font-bold text-sm">스마트스토어 홈 링크</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="https://smartstore.naver.com/..." 
-                                className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      /> )}
-
-                      {/* 휴대폰 번호 입력란 제거 (이메일 가입 시 중복 표시 해결) */}
-
-                      <div className="pt-4 flex justify-center">
-                        <Button 
-                          type="submit" 
-                          className="py-2 bg-[#007BFF] hover:bg-[#0056b3] text-white font-bold rounded-md" 
-                          disabled={isProfileLoading || !profileForm.formState.isDirty}
-                        >
-                          {isProfileLoading ? (
-                            <>
-                              <span className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 업데이트 중...
-                            </>
-                          ) : (
-                            "정보 저장"
-                          )}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* 계정 관리 탭 */}
-            <TabsContent value="danger">
-              <Card className="border-none shadow-sm">
-                <CardHeader>
-                  <CardTitle>계정 관리</CardTitle>
-                  <CardDescription>
-                    비밀번호 재설정 및 계정 삭제와 같은 계정 관련 작업을 수행할 수 있습니다.
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="space-y-6">
                  {!isSocial && (
                   <div className="border-b pb-6">
                     <h3 className="text-lg font-medium mb-2">비밀번호 재설정</h3>
@@ -397,117 +559,156 @@ export default function ProfilePage() {
                   </div>
                  )}
 
-                  {/* 계정 삭제 - Collapsible 로 감추기 */}
-                  <Collapsible>
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" className="text-sm text-muted-foreground px-0 hover:bg-transparent underline">
-                        계정 삭제 옵션 보기
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="mt-4">
-                        <p className="text-sm text-muted-foreground mb-4">
-                          계정을 삭제하면 모든 정보가 영구적으로 제거됩니다. 이 작업은 되돌릴 수 없습니다.
-                        </p>
-                        <Button 
-                          variant="outline" 
-                          className="border-red-300 text-red-500 hover:bg-red-50"
-                          onClick={() => setDeleteWarnOpen(true)}
-                        >
-                          계정 삭제
+                    {/* 계정 삭제 - Collapsible 로 감추기 */}
+                    <Collapsible>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" className="text-sm text-muted-foreground px-0 hover:bg-transparent underline">
+                          계정 탈퇴 옵션 보기
                         </Button>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="mt-4">
+                          <p className="text-sm text-muted-foreground mb-4">
+                            탈퇴하면 모든 정보가 영구적으로 제거됩니다. 이 작업은 되돌릴 수 없습니다.
+                            <br/><span className="font-bold text-black">계정을 삭제하신 후에는 3개월간 재가입이 제한됩니다</span>
+                          </p>
+                          <Button 
+                            variant="outline" 
+                            className="border-red-300 text-red-500 hover:bg-red-50"
+                            onClick={() => setDeleteWarnOpen(true)}
+                          >
+                            계정 탈퇴
+                          </Button>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
 
-                  {/* 30일 재가입 제한 경고 다이얼로그 */}
-                  <Dialog open={deleteWarnOpen} onOpenChange={setDeleteWarnOpen}>
-                    <DialogContent className="border-none shadow-md">
-                      <DialogHeader>
-                        <DialogTitle>정말 탈퇴하시겠어요?</DialogTitle>
-                        <DialogDescription>
-                          계정을 삭제하면 모든 데이터가 영구적으로 삭제되고,
-                          같은 이메일 또는 휴대폰 번호로 한 달(30일) 동안 재가입이 불가능합니다.
-                          그래도 탈퇴를 진행하시겠습니까?
-                        </DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="outline" type="button" onClick={() => setDeleteWarnOpen(false)}>
-                          취소
-                        </Button>
-                        <Button variant="destructive" className="bg-red-500 hover:bg-red-600" type="button" onClick={() => {
-                          setDeleteWarnOpen(false);
-                          setDeleteDialogOpen(true);
-                        }}>
-                          계속 진행
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                    {/* 30일 재가입 제한 경고 다이얼로그 */}
+                    <Dialog open={deleteWarnOpen} onOpenChange={setDeleteWarnOpen}>
+                      <DialogContent className="border-none shadow-md">
+                        <DialogHeader>
+                          <DialogTitle>정말 탈퇴하시겠어요?</DialogTitle>
+                          <DialogDescription>
+                            계정을 삭제하면 모든 데이터가 영구적으로 삭제되고,
+                            같은 이메일 또는 휴대폰 번호로 3개월(90일) 동안 재가입이 불가능합니다.
+                            그래도 탈퇴를 진행하시겠습니까?
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="gap-2 sm:gap-0">
+                          <Button variant="outline" type="button" onClick={() => setDeleteWarnOpen(false)}>
+                            취소
+                          </Button>
+                          <Button variant="destructive" className="bg-red-500 hover:bg-red-600" type="button" onClick={() => {
+                            setDeleteWarnOpen(false);
+                            setDeleteDialogOpen(true);
+                          }}>
+                            계속 진행
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
 
-                  {/* 삭제 확인 다이얼로그 */}
-                  <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                    <DialogContent className="border-none shadow-md">
-                      <DialogHeader>
-                        <DialogTitle>계정 삭제 확인</DialogTitle>
-                        <DialogDescription>
-                          계정을 삭제하시면 모든 데이터가 영구적으로 삭제되며, 이 작업은 되돌릴 수 없습니다.
-                        </DialogDescription>
-                      </DialogHeader>
+                    {/* 삭제 확인 다이얼로그 */}
+                    <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                      <DialogContent className="border-none shadow-md">
+                        <DialogHeader>
+                          <DialogTitle>계정 탈퇴 확인</DialogTitle>
+                          <DialogDescription>
+                            계정을 탈퇴하시면 모든 데이터가 영구적으로 삭제되며, 이 작업은 되돌릴 수 없습니다.
+                          </DialogDescription>
+                        </DialogHeader>
 
-                      <Form {...deleteAccountForm}>
-                        <form onSubmit={deleteAccountForm.handleSubmit(onDeleteSubmit)} className="space-y-4">
+                        <Form {...deleteAccountForm}>
+                          <form onSubmit={deleteAccountForm.handleSubmit(onDeleteSubmit)} className="space-y-4">
 
-                          <FormField
-                            control={deleteAccountForm.control}
-                            name="reason"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[#555] font-bold text-sm">탈퇴 사유</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    placeholder="탈퇴 사유를 입력해주세요 (10자 이상)"
-                                    className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <DialogFooter className="gap-2 sm:gap-0">
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              onClick={() => setDeleteDialogOpen(false)}
-                            >
-                              취소
-                            </Button>
-                            <Button 
-                              type="submit" 
-                              variant="destructive"
-                              className="bg-red-500 hover:bg-red-600"
-                              disabled={isDeleteLoading}
-                            >
-                              {isDeleteLoading ? (
-                                <>
-                                  <span className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 처리 중...
-                                </>
-                              ) : (
-                                "계정 삭제"
+                            <FormField
+                              control={deleteAccountForm.control}
+                              name="reason"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[#555] font-bold text-sm">탈퇴 사유</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="탈퇴 사유를 입력해주세요 (10자 이상)"
+                                      className="border border-[#ccc] rounded-md p-3 font-normal focus:border-[#007BFF]"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                               )}
-                            </Button>
-                          </DialogFooter>
-                        </form>
-                      </Form>
-                    </DialogContent>
-                  </Dialog>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        )}
+                            />
+
+                            <DialogFooter className="gap-2 sm:gap-0">
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => setDeleteDialogOpen(false)}
+                              >
+                                취소
+                              </Button>
+                              <Button 
+                                type="submit" 
+                                variant="destructive"
+                                className="bg-red-500 hover:bg-red-600"
+                                disabled={isDeleteLoading}
+                              >
+                                {isDeleteLoading ? (
+                                  <>
+                                    <span className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 처리 중...
+                                  </>
+                                ) : (
+                                  "계정 탈퇴"
+                                )}
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* 멤버십 해지 확인 다이얼로그 */}
+                    <Dialog open={cancelMembershipOpen} onOpenChange={setCancelMembershipOpen}>
+                      <DialogContent className="border-none shadow-md">
+                        <DialogHeader>
+                          <DialogTitle>멤버십 해지 확인</DialogTitle>
+                          <DialogDescription>
+                            멤버십을 해지하시면 현재 결제 주기가 끝난 후 서비스가 중단됩니다. 
+                            해지 후에도 남은 기간 동안은 서비스를 이용하실 수 있습니다.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="gap-2 sm:gap-0">
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setCancelMembershipOpen(false)}
+                          >
+                            취소
+                          </Button>
+                          <Button 
+                            type="button" 
+                            variant="destructive"
+                            className="bg-red-500 hover:bg-red-600"
+                            disabled={isCancellingMembership}
+                            onClick={handleCancelMembership}
+                          >
+                            {isCancellingMembership ? (
+                              <>
+                                <span className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 처리 중...
+                              </>
+                            ) : (
+                              "멤버십 해지"
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          )}
+        </div>
       </div>
     </div>
   );
