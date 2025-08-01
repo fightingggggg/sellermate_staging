@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { sendVerificationEmail } from "./email";
 import crypto from "crypto";
 import admin from "firebase-admin";
+import { autoPaymentScheduler } from "./scheduler";
 // ensure admin initialized via email.ts or here fallback
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -837,6 +838,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("=== 환경 변수 확인 완료 ===");
     res.json(envInfo);
   });
+
+  // 빌키 테스트 결제 엔드포인트 (디버그용)
+  app.post("/api/debug/test-billing-payment", async (req, res) => {
+    try {
+      console.log("=== 빌키 테스트 결제 시작 ===");
+      const { uid } = req.body;
+      
+      if (!uid) {
+        return res.status(400).json({ error: "uid is required" });
+      }
+
+      const clientId = process.env.NICEPAY_CLIENT_ID;
+      const secretKey = process.env.NICEPAY_SECRET_KEY;
+      
+      if (!clientId || !secretKey) {
+        return res.status(500).json({ error: "NicePay credentials not configured" });
+      }
+
+      // Firestore에서 빌키 정보 조회
+      const db = admin.firestore();
+      const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
+      
+      if (!billingKeyDoc.exists) {
+        return res.status(404).json({ error: "Billing key not found" });
+      }
+
+      const billingKeyData = billingKeyDoc.data();
+      if (!billingKeyData) {
+        return res.status(404).json({ error: "Billing key data not found" });
+      }
+      
+      console.log("빌키 데이터:", billingKeyData);
+
+      // Basic 인증 헤더 생성
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+
+      const testOrderId = `TEST_${Date.now()}_${uid}`;
+      const paymentData = {
+        clientId: clientId,
+        method: "BILL",
+        orderId: testOrderId,
+        amount: 14900, // 테스트 금액
+        goodsName: "스토어부스터 부스터 플랜 (테스트)",
+        billingKey: billingKeyData.billingKey,
+        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`
+      };
+
+      console.log("테스트 결제 요청 데이터:", paymentData);
+
+      // 나이스페이 결제 API 호출
+      const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${authHeader}`
+        },
+        body: JSON.stringify(paymentData)
+      });
+
+      console.log("나이스페이 API 응답 상태:", response.status);
+      const result = await response.json();
+      console.log("나이스페이 API 응답:", result);
+
+      if (!response.ok) {
+        return res.status(response.status).json({ 
+          error: "NicePay API error", 
+          detail: result 
+        });
+      }
+
+      // 테스트 결제 정보 저장
+      await db.collection("payments").doc(testOrderId).set({
+        uid: uid,
+        orderId: testOrderId,
+        amount: 14900,
+        goodsName: "스토어부스터 부스터 플랜 (테스트)",
+        status: "PENDING",
+        billingKey: billingKeyData.billingKey,
+        isTest: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log("=== 빌키 테스트 결제 완료 ===");
+
+      res.json({
+        success: true,
+        orderId: testOrderId,
+        tid: result.tid,
+        message: "테스트 결제가 요청되었습니다. 콜백을 확인하세요."
+      });
+
+    } catch (error: any) {
+      console.error("=== 빌키 테스트 결제 에러 ===");
+      console.error("에러:", error);
+      res.status(500).json({ 
+        error: "Internal server error", 
+        message: error.message 
+      });
+    }
+  });
+
+  // 구독 정보 확인 엔드포인트 (디버그용)
+  app.get("/api/debug/subscription/:uid", async (req, res) => {
+    try {
+      const { uid } = req.params;
+      const db = admin.firestore();
+      
+      const subscriptionDoc = await db.collection("subscriptions").doc(uid).get();
+      const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
+      const paymentsQuery = await db.collection("payments")
+        .where("uid", "==", uid)
+        .orderBy("createdAt", "desc")
+        .limit(5)
+        .get();
+
+      const result = {
+        subscription: subscriptionDoc.exists ? subscriptionDoc.data() : null,
+        billingKey: billingKeyDoc.exists ? billingKeyDoc.data() : null,
+        recentPayments: paymentsQuery.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+      };
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 수동 자동 결제 실행 엔드포인트 (디버그용)
+  app.post("/api/debug/run-auto-payment", async (req, res) => {
+    try {
+      console.log("=== 수동 자동 결제 실행 시작 ===");
+      const { uid } = req.body;
+      
+      if (!uid) {
+        return res.status(400).json({ error: "uid is required" });
+      }
+
+      console.log(`수동 자동 결제 실행: ${uid}`);
+      await autoPaymentScheduler.runManualPayment(uid);
+      
+      console.log("=== 수동 자동 결제 실행 완료 ===");
+      res.json({ 
+        success: true, 
+        message: "자동 결제가 실행되었습니다. 서버 로그를 확인하세요." 
+      });
+
+    } catch (error: any) {
+      console.error("수동 자동 결제 실행 중 오류:", error);
+      res.status(500).json({ 
+        error: "Internal server error", 
+        message: error.message 
+      });
+    }
+  });
+
+  // 스케줄러 상태 확인 엔드포인트 (디버그용)
+  app.get("/api/debug/scheduler-status", (req, res) => {
+    res.json({
+      schedulerRunning: true,
+      schedule: "매분 실행 (테스트 모드)",
+      nextRun: "1분 후",
+      message: "자동 결제 스케줄러가 실행 중입니다."
+    });
+  });
   
   // 빌키 발급 요청 (결제창 방식)
   app.post("/api/nicepay/billing-key", async (req, res) => {
@@ -944,8 +1112,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 성공 여부 확인
       if (authResultCode !== "0000") {
         console.error("Billing key failed:", authResultMsg);
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send("OK");
+        // 실패 시 결제 성공 페이지로 리다이렉트 (실패 정보 포함)
+        const failureUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}`;
+        return res.redirect(failureUrl);
       }
 
       // Firestore에서 해당 요청 찾기
@@ -991,13 +1160,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         billingKeyUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      res.setHeader('Content-Type', 'text/plain');
-      res.status(200).send("OK");
+      // 성공 시 결제 성공 페이지로 리다이렉트
+      const successUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}&billingKey=${billingKey}&cardName=${encodeURIComponent(cardName || '')}&cardNo=${cardNo || ''}`;
+      
+      res.redirect(successUrl);
 
     } catch (error: any) {
       console.error("Billing key callback error:", error);
-      res.setHeader('Content-Type', 'text/plain');
-      res.status(200).send("OK");
+      // 에러 시에도 결제 성공 페이지로 리다이렉트 (실패 정보 포함)
+      const errorUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?authResultCode=ERROR&authResultMsg=${encodeURIComponent(error.message)}`;
+      res.redirect(errorUrl);
     }
   });
 

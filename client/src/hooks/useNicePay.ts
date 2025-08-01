@@ -208,6 +208,105 @@ export const useNicePay = () => {
     }
   };
 
+  // 테스트 결제 요청 (디버그용)
+  const testBillingPayment = async (): Promise<any> => {
+    if (!currentUser?.uid) {
+      setError('로그인이 필요합니다.');
+      return null;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/debug/test-billing-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: currentUser.uid
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || '테스트 결제 요청에 실패했습니다.');
+      }
+
+      return data;
+    } catch (err: any) {
+      setError(err.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 구독 정보 확인 (디버그용)
+  const getSubscriptionInfo = async (): Promise<any> => {
+    if (!currentUser?.uid) {
+      setError('로그인이 필요합니다.');
+      return null;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/debug/subscription/${currentUser.uid}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || '구독 정보 조회에 실패했습니다.');
+      }
+
+      return data;
+    } catch (err: any) {
+      setError(err.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 수동 자동 결제 실행 (디버그용)
+  const runAutoPayment = async (): Promise<any> => {
+    if (!currentUser?.uid) {
+      setError('로그인이 필요합니다.');
+      return null;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/debug/run-auto-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: currentUser.uid
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || '자동 결제 실행에 실패했습니다.');
+      }
+
+      return data;
+    } catch (err: any) {
+      setError(err.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     error,
@@ -215,5 +314,8 @@ export const useNicePay = () => {
     getBillingKeyStatus,
     deleteBillingKey,
     requestPayment,
+    testBillingPayment,
+    getSubscriptionInfo,
+    runAutoPayment,
   };
 }; 

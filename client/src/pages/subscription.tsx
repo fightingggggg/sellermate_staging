@@ -12,11 +12,12 @@ import BillingKeyForm from "@/components/BillingKeyForm";
 export default function SubscriptionPage() {
   const { currentUser } = useAuth();
   const [, navigate] = useLocation();
-  const { loading, error, getBillingKeyStatus, requestPayment } = useNicePay();
+  const { loading, error, getBillingKeyStatus, requestPayment, testBillingPayment, getSubscriptionInfo, runAutoPayment } = useNicePay();
   
   const [billingKeyStatus, setBillingKeyStatus] = useState<any>(null);
   const [showBillingKeyForm, setShowBillingKeyForm] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
+  const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
 
   useEffect(() => {
     checkBillingKeyStatus();
@@ -65,6 +66,28 @@ export default function SubscriptionPage() {
   const handleCancel = () => {
     setShowBillingKeyForm(false);
     navigate("/membership");
+  };
+
+  const handleTestPayment = async () => {
+    const result = await testBillingPayment();
+    if (result?.success) {
+      alert('테스트 결제가 요청되었습니다. 서버 로그를 확인하세요.');
+    }
+  };
+
+  const handleCheckSubscription = async () => {
+    const info = await getSubscriptionInfo();
+    if (info) {
+      setSubscriptionInfo(info);
+      console.log('구독 정보:', info);
+    }
+  };
+
+  const handleRunAutoPayment = async () => {
+    const result = await runAutoPayment();
+    if (result?.success) {
+      alert('자동 결제가 실행되었습니다. 서버 로그를 확인하세요.');
+    }
   };
 
   if (showBillingKeyForm) {
@@ -193,25 +216,61 @@ export default function SubscriptionPage() {
                 </Alert>
               )}
 
-              {/* 구독 버튼 */}
-              <div className="space-y-3">
-                <Button 
-                  onClick={handleSubscribe}
-                  className="w-full py-3 text-lg font-semibold"
-                  disabled={loading || paymentStatus === 'processing'}
-                >
-                  {paymentStatus === 'processing' ? '처리중...' : 
-                   billingKeyStatus?.hasBillingKey ? '구독 시작하기' : '카드 등록하기'}
-                </Button>
-                
-                <Button 
-                  onClick={() => navigate("/membership")}
-                  variant="outline"
-                  className="w-full"
-                >
-                  돌아가기
-                </Button>
-              </div>
+                             {/* 구독 버튼 */}
+               <div className="space-y-3">
+                 <Button 
+                   onClick={handleSubscribe}
+                   className="w-full py-3 text-lg font-semibold"
+                   disabled={loading || paymentStatus === 'processing'}
+                 >
+                   {paymentStatus === 'processing' ? '처리중...' : 
+                    billingKeyStatus?.hasBillingKey ? '구독 시작하기' : '카드 등록하기'}
+                 </Button>
+                 
+                 {/* 디버그 버튼들 */}
+                 {billingKeyStatus?.hasBillingKey && (
+                   <div className="space-y-2 pt-4 border-t border-gray-200">
+                     <p className="text-sm text-gray-600 text-center">디버그 기능</p>
+                     <div className="grid grid-cols-2 gap-2">
+                       <Button 
+                         onClick={handleTestPayment}
+                         variant="outline"
+                         size="sm"
+                         disabled={loading}
+                       >
+                         테스트 결제
+                       </Button>
+                       <Button 
+                         onClick={handleCheckSubscription}
+                         variant="outline"
+                         size="sm"
+                         disabled={loading}
+                       >
+                         구독 정보 확인
+                       </Button>
+                     </div>
+                     <div className="grid grid-cols-1 gap-2">
+                       <Button 
+                         onClick={handleRunAutoPayment}
+                         variant="outline"
+                         size="sm"
+                         disabled={loading}
+                         className="bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100"
+                       >
+                         수동 자동 결제 실행
+                       </Button>
+                     </div>
+                   </div>
+                 )}
+                 
+                 <Button 
+                   onClick={() => navigate("/membership")}
+                   variant="outline"
+                   className="w-full"
+                 >
+                   돌아가기
+                 </Button>
+               </div>
             </CardContent>
           </Card>
         </div>

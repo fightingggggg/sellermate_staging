@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { autoPaymentScheduler } from "./scheduler";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -62,6 +63,10 @@ app.use((req, res, next) => {
 
   // 프로덕션 환경에서는 환경변수에서 포트를 가져오고, 기본값은 5005
   const port = Number(process.env.PORT) || 5005;
+  
+  // 자동 결제 스케줄러 시작
+  autoPaymentScheduler.start();
+  
   server.listen(
     {
       port,
@@ -70,6 +75,7 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      log(`자동 결제 스케줄러가 시작되었습니다. (매분 실행)`);
     },
   );
 })();
