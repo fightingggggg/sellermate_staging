@@ -163,7 +163,13 @@ export class AutoPaymentScheduler {
         taxAmount: 1355
       };
 
-      console.log(`자동 결제 요청: ${orderId}`);
+      console.log(`=== 자동 결제 API 호출 시작: ${orderId} ===`);
+      console.log("API URL:", 'https://api.nicepay.co.kr/v1/payments');
+      console.log("요청 헤더:", {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${authHeader.substring(0, 20)}...`
+      });
+      console.log("요청 본문:", JSON.stringify(paymentData, null, 2));
 
       // 나이스페이 빌키 결제 API 호출
       const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
@@ -175,8 +181,11 @@ export class AutoPaymentScheduler {
         body: JSON.stringify(paymentData)
       });
 
+      console.log("API 응답 상태:", response.status);
+      console.log("API 응답 헤더:", Object.fromEntries(response.headers.entries()));
       const result = await response.json();
-      console.log(`나이스페이 API 응답: ${response.status}`, result);
+      console.log("API 응답 본문:", JSON.stringify(result, null, 2));
+      console.log(`=== 자동 결제 API 호출 완료: ${orderId} ===`);
 
       if (response.ok && result.resultCode === '0000') {
         // 결제 성공

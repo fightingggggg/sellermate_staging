@@ -895,7 +895,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`
       };
 
-      console.log("테스트 결제 요청 데이터:", paymentData);
+      console.log("=== 테스트 결제 API 호출 시작 ===");
+      console.log("API URL:", 'https://api.nicepay.co.kr/v1/payments');
+      console.log("요청 헤더:", {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${authHeader.substring(0, 20)}...`
+      });
+      console.log("테스트 결제 요청 데이터:", JSON.stringify(paymentData, null, 2));
 
       // 나이스페이 빌키 결제 API 호출
       const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
@@ -907,9 +913,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body: JSON.stringify(paymentData)
       });
 
-      console.log("나이스페이 API 응답 상태:", response.status);
+      console.log("API 응답 상태:", response.status);
+      console.log("API 응답 헤더:", Object.fromEntries(response.headers.entries()));
       const result = await response.json();
-      console.log("나이스페이 API 응답:", result);
+      console.log("API 응답 본문:", JSON.stringify(result, null, 2));
+      console.log("=== 테스트 결제 API 호출 완료 ===");
 
       if (!response.ok) {
         return res.status(response.status).json({ 
@@ -1397,6 +1405,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taxAmount: Math.ceil(amount * 0.09) // 10% 부가세
       };
 
+      console.log("=== 빌키 결제 API 호출 시작 ===");
+      console.log("API URL:", 'https://api.nicepay.co.kr/v1/payments');
+      console.log("요청 헤더:", {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${authHeader.substring(0, 20)}...`
+      });
+      console.log("요청 본문:", JSON.stringify(paymentData, null, 2));
+
       // 나이스페이 빌키 결제 API 호출
       const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
         method: 'POST',
@@ -1407,9 +1423,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body: JSON.stringify(paymentData)
       });
 
+      console.log("API 응답 상태:", response.status);
+      console.log("API 응답 헤더:", Object.fromEntries(response.headers.entries()));
+      
       const result = await response.json();
+      console.log("API 응답 본문:", JSON.stringify(result, null, 2));
+      console.log("=== 빌키 결제 API 호출 완료 ===");
       
       if (!response.ok) {
+        console.error("API 호출 실패:", {
+          status: response.status,
+          statusText: response.statusText,
+          result: result
+        });
         return res.status(response.status).json({ 
           error: "NicePay API error", 
           detail: result 
@@ -1570,29 +1596,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
       
       try {
+        console.log("=== 빌키 승인 API 호출 시작 ===");
+        console.log("API URL:", 'https://api.nicepay.co.kr/v1/payments');
+        console.log("요청 헤더:", {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${authHeader.substring(0, 20)}...`
+        });
+        
+        const approvalRequestData = {
+          clientId: clientId,
+          method: "BILL",
+          orderId: orderId,
+          amount: 14900,
+          goodsName: "카드 등록",
+          billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
+          useEscrow: false,
+          currency: "KRW",
+          taxFreeAmount: 0,
+          supplyAmount: 13545,
+          taxAmount: 1355
+        };
+        
+        console.log("승인 요청 본문:", JSON.stringify(approvalRequestData, null, 2));
+
         const approvalResponse = await fetch('https://api.nicepay.co.kr/v1/payments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Basic ${authHeader}`
           },
-          body: JSON.stringify({
-            clientId: clientId,
-            method: "BILL",
-            orderId: orderId,
-            amount: 14900,
-            goodsName: "카드 등록",
-            billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
-            useEscrow: false,
-            currency: "KRW",
-            taxFreeAmount: 0,
-            supplyAmount: 13545,
-            taxAmount: 1355
-          })
+          body: JSON.stringify(approvalRequestData)
         });
 
+        console.log("승인 API 응답 상태:", approvalResponse.status);
+        console.log("승인 API 응답 헤더:", Object.fromEntries(approvalResponse.headers.entries()));
         const approvalResult = await approvalResponse.json();
-        console.log("빌키 승인 API 응답:", approvalResult);
+        console.log("승인 API 응답 본문:", JSON.stringify(approvalResult, null, 2));
+        console.log("=== 빌키 승인 API 호출 완료 ===");
 
         if (approvalResponse.ok && approvalResult.resultCode === '0000') {
           console.log("빌키 승인 성공");
