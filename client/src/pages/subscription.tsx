@@ -32,19 +32,38 @@ export default function SubscriptionPage() {
     setBillingKeyStatus(status);
   };
 
-  const handleBillingKeySuccess = () => {
+  const handleBillingKeySuccess = async () => {
     setShowBillingKeyForm(false);
     setShowBillingKeyModal(false);
-    checkBillingKeyStatus();
+    await checkBillingKeyStatus();
+    
+    // 카드 등록 성공 후 바로 결제 진행
+    setPaymentStatus('processing');
+
+    try {
+      const orderId = `SUB_${Date.now()}_${currentUser?.uid}`;
+      const amount = 14900;
+      const result = await requestPayment({
+        amount: amount,
+        goodsName: "부스터 플랜 구독",
+        orderId: orderId
+      });
+
+      if (result?.success) {
+        setPaymentStatus('success');
+        setTimeout(() => {
+          navigate("/profile");
+        }, 2000);
+      } else {
+        setPaymentStatus('failed');
+      }
+    } catch (err) {
+      setPaymentStatus('failed');
+    }
   };
 
   const handlePaymentMethodSelect = (method: 'naver' | 'kakao' | 'card') => {
     setSelectedPaymentMethod(method);
-    
-    // 일반 카드 선택 시 등록된 카드가 없으면 모달 표시
-    if (method === 'card' && !billingKeyStatus?.hasBillingKey) {
-      setShowBillingKeyModal(true);
-    }
   };
 
   const handleSubscribe = async () => {
@@ -247,9 +266,6 @@ export default function SubscriptionPage() {
                       <CreditCard className="w-4 h-4 text-blue-600" />
                     </div>
                     <span className="text-sm font-medium text-gray-700">일반 카드</span>
-                    {selectedPaymentMethod === 'card' && !billingKeyStatus?.hasBillingKey && (
-                      <div className="text-xs text-red-500 mt-1">카드 등록 필요</div>
-                    )}
                   </button>
                 </div>
               </CardContent>
