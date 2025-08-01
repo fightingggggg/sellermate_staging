@@ -89,6 +89,8 @@ export const useNicePay = () => {
   // 나이스페이 결제창 호출
   const callNicePayBillingKey = (data: any) => {
     try {
+      console.log('나이스페이 결제창 호출 데이터:', data);
+      
       (window as any).AUTHNICE.requestPay({
         clientId: data.clientId,
         method: data.method,
@@ -96,6 +98,11 @@ export const useNicePay = () => {
         amount: data.amount,
         goodsName: data.goodsName,
         returnUrl: data.returnUrl,
+        useEscrow: data.useEscrow,
+        currency: data.currency,
+        taxFreeAmount: data.taxFreeAmount,
+        supplyAmount: data.supplyAmount,
+        taxAmount: data.taxAmount,
         fnError: function (result: any) {
           console.error('나이스페이 결제창 에러:', result);
           setError('결제창 호출 중 오류가 발생했습니다: ' + result.errorMsg);

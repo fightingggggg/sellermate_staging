@@ -886,15 +886,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("Firestore 저장 완료");
 
-      // 결제창 호출을 위한 데이터 반환
+      // 결제창 호출을 위한 데이터 반환 (일반 결제로 진행)
       const responseData = {
         success: true,
         clientId: clientId,
         method: "card",
         orderId: orderId,
-        amount: 0, // 빌키 발급은 0원
-        goodsName: "빌키 발급",
-        returnUrl: returnUrl
+        amount: 1, // 최소 금액 1원
+        goodsName: "카드 등록",
+        returnUrl: returnUrl,
+        useEscrow: false, // 에스크로 사용 안함
+        currency: "KRW", // 원화
+        taxFreeAmount: 0, // 면세 금액
+        supplyAmount: 1, // 공급가액
+        taxAmount: 0 // 부가세
       };
       
       console.log("응답 데이터:", JSON.stringify(responseData, null, 2));
