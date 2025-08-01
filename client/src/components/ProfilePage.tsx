@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, UserRound, Search, Sparkles, Crown, CreditCard, BarChart3, History } from "lucide-react";
+import { Loader2, UserRound, Search, Sparkles, Crown, CreditCard, BarChart3, History, Wallet } from "lucide-react";
 import { 
   Dialog, 
   DialogContent, 
@@ -524,7 +524,54 @@ export default function ProfilePage() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                                     </div>
+
+                   {/* 결제 수단 관리 섹션 */}
+                   <div className="border-b pb-6">
+                     <h3 className="text-lg font-medium mb-4 flex items-center">
+                       <Wallet className="h-5 w-5 mr-2 text-green-600" />
+                       결제 수단 관리
+                     </h3>
+                     <div className="space-y-4">
+                       <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
+                         <div className="flex items-center justify-between mb-2">
+                           <div>
+                             <h4 className="font-semibold text-gray-800">등록된 결제 수단</h4>
+                             <p className="text-sm text-gray-600">현재 등록된 결제 수단이 없습니다.</p>
+                           </div>
+                           <Badge className="bg-gray-100 text-gray-600">없음</Badge>
+                         </div>
+                         <p className="text-sm text-gray-600 mb-3">
+                           결제 수단을 등록하면 멤버십 결제 시 자동으로 결제됩니다.
+                         </p>
+                         <div className="flex gap-2">
+                           <Button 
+                             variant="outline" 
+                             size="sm"
+                             onClick={() => navigate("/subscription")}
+                           >
+                             결제 수단 등록
+                           </Button>
+                           <Button 
+                             variant="outline" 
+                             size="sm"
+                             disabled={true}
+                             className="opacity-50 cursor-not-allowed"
+                           >
+                             결제 수단 변경
+                           </Button>
+                           <Button 
+                             variant="outline" 
+                             size="sm"
+                             disabled={true}
+                             className="opacity-50 cursor-not-allowed"
+                           >
+                             결제 수단 삭제
+                           </Button>
+                         </div>
+                       </div>
+                     </div>
+                   </div>
 
                  {!isSocial && (
                   <div className="border-b pb-6">
