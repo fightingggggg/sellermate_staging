@@ -17,7 +17,7 @@ interface BillingKeyFormProps {
 export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormProps) {
   const { loading, error, requestBillingKey, getBillingKeyStatus, deleteBillingKey } = useNicePay();
   const [billingKeyStatus, setBillingKeyStatus] = useState<any>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true); // 모달에서 사용되므로 기본값을 true로 설정
   const [cardInfo, setCardInfo] = useState({
     cardNo: '',
     expYear: '',
@@ -35,10 +35,9 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
   const checkBillingKeyStatus = async () => {
     const status = await getBillingKeyStatus();
     setBillingKeyStatus(status);
+    // 이미 등록된 카드가 있으면 폼을 숨김
     if (status?.hasBillingKey) {
       setShowForm(false);
-    } else {
-      setShowForm(true);
     }
   };
 
@@ -196,7 +195,7 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
               id="cardNo"
               type="text"
               placeholder="1234 5678 9012 3456"
-              value={cardInfo.cardNo.replace(/(\d{4})(?=\d)/g, '$1 ').replace(/(\d{4}\s\d{4}\s)\d{4}\s\d{4}/g, '$1•••• ••••')}
+              value={cardInfo.cardNo.replace(/(\d{4})(?=\d)/g, '$1 ').replace(/(\d{4}\s\d{4}\s)(\d{4})(\s\d{4})/, '$1••••••••')}
               onChange={(e) => setCardInfo(prev => ({ 
                 ...prev, 
                 cardNo: e.target.value.replace(/\s/g, '').replace(/\D/g, '').slice(0, 16) 
