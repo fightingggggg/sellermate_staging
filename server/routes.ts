@@ -1619,29 +1619,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         console.log("=== 빌키 승인 API 호출 시작 ===");
-        console.log("API URL:", 'https://api.nicepay.co.kr/v1/payments');
+        console.log("빌키 ID:", actualBillingKey);
+        console.log("API URL:", `https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`);
         console.log("요청 헤더:", {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${authHeader.substring(0, 20)}...`
         });
         
         const approvalRequestData = {
-          clientId: clientId,
-          method: "BILL",
           orderId: orderId,
           amount: 14900,
           goodsName: "카드 등록",
-          billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
-          useEscrow: false,
-          currency: "KRW",
-          taxFreeAmount: 0,
-          supplyAmount: 13545,
-          taxAmount: 1355
+          cardQuota: 0,
+          useShopInterest: false
         };
         
         console.log("승인 요청 본문:", JSON.stringify(approvalRequestData, null, 2));
 
-        const approvalResponse = await fetch('https://api.nicepay.co.kr/v1/payments', {
+        const approvalResponse = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
