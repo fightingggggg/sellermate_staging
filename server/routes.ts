@@ -891,14 +891,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderId: testOrderId,
         amount: 14900, // 테스트 금액
         goodsName: "스토어부스터 부스터 플랜 (테스트)",
-        authToken: actualBillingKey, // billingKey 대신 authToken 사용
+        billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
         returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`
       };
 
       console.log("테스트 결제 요청 데이터:", paymentData);
 
       // 나이스페이 빌키 결제 API 호출
-      const response = await fetch('https://api.nicepay.co.kr/v1/billing/payments', {
+      const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1388,7 +1388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderId: orderId,
         amount: amount,
         goodsName: goodsName,
-        authToken: actualBillingKey, // billingKey 대신 authToken 사용
+        billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
         returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/webhook`,
         useEscrow: false,
         currency: "KRW",
@@ -1398,7 +1398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // 나이스페이 빌키 결제 API 호출
-      const response = await fetch('https://api.nicepay.co.kr/v1/billing/payments', {
+      const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1570,7 +1570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
       
       try {
-        const approvalResponse = await fetch('https://api.nicepay.co.kr/v1/billing/payments', {
+        const approvalResponse = await fetch('https://api.nicepay.co.kr/v1/payments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1582,7 +1582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             orderId: orderId,
             amount: 14900,
             goodsName: "카드 등록",
-            authToken: actualBillingKey, // billingKey 대신 authToken 사용
+            billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
             useEscrow: false,
             currency: "KRW",
             taxFreeAmount: 0,
