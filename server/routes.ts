@@ -1039,11 +1039,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 스케줄러 상태 확인 엔드포인트 (디버그용)
   app.get("/api/debug/scheduler-status", (req, res) => {
+    const status = autoPaymentScheduler.getStatus();
     res.json({
-      schedulerRunning: true,
+      ...status,
       schedule: "5분마다 실행 (테스트 모드)",
       nextRun: "5분 후",
-      message: "자동 결제 스케줄러가 실행 중입니다."
+      message: "자동 결제 스케줄러가 실행 중입니다.",
+      timestamp: new Date().toISOString()
     });
   });
   
@@ -1642,12 +1644,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
+        // 구독 생성 및 자동결제 스케줄 시작
+        try {
+          await autoPaymentScheduler.createSubscriptionAndStartSchedule(uid, orderId, amount);
+          console.log("=== 구독 생성 및 자동결제 스케줄 시작 완료 ===");
+        } catch (error) {
+          console.error("구독 생성 중 오류:", error);
+          // 구독 생성 실패해도 결제는 성공으로 처리
+        }
+
         console.log("=== 빌키 결제 완료 ===");
         res.json({
           success: true,
           orderId: orderId,
           tid: result.tid,
-          message: "결제가 성공적으로 완료되었습니다.",
+          message: "결제가 성공적으로 완료되었습니다. 구독이 시작되었습니다.",
           result: result
         });
       } else {
@@ -1834,6 +1845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paymentDoc = await db.collection("payments").doc(orderId).get();
         
         if (paymentDoc.exists) {
+          const paymentData = paymentDoc.data();
           await paymentDoc.ref.update({
             status: "SUCCESS",
             tid: tid,
@@ -1842,6 +1854,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           console.log("Payment status updated to SUCCESS");
+
+          // 구독이 아직 없는 경우에만 생성
+          if (paymentData?.uid) {
+            const subscriptionDoc = await db.collection("subscriptions").doc(paymentData.uid).get();
+            if (!subscriptionDoc.exists) {
+              try {
+                await autoPaymentScheduler.createSubscriptionAndStartSchedule(
+                  paymentData.uid, 
+                  orderId, 
+                  amount || paymentData.amount
+                );
+                console.log("=== 웹훅에서 구독 생성 및 자동결제 스케줄 시작 완료 ===");
+              } catch (error) {
+                console.error("웹훅에서 구독 생성 중 오류:", error);
+              }
+            }
+          }
         }
       } else {
         console.log("Payment failed or pending");
