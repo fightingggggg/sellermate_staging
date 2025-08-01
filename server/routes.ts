@@ -806,6 +806,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 웹훅 테스트용 엔드포인트
   app.post("/api/nicepay/webhook-test", (req, res) => {
     console.log("Webhook test received:", req.body);
+    res.setHeader('Content-Type', 'text/plain');
+    res.status(200).send("OK");
+  });
+
+  // 더 간단한 웹훅 테스트용 엔드포인트
+  app.post("/webhook-test", (req, res) => {
+    console.log("Simple webhook test received:", req.body);
+    res.setHeader('Content-Type', 'text/plain');
+    res.status(200).send("OK");
+  });
+
+  // GET 요청도 처리하는 테스트 엔드포인트
+  app.get("/webhook-test", (req, res) => {
+    console.log("GET webhook test received");
+    res.setHeader('Content-Type', 'text/plain');
     res.status(200).send("OK");
   });
   
@@ -910,7 +925,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 성공 여부 확인
       if (authResultCode !== "0000") {
         console.error("Billing key failed:", authResultMsg);
-        return res.status(400).send("OK");
+        res.setHeader('Content-Type', 'text/plain');
+        return res.status(200).send("OK");
       }
 
       // Firestore에서 해당 요청 찾기
@@ -922,6 +938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (billingKeyQuery.empty) {
         console.warn("Billing key request not found:", orderId);
+        res.setHeader('Content-Type', 'text/plain');
         return res.status(200).send("OK");
       }
 
@@ -955,10 +972,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         billingKeyUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
+      res.setHeader('Content-Type', 'text/plain');
       res.status(200).send("OK");
 
     } catch (error: any) {
       console.error("Billing key callback error:", error);
+      res.setHeader('Content-Type', 'text/plain');
       res.status(200).send("OK");
     }
   });
@@ -1175,12 +1194,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!paymentDoc.exists) {
         console.warn("Payment not found:", orderId);
+        res.setHeader('Content-Type', 'text/plain');
         return res.status(200).send("OK");
       }
 
       const paymentData = paymentDoc.data();
       if (!paymentData) {
         console.warn("Payment data not found:", orderId);
+        res.setHeader('Content-Type', 'text/plain');
         return res.status(200).send("OK");
       }
 
@@ -1212,10 +1233,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      res.setHeader('Content-Type', 'text/plain');
       res.status(200).send("OK");
 
     } catch (error: any) {
       console.error("Payment callback error:", error);
+      res.setHeader('Content-Type', 'text/plain');
       res.status(200).send("OK");
     }
   });
