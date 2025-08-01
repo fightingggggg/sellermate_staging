@@ -1153,8 +1153,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "ACTIVE"
       };
 
+      // billingKey가 없으면 authToken을 billingKey로 사용
+      const actualBillingKey = billingKey || authToken;
+      
       // undefined가 아닌 값만 추가
-      if (billingKey !== undefined) billingKeyData.billingKey = billingKey;
+      if (actualBillingKey !== undefined) billingKeyData.billingKey = actualBillingKey;
       if (cardCode !== undefined) billingKeyData.cardCode = cardCode;
       if (cardName !== undefined) billingKeyData.cardName = cardName;
       if (cardNo !== undefined) billingKeyData.cardNo = cardNo;
@@ -1170,7 +1173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
-      if (billingKey !== undefined) updateData.billingKey = billingKey;
+      if (actualBillingKey !== undefined) updateData.billingKey = actualBillingKey;
 
       await doc.ref.update(updateData);
 
@@ -1181,7 +1184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // 성공 시 결제 성공 페이지로 리다이렉트
-      const successUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}&billingKey=${billingKey}&cardName=${encodeURIComponent(cardName || '')}&cardNo=${cardNo || ''}`;
+      const successUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}&billingKey=${actualBillingKey}&cardName=${encodeURIComponent(cardName || '')}&cardNo=${cardNo || ''}`;
       
       res.redirect(successUrl);
 
@@ -1364,7 +1367,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: amount,
         goodsName: goodsName,
         billingKey: billingKeyData.billingKey,
-        returnUrl: `${process.env.BASE_URL || 'http://localhost:3000'}/api/nicepay/payment/callback`
+        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`,
+        useEscrow: false,
+        currency: "KRW",
+        taxFreeAmount: 0,
+        supplyAmount: Math.floor(amount * 0.91), // 10% 부가세 제외
+        taxAmount: Math.ceil(amount * 0.09) // 10% 부가세
       };
 
       // 나이스페이 결제 API 호출
@@ -1386,16 +1394,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // 결제 요청 정보 저장
-      await db.collection("payments").doc(orderId).set({
+      // 결제 요청 정보 저장 (undefined 값 필터링)
+      const paymentRecord: any = {
         uid: uid,
         orderId: orderId,
         amount: amount,
         goodsName: goodsName,
         status: "PENDING",
-        billingKey: billingKeyData.billingKey,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      };
+
+      if (billingKeyData.billingKey !== undefined) paymentRecord.billingKey = billingKeyData.billingKey;
+
+      await db.collection("payments").doc(orderId).set(paymentRecord);
 
       res.json({
         success: true,

@@ -190,21 +190,24 @@ export class AutoPaymentScheduler {
 
         await db.collection('payments').doc(orderId).set(paymentData);
 
-        // 구독 정보 업데이트
+        // 구독 정보 업데이트 (문서가 없으면 생성)
         const newEndDate = new Date();
         newEndDate.setDate(newEndDate.getDate() + 30); // 30일 연장
 
-        await db.collection('subscriptions').doc(uid).update({
+        await db.collection('subscriptions').doc(uid).set({
           status: "ACTIVE",
           lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
           endDate: newEndDate,
+          uid: uid,
+          plan: "BOOSTER",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
           paymentHistory: admin.firestore.FieldValue.arrayUnion({
             orderId: orderId,
             amount: 14900,
             date: admin.firestore.FieldValue.serverTimestamp(),
             status: "SUCCESS"
           })
-        });
+        }, { merge: true });
 
         console.log(`구독 연장 완료: ${uid}, 새로운 만료일: ${newEndDate}`);
       } else {
@@ -228,12 +231,15 @@ export class AutoPaymentScheduler {
 
         await db.collection('payments').doc(orderId).set(failureData);
 
-        // 구독 상태를 만료로 변경
-        await db.collection('subscriptions').doc(uid).update({
+        // 구독 상태를 만료로 변경 (문서가 없으면 생성)
+        await db.collection('subscriptions').doc(uid).set({
           status: "EXPIRED",
           lastPaymentAttempt: admin.firestore.FieldValue.serverTimestamp(),
-          paymentFailureReason: result.resultMsg
-        });
+          paymentFailureReason: result.resultMsg,
+          uid: uid,
+          plan: "BOOSTER",
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
       }
 
     } catch (error) {
