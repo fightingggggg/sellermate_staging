@@ -185,7 +185,7 @@ export class AutoPaymentScheduler {
         paymentHistory: [{
           orderId: orderId,
           amount: amount,
-          date: admin.firestore.FieldValue.serverTimestamp(),
+          date: admin.firestore.Timestamp.fromDate(new Date()),
           status: "SUCCESS"
         }]
       };
@@ -344,7 +344,7 @@ export class AutoPaymentScheduler {
       paymentHistory: admin.firestore.FieldValue.arrayUnion({
         orderId: orderId,
         amount: 500,
-        date: admin.firestore.FieldValue.serverTimestamp(),
+        date: admin.firestore.Timestamp.fromDate(new Date()),
         status: "SUCCESS"
       })
     }, { merge: true });
