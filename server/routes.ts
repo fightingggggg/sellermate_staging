@@ -896,21 +896,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       console.log("=== 테스트 결제 API 호출 시작 ===");
-      console.log("API URL:", 'https://api.nicepay.co.kr/v1/payments');
+      console.log("빌키 ID:", actualBillingKey);
+      console.log("API URL:", `https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`);
       console.log("요청 헤더:", {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${authHeader.substring(0, 20)}...`
       });
-      console.log("테스트 결제 요청 데이터:", JSON.stringify(paymentData, null, 2));
+      
+      // 빌키 결제용 요청 데이터 (필드명 변경)
+      const billingPaymentData = {
+        orderId: testOrderId,
+        amount: 14900,
+        goodsName: "스토어부스터 부스터 플랜 (테스트)",
+        cardQuota: 0,
+        useShopInterest: false
+      };
+      
+      console.log("테스트 결제 요청 데이터:", JSON.stringify(billingPaymentData, null, 2));
 
       // 나이스페이 빌키 결제 API 호출
-      const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
+      const response = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${authHeader}`
         },
-        body: JSON.stringify(paymentData)
+        body: JSON.stringify(billingPaymentData)
       });
 
       console.log("API 응답 상태:", response.status);
@@ -1406,21 +1417,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       console.log("=== 빌키 결제 API 호출 시작 ===");
-      console.log("API URL:", 'https://api.nicepay.co.kr/v1/payments');
+      console.log("빌키 ID:", actualBillingKey);
+      console.log("API URL:", `https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`);
       console.log("요청 헤더:", {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${authHeader.substring(0, 20)}...`
       });
-      console.log("요청 본문:", JSON.stringify(paymentData, null, 2));
+      
+      // 빌키 결제용 요청 데이터 (필드명 변경)
+      const billingPaymentData = {
+        orderId: orderId,
+        amount: amount,
+        goodsName: goodsName,
+        cardQuota: 0,
+        useShopInterest: false
+      };
+      
+      console.log("요청 본문:", JSON.stringify(billingPaymentData, null, 2));
 
       // 나이스페이 빌키 결제 API 호출
-      const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
+      const response = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${authHeader}`
         },
-        body: JSON.stringify(paymentData)
+        body: JSON.stringify(billingPaymentData)
       });
 
       console.log("API 응답 상태:", response.status);
