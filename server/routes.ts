@@ -1062,14 +1062,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: clientId,
         method: "card",
         orderId: orderId,
-        amount: 500, // 최소 금액 1원
+        amount: 14900, // 실제 서비스 금액
         goodsName: "카드 등록",
         returnUrl: returnUrl,
         useEscrow: false, // 에스크로 사용 안함
         currency: "KRW", // 원화
         taxFreeAmount: 0, // 면세 금액
-        supplyAmount: 450, // 공급가액
-        taxAmount: 50 // 부가세
+        supplyAmount: 13545, // 공급가액 (14,900원의 10% 부가세 제외)
+        taxAmount: 1355 // 부가세 (14,900원의 10%)
       };
       
       console.log("응답 데이터:", JSON.stringify(responseData, null, 2));
@@ -1109,7 +1109,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         authToken
       } = req.body;
 
-      console.log("Billing key callback received:", { orderId, authResultCode, authResultMsg });
+      console.log("Billing key callback received:", { 
+        orderId, 
+        authResultCode, 
+        authResultMsg,
+        billingKey,
+        cardCode,
+        cardName,
+        cardNo,
+        expiry,
+        authToken,
+        tid
+      });
 
       // 성공 여부 확인
       if (authResultCode !== "0000") {
@@ -1135,26 +1146,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const doc = billingKeyQuery.docs[0];
       const uid = doc.id;
 
-      // 빌키 정보 저장
-      await db.collection("billingKeys").doc(uid).set({
-        billingKey: billingKey,
-        cardCode: cardCode,
-        cardName: cardName,
-        cardNo: cardNo,
-        expiry: expiry,
-        authToken: authToken,
-        tid: tid,
+      // undefined 값 필터링하여 빌키 정보 저장
+      const billingKeyData: any = {
         orderId: orderId,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         status: "ACTIVE"
-      });
+      };
 
-      // 요청 상태 업데이트
-      await doc.ref.update({
+      // undefined가 아닌 값만 추가
+      if (billingKey !== undefined) billingKeyData.billingKey = billingKey;
+      if (cardCode !== undefined) billingKeyData.cardCode = cardCode;
+      if (cardName !== undefined) billingKeyData.cardName = cardName;
+      if (cardNo !== undefined) billingKeyData.cardNo = cardNo;
+      if (expiry !== undefined) billingKeyData.expiry = expiry;
+      if (authToken !== undefined) billingKeyData.authToken = authToken;
+      if (tid !== undefined) billingKeyData.tid = tid;
+
+      await db.collection("billingKeys").doc(uid).set(billingKeyData);
+
+      // 요청 상태 업데이트 (undefined 값 필터링)
+      const updateData: any = {
         status: "COMPLETED",
-        billingKey: billingKey,
         completedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      };
+
+      if (billingKey !== undefined) updateData.billingKey = billingKey;
+
+      await doc.ref.update(updateData);
 
       // 사용자 정보에 빌키 상태 업데이트
       await db.collection("usersInfo").doc(uid).update({
