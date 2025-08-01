@@ -38,8 +38,8 @@ export class AutoPaymentScheduler {
     this.isRunning = true;
     console.log('자동 결제 스케줄러 시작됨');
 
-    // 매일 오전 9시에 실행 (테스트용: 매분 실행)
-    cron.schedule('* * * * *', async () => {
+    // 매일 오전 9시에 실행 (테스트용: 5분마다 실행)
+    cron.schedule('*/3 * * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -78,18 +78,21 @@ export class AutoPaymentScheduler {
     const db = admin.firestore();
     
     try {
-      // 만료된 구독 찾기
+      // 만료된 구독 찾기 (인덱스 생성 후 복원)
       const now = new Date();
       const subscriptionsQuery = await db.collection('subscriptions')
         .where('status', '==', 'ACTIVE')
         .where('endDate', '<=', now)
         .get();
 
-      console.log(`만료된 구독 수: ${subscriptionsQuery.size}`);
+      const expiredSubscriptions = subscriptionsQuery.docs;
 
-      for (const doc of subscriptionsQuery.docs) {
+      console.log(`전체 활성 구독 수: ${subscriptionsQuery.size}`);
+      console.log(`만료된 구독 수: ${expiredSubscriptions.length}`);
+
+      for (const doc of expiredSubscriptions) {
         const subscription = doc.data() as SubscriptionData;
-        console.log(`구독 처리 중: ${subscription.uid}`);
+        console.log(`만료된 구독 처리 중: ${subscription.uid}`);
 
         try {
           await this.processSubscriptionPayment(subscription.uid);
@@ -97,8 +100,12 @@ export class AutoPaymentScheduler {
           console.error(`구독 ${subscription.uid} 처리 실패:`, error);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('구독 조회 중 오류:', error);
+      // 인덱스 오류인 경우 스케줄러를 중단하지 않고 계속 실행
+      if (error.code === 9) {
+        console.log('Firestore 인덱스 오류가 발생했습니다. 인덱스 생성을 기다리는 중...');
+      }
     }
   }
 

@@ -953,10 +953,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(5)
         .get();
 
+      const sortedPayments = paymentsQuery.docs;
+
       const result = {
         subscription: subscriptionDoc.exists ? subscriptionDoc.data() : null,
         billingKey: billingKeyDoc.exists ? billingKeyDoc.data() : null,
-        recentPayments: paymentsQuery.docs.map(doc => ({
+        recentPayments: sortedPayments.map(doc => ({
           id: doc.id,
           ...doc.data()
         }))
@@ -1000,8 +1002,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/debug/scheduler-status", (req, res) => {
     res.json({
       schedulerRunning: true,
-      schedule: "매분 실행 (테스트 모드)",
-      nextRun: "1분 후",
+      schedule: "5분마다 실행 (테스트 모드)",
+      nextRun: "5분 후",
       message: "자동 결제 스케줄러가 실행 중입니다."
     });
   });
