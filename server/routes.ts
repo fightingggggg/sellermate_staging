@@ -1087,8 +1087,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           encryptionKey: encryptionKey.substring(0, 8) + '...'
         });
 
-        // AES-128 암호화
-        const cipher = crypto.createCipher('aes-128-ecb', encryptionKey);
+        // AES-128 암호화 (AES/ECB/PKCS5padding)
+        const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
         let encData = cipher.update(plainText, 'utf8', 'hex');
         encData += cipher.final('hex');
 
@@ -1235,6 +1235,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+
+  // 빌키 발급 테스트 엔드포인트 (API 방식)
+  app.post("/api/nicepay/billing-key/test", async (req, res) => {
+    try {
+      console.log("=== 빌키 발급 테스트 시작 ===");
+      console.log("요청 본문:", JSON.stringify(req.body, null, 2));
+      
+      const { uid, cardNo, expYear, expMonth, idNo, cardPw } = req.body;
+      
+      // 필수 필드 검증
+      if (!uid || !cardNo || !expYear || !expMonth || !idNo || !cardPw) {
+        console.error("필수 필드 누락:", { uid, cardNo: cardNo ? "있음" : "없음", expYear, expMonth, idNo: idNo ? "있음" : "없음", cardPw: cardPw ? "있음" : "없음" });
+        return res.status(400).json({ 
+          error: "Missing required fields", 
+          message: "uid, cardNo, expYear, expMonth, idNo, cardPw are required" 
+        });
+      }
+
+      const clientId = process.env.NICEPAY_CLIENT_ID;
+      const secretKey = process.env.NICEPAY_SECRET_KEY;
+      
+      if (!clientId || !secretKey) {
+        console.error("NicePay 인증 정보가 설정되지 않음");
+        return res.status(500).json({ error: "NicePay credentials not configured" });
+      }
+
+      const orderId = `BILL_${Date.now()}_${uid}`;
+      
+      // 카드 정보 암호화 (AES-128)
+      const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
+      const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
+      
+      console.log("암호화 정보:", {
+        plainText: plainText.replace(/cardPw=\d+/, 'cardPw=**'),
+        encryptionKey: encryptionKey.substring(0, 8) + '...',
+        encryptionKeyLength: encryptionKey.length
+      });
+
+      // AES-128 암호화 (AES/ECB/PKCS5padding)
+      const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
+      let encData = cipher.update(plainText, 'utf8', 'hex');
+      encData += cipher.final('hex');
+
+      console.log("암호화 완료:", {
+        encDataLength: encData.length,
+        encDataPreview: encData.substring(0, 20) + '...'
+      });
+
+      // ediDate 생성
+      const ediDate = new Date().toISOString();
+      
+      // signData 생성
+      const signData = crypto.createHash('sha256')
+        .update(orderId + ediDate + secretKey)
+        .digest('hex');
+
+      // 빌키 발급 API 요청
+      const billingKeyRequestData = {
+        encData: encData,
+        orderId: orderId,
+        ediDate: ediDate,
+        signData: signData
+      };
+
+      console.log("빌키 발급 API 요청 데이터:", {
+        orderId: billingKeyRequestData.orderId,
+        ediDate: billingKeyRequestData.ediDate,
+        signData: billingKeyRequestData.signData.substring(0, 20) + '...',
+        encDataLength: billingKeyRequestData.encData.length
+      });
+
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      
+      console.log("API 호출 시작:", 'https://api.nicepay.co.kr/v1/subscribe/regist');
+      
+      const response = await fetch('https://api.nicepay.co.kr/v1/subscribe/regist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${authHeader}`
+        },
+        body: JSON.stringify(billingKeyRequestData)
+      });
+
+      console.log("API 응답 상태:", response.status);
+      const result = await response.json();
+      console.log("빌키 발급 API 응답:", result);
+
+      if (response.ok && result.resultCode === '0000') {
+        // 빌키 발급 성공
+        const db = admin.firestore();
+        await db.collection("billingKeys").doc(uid).set({
+          billingKey: result.bid,
+          orderId: orderId,
+          status: "ACTIVE",
+          tid: result.tid,
+          cardCode: result.cardCode,
+          cardName: result.cardName,
+          authDate: result.authDate,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log("=== 빌키 발급 테스트 완료 ===");
+        res.json({
+          success: true,
+          billingKey: result.bid,
+          message: "빌키가 성공적으로 발급되었습니다.",
+          result: result
+        });
+      } else {
+        console.error("빌키 발급 실패:", result);
+        res.status(400).json({
+          success: false,
+          error: result.resultMsg || "빌키 발급에 실패했습니다.",
+          result: result
+        });
+      }
+
+    } catch (error: any) {
+      console.error("=== 빌키 발급 테스트 에러 ===");
+      console.error("에러:", error);
+      res.status(500).json({ 
+        error: "Internal server error", 
+        message: error.message 
+      });
+    }
+  });
 
   // 빌키 수동 승인 처리 (테스트용)
   app.post("/api/nicepay/billing-key/:uid/approve", async (req, res) => {
