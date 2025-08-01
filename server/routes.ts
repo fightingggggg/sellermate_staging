@@ -838,20 +838,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(envInfo);
   });
   
-  // 빌키 발급 요청
+  // 빌키 발급 요청 (결제창 방식)
   app.post("/api/nicepay/billing-key", async (req, res) => {
     try {
-      console.log("=== 빌키 발급 요청 시작 ===");
+      console.log("=== 빌키 발급 요청 시작 (결제창 방식) ===");
       console.log("요청 본문:", JSON.stringify(req.body, null, 2));
       
-      const { uid, cardNo, expiry, birth, pwd_2digit } = req.body;
+      const { uid } = req.body;
       
       // 필수 필드 검증
-      if (!uid || !cardNo || !expiry || !birth || !pwd_2digit) {
-        console.error("필수 필드 누락:", { uid, cardNo: cardNo ? "있음" : "없음", expiry, birth, pwd_2digit: pwd_2digit ? "있음" : "없음" });
+      if (!uid) {
+        console.error("필수 필드 누락:", { uid });
         return res.status(400).json({ 
           error: "Missing required fields", 
-          message: "uid, cardNo, expiry, birth, pwd_2digit are required" 
+          message: "uid is required" 
         });
       }
 
@@ -870,77 +870,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "NicePay credentials not configured" });
       }
 
-      // Basic 인증 헤더 생성
-      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
-      console.log("인증 헤더 생성 완료");
+      console.log("인증 정보 확인 완료");
 
-      const billingKeyData = {
-        clientId: clientId,
-        method: "BILL",
-        orderId: `BILL_${Date.now()}_${uid}`,
-        amount: 0, // 빌키 발급은 0원
-        goodsName: "빌키 발급",
-        returnUrl: `${process.env.BASE_URL || 'http://localhost:3000'}/api/nicepay/billing-key/callback`,
-        fnError: function(result: any) {
-          console.error("Billing key error:", result);
-        }
-      };
-
-      console.log("빌키 발급 요청 데이터:", JSON.stringify(billingKeyData, null, 2));
-
-      // 나이스페이 빌키 발급 API 호출
-      console.log("나이스페이 API 호출 시작...");
-      const response = await fetch('https://api.nicepay.co.kr/v1/billing/authorizations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${authHeader}`
-        },
-        body: JSON.stringify(billingKeyData)
-      });
-
-      console.log("나이스페이 API 응답 상태:", response.status);
-      console.log("나이스페이 API 응답 헤더:", Object.fromEntries(response.headers.entries()));
-
-      const result = await response.json();
-      console.log("나이스페이 API 응답 본문:", JSON.stringify(result, null, 2));
-      
-      if (!response.ok) {
-        console.error("나이스페이 API 호출 실패:", {
-          status: response.status,
-          statusText: response.statusText,
-          result: result
-        });
-        return res.status(response.status).json({ 
-          error: "NicePay API error", 
-          detail: result 
-        });
-      }
-
-      console.log("나이스페이 API 호출 성공");
+      const orderId = `BILL_${Date.now()}_${uid}`;
+      const returnUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/billing-key/callback`;
 
       // Firestore에 빌키 발급 요청 정보 저장
       console.log("Firestore 저장 시작...");
       const db = admin.firestore();
       await db.collection("billingKeyRequests").doc(uid).set({
-        orderId: billingKeyData.orderId,
+        orderId: orderId,
         status: "PENDING",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        cardInfo: {
-          cardNo: cardNo.substring(0, 4) + "****" + cardNo.substring(-4), // 마스킹 처리
-          expiry: expiry
-        }
+        returnUrl: returnUrl
       });
       console.log("Firestore 저장 완료");
 
+      // 결제창 호출을 위한 데이터 반환
       const responseData = {
         success: true,
-        orderId: billingKeyData.orderId,
-        redirectUrl: result.redirectUrl || null
+        clientId: clientId,
+        method: "card",
+        orderId: orderId,
+        amount: 0, // 빌키 발급은 0원
+        goodsName: "빌키 발급",
+        returnUrl: returnUrl
       };
       
       console.log("응답 데이터:", JSON.stringify(responseData, null, 2));
-      console.log("=== 빌키 발급 요청 완료 ===");
+      console.log("=== 빌키 발급 요청 완료 (결제창 방식) ===");
 
       res.json(responseData);
 
@@ -1125,11 +1083,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
 
       // 나이스페이 빌키 삭제 API 호출
-      const response = await fetch(`https://api.nicepay.co.kr/v1/billing/authorizations/${billingKeyData.billingKey}`, {
-        method: 'DELETE',
+      const response = await fetch(`https://api.nicepay.co.kr/v1/payments/${billingKeyData.billingKey}/cancel`, {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Basic ${authHeader}`
-        }
+        },
+        body: JSON.stringify({
+          clientId: clientId,
+          reason: "사용자 요청"
+        })
       });
 
       if (!response.ok) {

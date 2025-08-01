@@ -14,10 +14,6 @@ interface BillingKeyFormProps {
 
 export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormProps) {
   const { loading, error, requestBillingKey, getBillingKeyStatus, deleteBillingKey } = useNicePay();
-  const [cardNo, setCardNo] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [birth, setBirth] = useState('');
-  const [pwd_2digit, setPwd_2digit] = useState('');
   const [billingKeyStatus, setBillingKeyStatus] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -38,17 +34,11 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const result = await requestBillingKey({
-      cardNo,
-      expiry,
-      birth,
-      pwd_2digit
-    });
+    const result = await requestBillingKey();
 
     if (result?.success) {
-      // 빌키 발급 성공 시 상태 다시 확인
-      await checkBillingKeyStatus();
-      onSuccess?.();
+      // 결제창이 호출되므로 여기서는 아무것도 하지 않음
+      // 콜백에서 처리됨
     }
   };
 
@@ -59,28 +49,7 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
     }
   };
 
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
-    const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return v;
-    }
-  };
 
-  const formatExpiry = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    if (v.length >= 2) {
-      return v.substring(0, 2) + '/' + v.substring(2, 4);
-    }
-    return v;
-  };
 
   if (billingKeyStatus?.hasBillingKey) {
     return (
@@ -151,13 +120,13 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>카드 정보 입력</CardTitle>
+        <CardTitle>카드 등록</CardTitle>
         <CardDescription>
-          자동 결제를 위해 카드 정보를 입력해주세요.
+          자동 결제를 위해 카드를 등록해주세요. 나이스페이 결제창이 열립니다.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -165,77 +134,34 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
             </Alert>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="cardNo">카드번호</Label>
-            <Input
-              id="cardNo"
-              type="text"
-              placeholder="1234 5678 9012 3456"
-              value={cardNo}
-              onChange={(e) => setCardNo(formatCardNumber(e.target.value))}
-              maxLength={19}
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="expiry">유효기간</Label>
-              <Input
-                id="expiry"
-                type="text"
-                placeholder="MM/YY"
-                value={expiry}
-                onChange={(e) => setExpiry(formatExpiry(e.target.value))}
-                maxLength={5}
-                required
-              />
+          <div className="text-center space-y-4">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                카드 등록을 위해 나이스페이 결제창이 열립니다.
+                <br />
+                결제창에서 카드 정보를 입력해주세요.
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="birth">생년월일</Label>
-              <Input
-                id="birth"
-                type="text"
-                placeholder="YYMMDD"
-                value={birth}
-                onChange={(e) => setBirth(e.target.value.replace(/[^0-9]/g, ''))}
-                maxLength={6}
-                required
-              />
+
+            <div className="flex gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onCancel}
+                className="flex-1"
+              >
+                취소
+              </Button>
+              <Button 
+                onClick={handleSubmit}
+                className="flex-1"
+                disabled={loading}
+              >
+                {loading ? '처리중...' : '카드 등록하기'}
+              </Button>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="pwd_2digit">카드 비밀번호 앞 2자리</Label>
-            <Input
-              id="pwd_2digit"
-              type="password"
-              placeholder="**"
-              value={pwd_2digit}
-              onChange={(e) => setPwd_2digit(e.target.value.replace(/[^0-9]/g, ''))}
-              maxLength={2}
-              required
-            />
-          </div>
-
-          <div className="flex gap-2 pt-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onCancel}
-              className="flex-1"
-            >
-              취소
-            </Button>
-            <Button 
-              type="submit" 
-              className="flex-1"
-              disabled={loading}
-            >
-              {loading ? '처리중...' : '카드 등록'}
-            </Button>
-          </div>
-        </form>
+        </div>
       </CardContent>
     </Card>
   );

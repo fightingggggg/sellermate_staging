@@ -3,10 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface BillingKeyRequest {
   uid: string;
-  cardNo: string;
-  expiry: string;
-  birth: string;
-  pwd_2digit: string;
 }
 
 interface PaymentRequest {
@@ -38,8 +34,8 @@ export const useNicePay = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 빌키 발급 요청
-  const requestBillingKey = async (cardInfo: Omit<BillingKeyRequest, 'uid'>): Promise<BillingKeyResponse | null> => {
+  // 빌키 발급 요청 (결제창 방식)
+  const requestBillingKey = async (): Promise<BillingKeyResponse | null> => {
     if (!currentUser?.uid) {
       setError('로그인이 필요합니다.');
       return null;
@@ -55,8 +51,7 @@ export const useNicePay = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          uid: currentUser.uid,
-          ...cardInfo
+          uid: currentUser.uid
         }),
       });
 
@@ -66,12 +61,49 @@ export const useNicePay = () => {
         throw new Error(data.message || '빌키 발급 요청에 실패했습니다.');
       }
 
+      // 결제창 호출
+      if (data.success && data.clientId) {
+        // 나이스페이 JS SDK가 로드되어 있는지 확인
+        if (typeof (window as any).AUTHNICE === 'undefined') {
+          // SDK 로드
+          const script = document.createElement('script');
+          script.src = 'https://pay.nicepay.co.kr/v1/js/';
+          script.onload = () => {
+            callNicePayBillingKey(data);
+          };
+          document.head.appendChild(script);
+        } else {
+          callNicePayBillingKey(data);
+        }
+      }
+
       return data;
     } catch (err: any) {
       setError(err.message);
       return null;
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 나이스페이 결제창 호출
+  const callNicePayBillingKey = (data: any) => {
+    try {
+      (window as any).AUTHNICE.requestPay({
+        clientId: data.clientId,
+        method: data.method,
+        orderId: data.orderId,
+        amount: data.amount,
+        goodsName: data.goodsName,
+        returnUrl: data.returnUrl,
+        fnError: function (result: any) {
+          console.error('나이스페이 결제창 에러:', result);
+          setError('결제창 호출 중 오류가 발생했습니다: ' + result.errorMsg);
+        }
+      });
+    } catch (error: any) {
+      console.error('결제창 호출 에러:', error);
+      setError('결제창을 호출할 수 없습니다.');
     }
   };
 
