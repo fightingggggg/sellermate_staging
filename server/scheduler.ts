@@ -21,10 +21,12 @@ interface SubscriptionData {
   status: string;
   endDate: any;
   plan: string;
+  createdAt?: any;
 }
 
 export class AutoPaymentScheduler {
   private isRunning = false;
+  private userSchedules = new Map<string, any>();
 
   constructor() {
     console.log('자동 결제 스케줄러 초기화 완료');
@@ -40,82 +42,145 @@ export class AutoPaymentScheduler {
     this.isRunning = true;
     console.log('자동 결제 스케줄러 시작됨');
 
-    // 매일 오전 9시에 실행 (테스트용: 5분마다 실행)
-    cron.schedule('*/3 * * * *', async () => {
-      console.log('=== 자동 결제 스케줄러 실행 시작 ===');
+    // 1분마다 새로운 구독을 확인하여 개별 스케줄 설정
+    cron.schedule('*/1 * * * *', async () => {
+      console.log('=== 구독 스케줄 확인 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
       try {
-        await this.processAutoPayments();
+        await this.checkAndScheduleSubscriptions();
       } catch (error) {
-        console.error('자동 결제 처리 중 오류:', error);
+        console.error('구독 스케줄 확인 중 오류:', error);
       }
       
-      console.log('=== 자동 결제 스케줄러 실행 완료 ===');
+      console.log('=== 구독 스케줄 확인 완료 ===');
     });
-
-    // 실제 운영용: 매일 오전 9시 실행
-    // cron.schedule('0 9 * * *', async () => {
-    //   console.log('=== 자동 결제 스케줄러 실행 시작 ===');
-    //   console.log('실행 시간:', new Date().toISOString());
-    //   
-    //   try {
-    //     await this.processAutoPayments();
-    //   } catch (error) {
-    //     console.error('자동 결제 처리 중 오류:', error);
-    //   }
-    //   
-    //   console.log('=== 자동 결제 스케줄러 실행 완료 ===');
-    // });
   }
 
   // 스케줄러 중지
   stop() {
     this.isRunning = false;
+    
+    // 모든 유저 스케줄 중지
+    for (const [uid, schedule] of this.userSchedules) {
+      schedule.stop();
+      console.log(`유저 ${uid} 스케줄 중지됨`);
+    }
+    this.userSchedules.clear();
+    
     console.log('자동 결제 스케줄러 중지됨');
   }
 
-  // 자동 결제 처리
-  private async processAutoPayments() {
+  // 구독 확인 및 개별 스케줄 설정
+  private async checkAndScheduleSubscriptions() {
     const db = admin.firestore();
     
     try {
-      // 만료된 구독 찾기 (인덱스 생성 후 복원)
-      const now = new Date();
+      // 활성 구독 찾기
       const subscriptionsQuery = await db.collection('subscriptions')
         .where('status', '==', 'ACTIVE')
-        .where('endDate', '<=', now)
         .get();
 
-      const expiredSubscriptions = subscriptionsQuery.docs;
+      const activeSubscriptions = subscriptionsQuery.docs;
+      console.log(`활성 구독 수: ${activeSubscriptions.length}`);
 
-      console.log(`전체 활성 구독 수: ${subscriptionsQuery.size}`);
-      console.log(`만료된 구독 수: ${expiredSubscriptions.length}`);
+      // 현재 스케줄된 유저들 확인
+      const scheduledUsers = new Set(this.userSchedules.keys());
+      const activeUsers = new Set(activeSubscriptions.map(doc => doc.id));
 
-      for (const doc of expiredSubscriptions) {
-        const subscription = doc.data() as SubscriptionData;
-        console.log(`만료된 구독 처리 중: ${subscription.uid}`);
-
-        try {
-          await this.processSubscriptionPayment(subscription.uid);
-        } catch (error) {
-          console.error(`구독 ${subscription.uid} 처리 실패:`, error);
+      // 더 이상 활성화되지 않은 구독의 스케줄 제거
+      for (const uid of scheduledUsers) {
+        if (!activeUsers.has(uid)) {
+          const schedule = this.userSchedules.get(uid);
+          if (schedule) {
+            schedule.stop();
+            this.userSchedules.delete(uid);
+            console.log(`유저 ${uid} 스케줄 제거됨`);
+          }
         }
       }
-    } catch (error: any) {
-      console.error('구독 조회 중 오류:', error);
-      // 인덱스 오류인 경우 스케줄러를 중단하지 않고 계속 실행
-      if (error.code === 9) {
-        console.log('Firestore 인덱스 오류가 발생했습니다. 인덱스 생성을 기다리는 중...');
+
+      // 새로운 활성 구독에 대해 개별 스케줄 설정
+      for (const doc of activeSubscriptions) {
+        const subscription = doc.data() as SubscriptionData;
+        const uid = doc.id;
+
+        if (!this.userSchedules.has(uid)) {
+          await this.scheduleUserPayment(uid, subscription);
+        }
       }
+    } catch (error) {
+      console.error('구독 확인 중 오류:', error);
     }
   }
+
+  // 개별 유저 결제 스케줄 설정
+  private async scheduleUserPayment(uid: string, subscription: SubscriptionData) {
+    try {
+      // 구독 시작 시간 기준으로 5분마다 실행
+      const startTime = subscription.createdAt?.toDate() || new Date();
+      const now = new Date();
+      
+      // 다음 실행 시간 계산 (5분 간격)
+      const timeSinceStart = now.getTime() - startTime.getTime();
+      const minutesSinceStart = Math.floor(timeSinceStart / (1000 * 60));
+      const nextInterval = Math.ceil(minutesSinceStart / 5) * 5;
+      const nextExecutionTime = new Date(startTime.getTime() + (nextInterval * 60 * 1000));
+      
+      console.log(`유저 ${uid} 스케줄 설정: ${nextExecutionTime.toISOString()}`);
+
+      // 5분마다 실행되는 스케줄 생성
+      const schedule = cron.schedule('*/5 * * * *', async () => {
+        console.log(`=== 유저 ${uid} 자동 결제 실행 ===`);
+        console.log('실행 시간:', new Date().toISOString());
+        
+        try {
+          await this.processSubscriptionPayment(uid);
+        } catch (error) {
+          console.error(`유저 ${uid} 자동 결제 처리 중 오류:`, error);
+        }
+      });
+
+      // 스케줄 시작
+      schedule.start();
+      this.userSchedules.set(uid, schedule);
+      
+      console.log(`유저 ${uid} 스케줄 시작됨`);
+    } catch (error) {
+      console.error(`유저 ${uid} 스케줄 설정 중 오류:`, error);
+    }
+  }
+
+
 
   // 개별 구독 결제 처리
   private async processSubscriptionPayment(uid: string) {
     const db = admin.firestore();
     
     try {
+      // 구독 정보 조회
+      const subscriptionDoc = await db.collection('subscriptions').doc(uid).get();
+      if (!subscriptionDoc.exists) {
+        console.log(`구독이 없음: ${uid}`);
+        return;
+      }
+
+      const subscription = subscriptionDoc.data() as SubscriptionData;
+      if (subscription.status !== 'ACTIVE') {
+        console.log(`구독이 비활성 상태: ${uid}`);
+        return;
+      }
+
+      // 만료 여부 확인
+      const now = new Date();
+      const endDate = subscription.endDate?.toDate() || new Date();
+      if (endDate > now) {
+        console.log(`구독이 아직 만료되지 않음: ${uid}, 만료일: ${endDate.toISOString()}`);
+        return;
+      }
+
+      console.log(`만료된 구독 처리 중: ${uid}, 만료일: ${endDate.toISOString()}`);
+
       // 빌키 정보 조회
       const billingKeyDoc = await db.collection('billingKeys').doc(uid).get();
       if (!billingKeyDoc.exists) {
@@ -153,15 +218,15 @@ export class AutoPaymentScheduler {
         clientId: clientId,
         method: "BILL",
         orderId: orderId,
-        amount: 14900,
+        amount: 500,
         goodsName: "스토어부스터 부스터 플랜 (자동결제)",
         billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
         returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/webhook`,
         useEscrow: false,
         currency: "KRW",
         taxFreeAmount: 0,
-        supplyAmount: 13545,
-        taxAmount: 1355
+        supplyAmount: 455,
+        taxAmount: 45
       };
 
       console.log(`=== 자동 결제 API 호출 시작: ${orderId} ===`);
@@ -183,7 +248,7 @@ export class AutoPaymentScheduler {
       // 빌키 결제용 요청 데이터 (필드명 변경)
       const billingPaymentData = {
         orderId: orderId,
-        amount: 14900,
+        amount: 500,
         goodsName: "스토어부스터 부스터 플랜 (자동결제)",
         cardQuota: 0,
         useShopInterest: false,
@@ -217,7 +282,7 @@ export class AutoPaymentScheduler {
         const paymentData: any = {
           uid: uid,
           orderId: orderId,
-          amount: 14900,
+          amount: 500,
           goodsName: "스토어부스터 부스터 플랜 (자동결제)",
           status: "SUCCESS",
           isAutoPayment: true,
@@ -243,7 +308,7 @@ export class AutoPaymentScheduler {
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           paymentHistory: admin.firestore.FieldValue.arrayUnion({
             orderId: orderId,
-            amount: 14900,
+            amount: 500,
             date: admin.firestore.FieldValue.serverTimestamp(),
             status: "SUCCESS"
           })
@@ -258,7 +323,7 @@ export class AutoPaymentScheduler {
         const failureData: any = {
           uid: uid,
           orderId: orderId,
-          amount: 14900,
+          amount: 500,
           goodsName: "스토어부스터 부스터 플랜 (자동결제)",
           status: "FAILED",
           errorMessage: result.resultMsg,
@@ -290,7 +355,7 @@ export class AutoPaymentScheduler {
       const errorData: any = {
         uid: uid,
         orderId: orderId,
-        amount: 14900,
+        amount: 500,
         goodsName: "스토어부스터 부스터 플랜 (자동결제)",
         status: "ERROR",
         errorMessage: error instanceof Error ? error.message : 'Unknown error',

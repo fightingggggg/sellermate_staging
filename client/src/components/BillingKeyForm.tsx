@@ -235,7 +235,7 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
               <Input
                 id="cardPw"
                 type="password"
-                placeholder="12"
+                placeholder="••"
                 value={cardInfo.cardPw}
                 onChange={(e) => setCardInfo(prev => ({ ...prev, cardPw: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
                 maxLength={2}

@@ -889,7 +889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: clientId,
         method: "BILL",
         orderId: testOrderId,
-        amount: 14900, // 테스트 금액
+        amount: 500, // 테스트 금액
         goodsName: "스토어부스터 부스터 플랜 (테스트)",
         billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
         returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`
@@ -914,7 +914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 빌키 결제용 요청 데이터 (필드명 변경)
       const billingPaymentData = {
         orderId: testOrderId,
-        amount: 14900,
+        amount: 500,
         goodsName: "스토어부스터 부스터 플랜 (테스트)",
         cardQuota: 0,
         useShopInterest: false,
@@ -951,7 +951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.collection("payments").doc(testOrderId).set({
         uid: uid,
         orderId: testOrderId,
-        amount: 14900,
+        amount: 500,
         goodsName: "스토어부스터 부스터 플랜 (테스트)",
         status: "PENDING",
         billingKey: billingKeyData.billingKey,
@@ -1354,14 +1354,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           clientId: clientId,
           method: "BILL",
           orderId: orderId,
-          amount: 14900,
+          amount: 500,
           goodsName: "카드 등록 (수동승인)",
           billingKey: authToken,
           useEscrow: false,
           currency: "KRW",
           taxFreeAmount: 0,
-          supplyAmount: 13545,
-          taxAmount: 1355
+          supplyAmount: 455,
+          taxAmount: 45
         })
       });
 

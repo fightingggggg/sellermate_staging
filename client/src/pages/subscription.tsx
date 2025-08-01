@@ -44,7 +44,7 @@ export default function SubscriptionPage() {
     try {
       const orderId = `SUB_${Date.now()}_${currentUser?.uid}`;
       const result = await requestPayment({
-        amount: 14900, // 월 14,900원
+        amount: 500, // 테스트 금액
         goodsName: "스토어부스터 부스터 플랜",
         orderId: orderId
       });
@@ -118,7 +118,7 @@ export default function SubscriptionPage() {
             부스터 플랜 구독
           </h1>
           <p className="text-lg text-gray-600">
-            월 14,900원으로 더 많은 기능을 이용해보세요
+            테스트 금액 500원으로 더 많은 기능을 이용해보세요
           </p>
         </div>
 
