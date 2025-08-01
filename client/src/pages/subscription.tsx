@@ -441,19 +441,11 @@ export default function SubscriptionPage() {
 
         {/* 카드 등록 모달 */}
         <Dialog open={showBillingKeyModal} onOpenChange={setShowBillingKeyModal}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-lg font-semibold">카드 등록</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <p className="text-gray-600 mb-4">
-                일반 카드 결제를 위해 카드 정보를 등록해주세요.
-              </p>
-              <BillingKeyForm 
-                onSuccess={handleBillingKeySuccess}
-                onCancel={() => setShowBillingKeyModal(false)}
-              />
-            </div>
+          <DialogContent className="max-w-md border-0 shadow-none p-0">
+            <BillingKeyForm 
+              onSuccess={handleBillingKeySuccess}
+              onCancel={() => setShowBillingKeyModal(false)}
+            />
           </DialogContent>
         </Dialog>
       </div>
