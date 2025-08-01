@@ -10,7 +10,7 @@ import { useNicePay } from "@/hooks/useNicePay";
 import BillingKeyForm from "@/components/BillingKeyForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 
 export default function SubscriptionPage() {
   const { currentUser } = useAuth();
@@ -22,16 +22,44 @@ export default function SubscriptionPage() {
   const [showBillingKeyModal, setShowBillingKeyModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
   const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
+  const [billingKeyInfo, setBillingKeyInfo] = useState<any>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'naver' | 'kakao' | 'card'>('card');
   const [paymentPeriod, setPaymentPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
   useEffect(() => {
     checkBillingKeyStatus();
+    fetchBillingKeyInfo();
   }, []);
 
   const checkBillingKeyStatus = async () => {
     const status = await getBillingKeyStatus();
     setBillingKeyStatus(status);
+  };
+
+  const fetchBillingKeyInfo = async () => {
+    if (!currentUser?.uid) {
+      console.log('사용자 UID가 없어서 결제 수단 정보를 가져올 수 없습니다.');
+      return;
+    }
+    
+    try {
+      const billingKeyDoc = await getDoc(doc(db, 'billingKeys', currentUser.uid));
+      
+      if (billingKeyDoc.exists()) {
+        const billingKeyData = billingKeyDoc.data();
+        console.log('결제 수단 정보 로드됨:', billingKeyData);
+        setBillingKeyInfo({
+          id: billingKeyDoc.id,
+          ...billingKeyData
+        });
+      } else {
+        console.log('등록된 결제 수단이 없음');
+        setBillingKeyInfo(null);
+      }
+    } catch (error) {
+      console.error('결제 수단 정보 가져오기 실패:', error);
+      setBillingKeyInfo(null);
+    }
   };
 
   const handleBillingKeySuccess = async () => {
@@ -55,18 +83,22 @@ export default function SubscriptionPage() {
         // 구독 정보를 Firestore에 저장
         try {
           const subscriptionData = {
-            userId: currentUser?.uid,
-            planType: 'booster',
-            status: 'active',
+            uid: currentUser?.uid,
+            plan: 'BOOSTER',
+            status: 'ACTIVE',
             startDate: serverTimestamp(),
             endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후
-            nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            amount: amount,
+            lastPaymentAmount: amount,
+            lastPaymentOrderId: orderId,
             paymentMethod: selectedPaymentMethod,
-            autoRenew: true,
-            orderId: orderId,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
+            paymentHistory: [{
+              amount: amount,
+              date: serverTimestamp(),
+              orderId: orderId,
+              status: 'SUCCESS',
+              plan: 'BOOSTER'
+            }],
+            createdAt: serverTimestamp()
           };
 
           await addDoc(collection(db, 'subscriptions'), subscriptionData);
@@ -113,18 +145,22 @@ export default function SubscriptionPage() {
         // 구독 정보를 Firestore에 저장
         try {
           const subscriptionData = {
-            userId: currentUser?.uid,
-            planType: 'booster',
-            status: 'active',
+            uid: currentUser?.uid,
+            plan: 'BOOSTER',
+            status: 'ACTIVE',
             startDate: serverTimestamp(),
             endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후
-            nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            amount: amount,
+            lastPaymentAmount: amount,
+            lastPaymentOrderId: orderId,
             paymentMethod: selectedPaymentMethod,
-            autoRenew: true,
-            orderId: orderId,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
+            paymentHistory: [{
+              amount: amount,
+              date: serverTimestamp(),
+              orderId: orderId,
+              status: 'SUCCESS',
+              plan: 'BOOSTER'
+            }],
+            createdAt: serverTimestamp()
           };
 
           await addDoc(collection(db, 'subscriptions'), subscriptionData);
@@ -237,7 +273,7 @@ export default function SubscriptionPage() {
                         셀러 기능
                       </h4>
                       <div className="space-y-1 text-sm text-gray-600">
-                        <div>• 키워드 분석 무제한</div>
+                        <div>• 키워드 분석 50회/일</div>
                         <div>• 키워드 알림 매일</div>
                         <div>• 상품 분석 및 실시간 순위 추적 (월 50회)</div>
                         <div>• 상품 순위 확인 (일 30개)</div>
@@ -252,7 +288,7 @@ export default function SubscriptionPage() {
                         인플루언서 기능
                       </h4>
                       <div className="space-y-1 text-sm text-gray-600">
-                        <div>• 키워드 분석 무제한</div>
+                        <div>• 키워드 분석 50회/일</div>
                         <div>• 채널 영향력 확인 (일 10회)</div>
                         <div>• 블로그/포스트 진단 (일 10개)</div>
                         <div>• 포스트 순위 확인 (일 10회)</div>
@@ -313,9 +349,34 @@ export default function SubscriptionPage() {
                     <div className="w-8 h-8 bg-blue-100 rounded mx-auto mb-2 flex items-center justify-center">
                       <CreditCard className="w-4 h-4 text-blue-600" />
                     </div>
-                    <span className="text-sm font-medium text-gray-700">일반 카드</span>
+                    <span className="text-sm font-medium text-gray-700">
+                      {billingKeyInfo ? (
+                        <div>
+                          <div>등록된 카드</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {billingKeyInfo.cardName}
+                            {billingKeyInfo.cardNo && ` (${billingKeyInfo.cardNo})`}
+                          </div>
+                        </div>
+                      ) : (
+                        '일반 카드'
+                      )}
+                    </span>
                   </button>
                 </div>
+                
+                {/* 등록된 카드 정보 표시 */}
+                {billingKeyInfo && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">등록된 카드 정보</h4>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      {billingKeyInfo.cardName && <p>• 카드명: {billingKeyInfo.cardName}</p>}
+                      {billingKeyInfo.cardNo && <p>• 카드번호: {billingKeyInfo.cardNo}</p>}
+                      {billingKeyInfo.expiry && <p>• 유효기간: {billingKeyInfo.expiry}</p>}
+                      {billingKeyInfo.status && <p>• 상태: {billingKeyInfo.status}</p>}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

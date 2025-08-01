@@ -5,9 +5,14 @@ import {
   updateDoc, 
   increment, 
   serverTimestamp,
-  Timestamp 
+  Timestamp,
+  collection,
+  query,
+  where,
+  getDocs
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { MEMBERSHIP_LIMITS } from '@/types';
 
 // CustomEvent 타입 확장
 declare global {
@@ -40,6 +45,42 @@ export class UsageService {
       .replace(/-/g, '_dash_')
       .replace(/\+/g, '_plus_');
     return `users/${safeEmail}/usage`;
+  }
+
+  // 사용자의 멤버십 타입 확인
+  private static async getUserMembershipType(userEmail: string): Promise<'basic' | 'booster'> {
+    try {
+      const safeEmail = userEmail
+        .replace(/\./g, '_dot_')
+        .replace(/@/g, '_at_')
+        .replace(/-/g, '_dash_')
+        .replace(/\+/g, '_plus_');
+      
+      // subscriptions 컬렉션에서 활성 구독 확인
+      const subscriptionsRef = collection(db, 'subscriptions');
+      const q = query(
+        subscriptionsRef,
+        where('uid', '==', safeEmail),
+        where('status', '==', 'ACTIVE')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const subscriptionDoc = querySnapshot.docs[0];
+        const subscriptionData = subscriptionDoc.data();
+        
+        // plan이 BOOSTER이면 booster, 아니면 basic
+        if (subscriptionData.plan === 'BOOSTER') {
+          return 'booster';
+        }
+      }
+      
+      return 'basic'; // 활성 구독이 없거나 BOOSTER가 아니면 basic
+    } catch (error) {
+      console.warn('Failed to get user membership type:', error);
+      return 'basic'; // 에러 시 기본값
+    }
   }
 
   private static getTodayString(): string {
@@ -82,7 +123,8 @@ export class UsageService {
   // 키워드 분석 사용량 확인
   static async checkKeywordAnalysisLimit(userEmail: string): Promise<UsageLimit> {
     const usage = await this.getDailyUsage(userEmail);
-    const maxCount = 10; // 하루 10회 제한
+    const membershipType = await this.getUserMembershipType(userEmail);
+    const maxCount = MEMBERSHIP_LIMITS[membershipType].dailyKeywordAnalysis;
     // keywordAnalysis 필드가 없거나 undefined/null인 경우 0으로 간주
     const currentCount = usage.keywordAnalysis ?? 0;
     const canUse = currentCount < maxCount;
@@ -98,7 +140,8 @@ export class UsageService {
   // 상품 최적화 사용량 확인
   static async checkProductOptimizationLimit(userEmail: string): Promise<UsageLimit> {
     const usage = await this.getDailyUsage(userEmail);
-    const maxCount = 10; // 하루 10회 제한 (완벽한 + 빠른 합산)
+    const membershipType = await this.getUserMembershipType(userEmail);
+    const maxCount = MEMBERSHIP_LIMITS[membershipType].dailyProductOptimization;
     // productOptimization 필드가 없거나 undefined/null인 경우 0으로 간주
     const currentCount = usage.productOptimization ?? 0;
     const canUse = currentCount < maxCount;

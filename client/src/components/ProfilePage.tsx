@@ -9,7 +9,7 @@ import { useHistoryLimit } from "@/hooks/useHistoryLimit";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/types";
 import { db, auth } from "@/lib/firebase"; // db는 initializeApp 후에 만든 Firestore 인스턴스
-import { collection, addDoc, serverTimestamp, setDoc, doc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, setDoc, doc, query, where, orderBy, limit, getDocs, getDoc } from "firebase/firestore";
 
 // UI 컴포넌트 import
 import {
@@ -62,7 +62,8 @@ export default function ProfilePage() {
     deleteUserAccount, 
     logout,
     error: authError,
-    sendPasswordReset // Added sendPasswordReset function
+    sendPasswordReset, // Added sendPasswordReset function
+    currentUser // Added currentUser
   } = useAuth();
   const { usageInfo, isLoading: usageLoading } = useUsage();
   const { currentCount: historyCurrent, maxCount: historyMax, isLoading: historyLoading } = useHistoryLimit();
@@ -80,6 +81,10 @@ export default function ProfilePage() {
   // 구독 정보 상태
   const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  
+  // 결제 수단 정보 상태
+  const [billingKeyInfo, setBillingKeyInfo] = useState<any>(null);
+  const [billingKeyLoading, setBillingKeyLoading] = useState(false);
 
   // 프로필 폼
   const profileForm = useForm<ProfileFormValues>({
@@ -216,27 +221,66 @@ export default function ProfilePage() {
 
   // 구독 정보 가져오기
   const fetchSubscriptionInfo = async () => {
-    if (!userProfile?.uid) return;
+    console.log('전체 userProfile 객체:', userProfile);
+    console.log('currentUser 객체:', currentUser);
+    console.log('userProfile의 모든 키:', Object.keys(userProfile || {}));
     
+    // Firebase Auth 정보 확인
+    console.log('Firebase Auth 현재 사용자:', auth.currentUser);
+    console.log('Firebase Auth UID:', auth.currentUser?.uid);
+    console.log('Firebase Auth Email:', auth.currentUser?.email);
+    
+    // currentUser에서 uid를 가져오거나, userProfile에서 provider 기반으로 uid 생성
+    let possibleUid = currentUser?.uid;
+    
+    if (!possibleUid && (userProfile as any)?.provider && userProfile?.number) {
+      // provider와 number를 조합하여 uid 생성 (예: kakao_4359614198)
+      const numberWithoutPlus = userProfile.number.replace('+82', '');
+      possibleUid = `${(userProfile as any).provider}_${numberWithoutPlus}`;
+      console.log('생성된 uid:', possibleUid);
+    }
+    
+    if (!possibleUid) {
+      console.log('uid를 찾을 수 없음. userProfile:', userProfile, 'currentUser:', currentUser);
+      return;
+    }
+    
+    console.log('사용할 uid:', possibleUid);
     setSubscriptionLoading(true);
     try {
       const subscriptionsRef = collection(db, 'subscriptions');
       const q = query(
         subscriptionsRef,
-        where('userId', '==', userProfile.uid),
-        where('status', '==', 'active'),
+        where('uid', '==', possibleUid),
+        where('status', '==', 'ACTIVE'),
         orderBy('createdAt', 'desc'),
         limit(1)
       );
       
+      console.log('쿼리 실행 중...');
       const querySnapshot = await getDocs(q);
+      console.log('쿼리 결과 - 문서 개수:', querySnapshot.size);
+      
       if (!querySnapshot.empty) {
         const subscriptionDoc = querySnapshot.docs[0];
-        setSubscriptionInfo({
+        const subscriptionData = {
           id: subscriptionDoc.id,
           ...subscriptionDoc.data()
-        });
+        };
+        console.log('구독 정보 로드됨:', subscriptionData);
+        setSubscriptionInfo(subscriptionData);
       } else {
+        console.log('활성 구독 정보 없음 - 전체 구독 문서 확인');
+        // 전체 구독 문서 확인
+        const allSubscriptionsQuery = query(
+          subscriptionsRef,
+          where('uid', '==', possibleUid)
+        );
+        const allSubscriptionsSnapshot = await getDocs(allSubscriptionsQuery);
+        console.log('전체 구독 문서 개수:', allSubscriptionsSnapshot.size);
+        allSubscriptionsSnapshot.forEach((doc) => {
+          console.log('구독 문서:', doc.id, doc.data());
+        });
         setSubscriptionInfo(null);
       }
     } catch (error) {
@@ -244,6 +288,43 @@ export default function ProfilePage() {
       setSubscriptionInfo(null);
     } finally {
       setSubscriptionLoading(false);
+    }
+  };
+
+  // 결제 수단 정보 가져오기
+  const fetchBillingKeyInfo = async () => {
+    let possibleUid = currentUser?.uid;
+    
+    if (!possibleUid && (userProfile as any)?.provider && userProfile?.number) {
+      const numberWithoutPlus = userProfile.number.replace('+82', '');
+      possibleUid = `${(userProfile as any).provider}_${numberWithoutPlus}`;
+    }
+    
+    if (!possibleUid) {
+      console.log('uid를 찾을 수 없음. 결제 수단 정보를 가져올 수 없습니다.');
+      return;
+    }
+    
+    setBillingKeyLoading(true);
+    try {
+      const billingKeyDoc = await getDoc(doc(db, 'billingKeys', possibleUid));
+      
+      if (billingKeyDoc.exists()) {
+        const billingKeyData = billingKeyDoc.data();
+        console.log('결제 수단 정보 로드됨:', billingKeyData);
+        setBillingKeyInfo({
+          id: billingKeyDoc.id,
+          ...billingKeyData
+        });
+      } else {
+        console.log('등록된 결제 수단이 없음');
+        setBillingKeyInfo(null);
+      }
+    } catch (error) {
+      console.error('결제 수단 정보 가져오기 실패:', error);
+      setBillingKeyInfo(null);
+    } finally {
+      setBillingKeyLoading(false);
     }
   };
 
@@ -256,8 +337,9 @@ export default function ProfilePage() {
         number: userProfile.number || "",
       });
       
-      // 구독 정보도 함께 가져오기
+      // 구독 정보와 결제 수단 정보 함께 가져오기
       fetchSubscriptionInfo();
+      fetchBillingKeyInfo();
     }
   }, [userProfile]);
 
@@ -539,15 +621,21 @@ export default function ProfilePage() {
                             <Badge className="bg-purple-100 text-purple-800">부스터</Badge>
                           </div>
                           <div className="text-sm text-gray-600 mb-3 space-y-1">
-                            <p>• 키워드 분석 무제한</p>
+                            <p>• 키워드 분석 50회/일</p>
                             <p>• 상품 최적화 30회/일</p>
                             <p>• 최근 내역 50개 저장</p>
                             <p>• 확장 프로그램 무제한 사용</p>
                             <p>• 신규 기능 우선 이용</p>
                           </div>
                           <div className="text-sm text-gray-600 mb-3">
-                            <p>다음 결제일: {subscriptionInfo.nextBillingDate?.toDate?.()?.toLocaleDateString() || '정보 없음'}</p>
-                            <p>결제 금액: {subscriptionInfo.amount?.toLocaleString()}원/월</p>
+                            <p>다음 결제일: {subscriptionInfo.endDate?.toDate?.()?.toLocaleDateString() || '정보 없음'}</p>
+                            <p>결제 금액: {subscriptionInfo.lastPaymentAmount?.toLocaleString()}원/월</p>
+                            <p>결제 방법: {
+                              billingKeyInfo?.cardName 
+                              // subscriptionInfo.paymentMethod === 'naver' ? '네이버페이' :
+                              // subscriptionInfo.paymentMethod === 'kakao' ? '카카오페이' :
+                              // subscriptionInfo.paymentMethod === 'card' ? (billingKeyInfo?.cardName || '일반 카드') : '정보 없음'
+                            }</p>
                           </div>
                           <div className="flex gap-2">
                             <Button 
@@ -626,43 +714,92 @@ export default function ProfilePage() {
                        결제 수단 관리
                      </h3>
                      <div className="space-y-4">
-                       <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
-                         <div className="flex items-center justify-between mb-2">
-                           <div>
-                             <h4 className="font-semibold text-gray-800">등록된 결제 수단</h4>
-                             <p className="text-sm text-gray-600">현재 등록된 결제 수단이 없습니다.</p>
+                       {billingKeyLoading ? (
+                         <div className="flex justify-center items-center h-20">
+                           <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                         </div>
+                       ) : billingKeyInfo ? (
+                         // 등록된 결제 수단이 있는 경우
+                         <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
+                           <div className="flex items-center justify-between mb-2">
+                             <div>
+                               <h4 className="font-semibold text-gray-800">등록된 결제 수단</h4>
+                               <p className="text-sm text-gray-600">
+                                 {billingKeyInfo.cardName || '카드 정보'}
+                                 {billingKeyInfo.cardNo && ` (${billingKeyInfo.cardNo})`}
+                               </p>
+                             </div>
+                             <Badge className="bg-green-100 text-green-800">등록됨</Badge>
                            </div>
-                           <Badge className="bg-gray-100 text-gray-600">없음</Badge>
+                           <div className="text-sm text-gray-600 mb-3 space-y-1">
+                             {billingKeyInfo.cardName && <p>• 카드명: {billingKeyInfo.cardName}</p>}
+                             {billingKeyInfo.cardNo && <p>• 카드번호: {billingKeyInfo.cardNo}</p>}
+                             {billingKeyInfo.expiry && <p>• 유효기간: {billingKeyInfo.expiry}</p>}
+                             {billingKeyInfo.status && <p>• 상태: {billingKeyInfo.status}</p>}
+                             {billingKeyInfo.createdAt && (
+                               <p>• 등록일: {billingKeyInfo.createdAt.toDate?.()?.toLocaleDateString() || '정보 없음'}</p>
+                             )}
+                           </div>
+                           <p className="text-sm text-gray-600 mb-3">
+                             현재 등록된 결제 수단으로 자동 결제됩니다.
+                           </p>
+                           <div className="flex gap-2">
+                             <Button 
+                               variant="outline" 
+                               size="sm"
+                               onClick={() => navigate("/subscription")}
+                             >
+                               결제 수단 변경
+                             </Button>
+                             <Button 
+                               variant="outline" 
+                               size="sm"
+                               className="border-red-300 text-red-500 hover:bg-red-50"
+                             >
+                               결제 수단 삭제
+                             </Button>
+                           </div>
                          </div>
-                         <p className="text-sm text-gray-600 mb-3">
-                           결제 수단을 등록하면 멤버십 결제 시 자동으로 결제됩니다.
-                         </p>
-                         <div className="flex gap-2">
-                           <Button 
-                             variant="outline" 
-                             size="sm"
-                             onClick={() => navigate("/subscription")}
-                           >
-                             결제 수단 등록
-                           </Button>
-                           <Button 
-                             variant="outline" 
-                             size="sm"
-                             disabled={true}
-                             className="opacity-50 cursor-not-allowed"
-                           >
-                             결제 수단 변경
-                           </Button>
-                           <Button 
-                             variant="outline" 
-                             size="sm"
-                             disabled={true}
-                             className="opacity-50 cursor-not-allowed"
-                           >
-                             결제 수단 삭제
-                           </Button>
+                       ) : (
+                         // 등록된 결제 수단이 없는 경우
+                         <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
+                           <div className="flex items-center justify-between mb-2">
+                             <div>
+                               <h4 className="font-semibold text-gray-800">등록된 결제 수단</h4>
+                               <p className="text-sm text-gray-600">현재 등록된 결제 수단이 없습니다.</p>
+                             </div>
+                             <Badge className="bg-gray-100 text-gray-600">없음</Badge>
+                           </div>
+                           <p className="text-sm text-gray-600 mb-3">
+                             결제 수단을 등록하면 멤버십 결제 시 자동으로 결제됩니다.
+                           </p>
+                           <div className="flex gap-2">
+                             <Button 
+                               variant="outline" 
+                               size="sm"
+                               onClick={() => navigate("/subscription")}
+                             >
+                               결제 수단 등록
+                             </Button>
+                             <Button 
+                               variant="outline" 
+                               size="sm"
+                               disabled={true}
+                               className="opacity-50 cursor-not-allowed"
+                             >
+                               결제 수단 변경
+                             </Button>
+                             <Button 
+                               variant="outline" 
+                               size="sm"
+                               disabled={true}
+                               className="opacity-50 cursor-not-allowed"
+                             >
+                               결제 수단 삭제
+                             </Button>
+                           </div>
                          </div>
-                       </div>
+                       )}
                      </div>
                    </div>
 

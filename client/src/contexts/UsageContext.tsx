@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { MEMBERSHIP_LIMITS } from '@/types';
 
 interface UsageStat {
   current: number;
@@ -45,10 +46,37 @@ export function UsageProvider({ children }: { children: ReactNode }) {
     const today = new Date().toISOString().split('T')[0];
     const docRef = doc(db, `users/${safeEmail}/usage`, today);
 
-    const unsubscribe = onSnapshot(docRef, (snap) => {
+    const unsubscribe = onSnapshot(docRef, async (snap) => {
       const data = snap.exists() ? snap.data() as any : {};
-      const maxKeywordAnalysis = 10;
-      const maxProductOptimization = 10;
+      
+      // 멤버십 타입 확인
+      let membershipType: 'basic' | 'booster' = 'basic';
+      try {
+        // subscriptions 컬렉션에서 활성 구독 확인
+        const subscriptionsRef = collection(db, 'subscriptions');
+        const q = query(
+          subscriptionsRef,
+          where('uid', '==', safeEmail),
+          where('status', '==', 'ACTIVE')
+        );
+        
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const subscriptionDoc = querySnapshot.docs[0];
+          const subscriptionData = subscriptionDoc.data();
+          
+          // plan이 BOOSTER이면 booster, 아니면 basic
+          if (subscriptionData.plan === 'BOOSTER') {
+            membershipType = 'booster';
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to get user membership type:', error);
+      }
+
+      const maxKeywordAnalysis = MEMBERSHIP_LIMITS[membershipType].dailyKeywordAnalysis;
+      const maxProductOptimization = MEMBERSHIP_LIMITS[membershipType].dailyProductOptimization;
       const keywordCurrent = data.keywordAnalysis || 0;
       const productCurrent = data.productOptimization || 0;
 

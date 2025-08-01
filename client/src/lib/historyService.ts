@@ -116,15 +116,27 @@ export class HistoryService {
         .replace(/-/g, '_dash_')
         .replace(/\+/g, '_plus_');
       
-      const userDocRef = doc(db, 'usersInfo', safeEmail);
-      const userDoc = await getDoc(userDocRef);
+      // subscriptions 컬렉션에서 활성 구독 확인
+      const subscriptionsRef = collection(db, 'subscriptions');
+      const q = query(
+        subscriptionsRef,
+        where('uid', '==', safeEmail),
+        where('status', '==', 'ACTIVE')
+      );
       
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        return userData.membershipType || 'basic'; // 기본값은 basic
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const subscriptionDoc = querySnapshot.docs[0];
+        const subscriptionData = subscriptionDoc.data();
+        
+        // plan이 BOOSTER이면 booster, 아니면 basic
+        if (subscriptionData.plan === 'BOOSTER') {
+          return 'booster';
+        }
       }
       
-      return 'basic'; // 문서가 없으면 기본값
+      return 'basic'; // 활성 구독이 없거나 BOOSTER가 아니면 basic
     } catch (error) {
       console.warn('Failed to get user membership type:', error);
       return 'basic'; // 에러 시 기본값
