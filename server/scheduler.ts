@@ -146,7 +146,7 @@ export class AutoPaymentScheduler {
         amount: 14900,
         goodsName: "스토어부스터 부스터 플랜 (자동결제)",
         billingKey: billingKeyData.billingKey,
-        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`,
+        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/webhook`,
         useEscrow: false,
         currency: "KRW",
         taxFreeAmount: 0,

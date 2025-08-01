@@ -1043,7 +1043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("인증 정보 확인 완료");
 
       const orderId = `BILL_${Date.now()}_${uid}`;
-      const returnUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/billing-key/callback`;
+      const returnUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/webhook`;
 
       // Firestore에 빌키 발급 요청 정보 저장
       console.log("Firestore 저장 시작...");
@@ -1093,108 +1093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 빌키 발급 콜백 처리
-  app.post("/api/nicepay/billing-key/callback", async (req, res) => {
-    try {
-      const { 
-        authResultCode, 
-        authResultMsg, 
-        tid, 
-        orderId, 
-        billingKey,
-        cardCode,
-        cardName,
-        cardNo,
-        expiry,
-        authToken
-      } = req.body;
 
-      console.log("Billing key callback received:", { 
-        orderId, 
-        authResultCode, 
-        authResultMsg,
-        billingKey,
-        cardCode,
-        cardName,
-        cardNo,
-        expiry,
-        authToken,
-        tid
-      });
-
-      // 성공 여부 확인
-      if (authResultCode !== "0000") {
-        console.error("Billing key failed:", authResultMsg);
-        // 실패 시 결제 성공 페이지로 리다이렉트 (실패 정보 포함)
-        const failureUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}`;
-        return res.redirect(failureUrl);
-      }
-
-      // Firestore에서 해당 요청 찾기
-      const db = admin.firestore();
-      const billingKeyQuery = await db.collection("billingKeyRequests")
-        .where("orderId", "==", orderId)
-        .limit(1)
-        .get();
-
-      if (billingKeyQuery.empty) {
-        console.warn("Billing key request not found:", orderId);
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send("OK");
-      }
-
-      const doc = billingKeyQuery.docs[0];
-      const uid = doc.id;
-
-      // undefined 값 필터링하여 빌키 정보 저장
-      const billingKeyData: any = {
-        orderId: orderId,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: "ACTIVE"
-      };
-
-      // billingKey가 없으면 authToken을 billingKey로 사용
-      const actualBillingKey = billingKey || authToken;
-      
-      // undefined가 아닌 값만 추가
-      if (actualBillingKey !== undefined) billingKeyData.billingKey = actualBillingKey;
-      if (cardCode !== undefined) billingKeyData.cardCode = cardCode;
-      if (cardName !== undefined) billingKeyData.cardName = cardName;
-      if (cardNo !== undefined) billingKeyData.cardNo = cardNo;
-      if (expiry !== undefined) billingKeyData.expiry = expiry;
-      if (authToken !== undefined) billingKeyData.authToken = authToken;
-      if (tid !== undefined) billingKeyData.tid = tid;
-
-      await db.collection("billingKeys").doc(uid).set(billingKeyData);
-
-      // 요청 상태 업데이트 (undefined 값 필터링)
-      const updateData: any = {
-        status: "COMPLETED",
-        completedAt: admin.firestore.FieldValue.serverTimestamp()
-      };
-
-      if (actualBillingKey !== undefined) updateData.billingKey = actualBillingKey;
-
-      await doc.ref.update(updateData);
-
-      // 사용자 정보에 빌키 상태 업데이트
-      await db.collection("usersInfo").doc(uid).update({
-        hasBillingKey: true,
-        billingKeyUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      // 성공 시 결제 성공 페이지로 리다이렉트
-      const successUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}&billingKey=${actualBillingKey}&cardName=${encodeURIComponent(cardName || '')}&cardNo=${cardNo || ''}`;
-      
-      res.redirect(successUrl);
-
-    } catch (error: any) {
-      console.error("Billing key callback error:", error);
-      // 에러 시에도 결제 성공 페이지로 리다이렉트 (실패 정보 포함)
-      const errorUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?authResultCode=ERROR&authResultMsg=${encodeURIComponent(error.message)}`;
-      res.redirect(errorUrl);
-    }
-  });
 
   // 빌키 상태 확인
   app.get("/api/nicepay/billing-key/:uid", async (req, res) => {
@@ -1367,7 +1266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: amount,
         goodsName: goodsName,
         billingKey: billingKeyData.billingKey,
-        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`,
+        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/webhook`,
         useEscrow: false,
         currency: "KRW",
         taxFreeAmount: 0,
@@ -1424,8 +1323,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 결제 콜백 처리
-  app.post("/api/nicepay/payment/callback", async (req, res) => {
+  // 통합 웹훅 콜백 처리 (빌키 발급 + 결제)
+  app.post("/api/nicepay/webhook", async (req, res) => {
+    try {
+      const { 
+        authResultCode, 
+        authResultMsg, 
+        tid, 
+        orderId, 
+        amount,
+        goodsName
+      } = req.body;
+
+      console.log("Webhook received:", { orderId, authResultCode, authResultMsg });
+
+      // 빌키 발급인지 결제인지 구분
+      const isBillingKeyRequest = orderId && orderId.startsWith('BILL_');
+      const isPaymentRequest = orderId && (orderId.startsWith('TEST_') || orderId.startsWith('AUTO_') || orderId.startsWith('PAY_'));
+
+      if (isBillingKeyRequest) {
+        // 빌키 발급 콜백 처리
+        console.log("Processing billing key callback");
+        return await handleBillingKeyCallback(req, res);
+      } else if (isPaymentRequest) {
+        // 결제 콜백 처리
+        console.log("Processing payment callback");
+        return await handlePaymentCallback(req, res);
+      } else {
+        console.warn("Unknown callback type:", orderId);
+        res.setHeader('Content-Type', 'text/plain');
+        return res.status(200).send("OK");
+      }
+
+    } catch (error: any) {
+      console.error("Webhook error:", error);
+      res.setHeader('Content-Type', 'text/plain');
+      res.status(200).send("OK");
+    }
+  });
+
+  // 빌키 발급 콜백 처리 함수
+  async function handleBillingKeyCallback(req: any, res: any) {
+    try {
+      const { 
+        authResultCode, 
+        authResultMsg, 
+        tid, 
+        orderId, 
+        billingKey,
+        cardCode,
+        cardName,
+        cardNo,
+        expiry,
+        authToken
+      } = req.body;
+
+      console.log("Billing key callback received:", { 
+        orderId, 
+        authResultCode, 
+        authResultMsg,
+        billingKey,
+        cardCode,
+        cardName,
+        cardNo,
+        expiry,
+        authToken,
+        tid
+      });
+
+      // 성공 여부 확인
+      if (authResultCode !== "0000") {
+        console.error("Billing key failed:", authResultMsg);
+        // 실패 시 결제 성공 페이지로 리다이렉트 (실패 정보 포함)
+        const failureUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}`;
+        return res.redirect(failureUrl);
+      }
+
+      // Firestore에서 해당 요청 찾기
+      const db = admin.firestore();
+      const billingKeyQuery = await db.collection("billingKeyRequests")
+        .where("orderId", "==", orderId)
+        .limit(1)
+        .get();
+
+      if (billingKeyQuery.empty) {
+        console.warn("Billing key request not found:", orderId);
+        res.setHeader('Content-Type', 'text/plain');
+        return res.status(200).send("OK");
+      }
+
+      const doc = billingKeyQuery.docs[0];
+      const uid = doc.id;
+
+      // billingKey가 없으면 authToken을 billingKey로 사용
+      const actualBillingKey = billingKey || authToken;
+      
+      // undefined 값 필터링하여 빌키 정보 저장
+      const billingKeyData: any = {
+        orderId: orderId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "ACTIVE"
+      };
+
+      // undefined가 아닌 값만 추가
+      if (actualBillingKey !== undefined) billingKeyData.billingKey = actualBillingKey;
+      if (cardCode !== undefined) billingKeyData.cardCode = cardCode;
+      if (cardName !== undefined) billingKeyData.cardName = cardName;
+      if (cardNo !== undefined) billingKeyData.cardNo = cardNo;
+      if (expiry !== undefined) billingKeyData.expiry = expiry;
+      if (authToken !== undefined) billingKeyData.authToken = authToken;
+      if (tid !== undefined) billingKeyData.tid = tid;
+
+      await db.collection("billingKeys").doc(uid).set(billingKeyData);
+
+      // 요청 상태 업데이트 (undefined 값 필터링)
+      const updateData: any = {
+        status: "COMPLETED",
+        completedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      if (actualBillingKey !== undefined) updateData.billingKey = actualBillingKey;
+
+      await doc.ref.update(updateData);
+
+      // 사용자 정보에 빌키 상태 업데이트
+      await db.collection("usersInfo").doc(uid).update({
+        hasBillingKey: true,
+        billingKeyUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 성공 시 결제 성공 페이지로 리다이렉트
+      const successUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}&billingKey=${actualBillingKey}&cardName=${encodeURIComponent(cardName || '')}&cardNo=${cardNo || ''}`;
+      
+      res.redirect(successUrl);
+
+    } catch (error: any) {
+      console.error("Billing key callback error:", error);
+      // 에러 시에도 결제 성공 페이지로 리다이렉트 (실패 정보 포함)
+      const errorUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?authResultCode=ERROR&authResultMsg=${encodeURIComponent(error.message)}`;
+      res.redirect(errorUrl);
+    }
+  }
+
+  // 결제 콜백 처리 함수
+  async function handlePaymentCallback(req: any, res: any) {
     try {
       const { 
         authResultCode, 
@@ -1490,7 +1531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'text/plain');
       res.status(200).send("OK");
     }
-  });
+  }
 
   const port = Number(process.env.PORT) || 5005;
   const httpServer = createServer(app);
