@@ -146,12 +146,17 @@ export class AutoPaymentScheduler {
         amount: 14900,
         goodsName: "스토어부스터 부스터 플랜 (자동결제)",
         billingKey: billingKeyData.billingKey,
-        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`
+        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`,
+        useEscrow: false,
+        currency: "KRW",
+        taxFreeAmount: 0,
+        supplyAmount: 13545,
+        taxAmount: 1355
       };
 
       console.log(`자동 결제 요청: ${orderId}`);
 
-      // 나이스페이 결제 API 호출
+      // 나이스페이 빌키 결제 API 호출
       const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
         method: 'POST',
         headers: {
@@ -168,19 +173,22 @@ export class AutoPaymentScheduler {
         // 결제 성공
         console.log(`자동 결제 성공: ${orderId}`);
         
-        // 결제 정보 저장
-        await db.collection('payments').doc(orderId).set({
+        // 결제 정보 저장 (undefined 값 필터링)
+        const paymentData: any = {
           uid: uid,
           orderId: orderId,
           amount: 14900,
           goodsName: "스토어부스터 부스터 플랜 (자동결제)",
           status: "SUCCESS",
-          billingKey: billingKeyData.billingKey,
-          tid: result.tid,
           isAutoPayment: true,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           completedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+        };
+
+        if (billingKeyData.billingKey !== undefined) paymentData.billingKey = billingKeyData.billingKey;
+        if (result.tid !== undefined) paymentData.tid = result.tid;
+
+        await db.collection('payments').doc(orderId).set(paymentData);
 
         // 구독 정보 업데이트
         const newEndDate = new Date();
@@ -203,18 +211,22 @@ export class AutoPaymentScheduler {
         // 결제 실패
         console.error(`자동 결제 실패: ${orderId}`, result);
         
-        await db.collection('payments').doc(orderId).set({
+        // 실패 정보 저장 (undefined 값 필터링)
+        const failureData: any = {
           uid: uid,
           orderId: orderId,
           amount: 14900,
           goodsName: "스토어부스터 부스터 플랜 (자동결제)",
           status: "FAILED",
-          billingKey: billingKeyData.billingKey,
           errorMessage: result.resultMsg,
           isAutoPayment: true,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           failedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+        };
+
+        if (billingKeyData.billingKey !== undefined) failureData.billingKey = billingKeyData.billingKey;
+
+        await db.collection('payments').doc(orderId).set(failureData);
 
         // 구독 상태를 만료로 변경
         await db.collection('subscriptions').doc(uid).update({
@@ -227,9 +239,9 @@ export class AutoPaymentScheduler {
     } catch (error) {
       console.error(`자동 결제 처리 중 오류 (${uid}):`, error);
       
-      // 오류 정보 저장
+      // 오류 정보 저장 (undefined 값 필터링)
       const orderId = `AUTO_ERROR_${Date.now()}_${uid}`;
-      await db.collection('payments').doc(orderId).set({
+      const errorData: any = {
         uid: uid,
         orderId: orderId,
         amount: 14900,
@@ -239,7 +251,9 @@ export class AutoPaymentScheduler {
         isAutoPayment: true,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         failedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      };
+
+      await db.collection('payments').doc(orderId).set(errorData);
     }
   }
 
