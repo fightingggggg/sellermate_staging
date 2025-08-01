@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import admin from 'firebase-admin';
+import crypto from 'crypto';
 
 // Firestore 초기화 확인
 if (!admin.apps.length) {
@@ -175,7 +176,6 @@ export class AutoPaymentScheduler {
       const ediDate = new Date().toISOString();
       
       // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
-      const crypto = require('crypto');
       const signData = crypto.createHash('sha256')
         .update(orderId + actualBillingKey + ediDate + secretKey)
         .digest('hex');

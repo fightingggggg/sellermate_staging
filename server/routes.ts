@@ -907,7 +907,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ediDate = new Date().toISOString();
       
       // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
-      const crypto = require('crypto');
       const signData = crypto.createHash('sha256')
         .update(testOrderId + actualBillingKey + ediDate + secretKey)
         .digest('hex');
@@ -1439,7 +1438,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ediDate = new Date().toISOString();
       
       // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
-      const crypto = require('crypto');
       const signData = crypto.createHash('sha256')
         .update(orderId + actualBillingKey + ediDate + secretKey)
         .digest('hex');
@@ -1652,7 +1650,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const ediDate = new Date().toISOString();
         
         // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
-        const crypto = require('crypto');
         const signData = crypto.createHash('sha256')
           .update(orderId + actualBillingKey + ediDate + secretKey)
           .digest('hex');
