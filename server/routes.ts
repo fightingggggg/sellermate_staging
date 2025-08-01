@@ -892,14 +892,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientId: clientId,
         method: "card",
         orderId: orderId,
-        amount: 1, // 최소 금액 1원
+        amount: 500, // 최소 금액 1원
         goodsName: "카드 등록",
         returnUrl: returnUrl,
         useEscrow: false, // 에스크로 사용 안함
         currency: "KRW", // 원화
         taxFreeAmount: 0, // 면세 금액
-        supplyAmount: 1, // 공급가액
-        taxAmount: 0 // 부가세
+        supplyAmount: 450, // 공급가액
+        taxAmount: 50 // 부가세
       };
       
       console.log("응답 데이터:", JSON.stringify(responseData, null, 2));
