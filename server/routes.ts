@@ -874,6 +874,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Basic 인증 헤더 생성
       const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
 
+      // billingKey가 없으면 authToken을 사용
+      const actualBillingKey = billingKeyData.billingKey || billingKeyData.authToken;
+      
+      if (!actualBillingKey) {
+        return res.status(400).json({ 
+          error: "Billing key not available", 
+          message: "Billing key or auth token not found" 
+        });
+      }
+
       const testOrderId = `TEST_${Date.now()}_${uid}`;
       const paymentData = {
         clientId: clientId,
@@ -881,14 +891,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderId: testOrderId,
         amount: 14900, // 테스트 금액
         goodsName: "스토어부스터 부스터 플랜 (테스트)",
-        billingKey: billingKeyData.billingKey,
+        authToken: actualBillingKey, // billingKey 대신 authToken 사용
         returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`
       };
 
       console.log("테스트 결제 요청 데이터:", paymentData);
 
-      // 나이스페이 결제 API 호출
-      const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
+      // 나이스페이 빌키 결제 API 호출
+      const response = await fetch('https://api.nicepay.co.kr/v1/billing/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1095,6 +1105,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
 
+  // 빌키 수동 승인 처리 (테스트용)
+  app.post("/api/nicepay/billing-key/:uid/approve", async (req, res) => {
+    try {
+      const { uid } = req.params;
+      console.log("=== 빌키 수동 승인 시작 ===");
+      console.log("요청된 UID:", uid);
+      
+      const db = admin.firestore();
+      const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
+      
+      if (!billingKeyDoc.exists) {
+        return res.status(404).json({ error: "Billing key not found" });
+      }
+
+      const billingKeyData = billingKeyDoc.data();
+      if (!billingKeyData) {
+        return res.status(404).json({ error: "Billing key data not found" });
+      }
+
+      console.log("현재 빌키 데이터:", billingKeyData);
+
+      // authToken을 billingKey로 사용
+      const authToken = billingKeyData.authToken;
+      if (!authToken) {
+        return res.status(400).json({ error: "Auth token not found" });
+      }
+
+      const clientId = process.env.NICEPAY_CLIENT_ID;
+      const secretKey = process.env.NICEPAY_SECRET_KEY;
+      
+      if (!clientId || !secretKey) {
+        return res.status(500).json({ error: "NicePay credentials not configured" });
+      }
+
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      const orderId = `APPROVE_${Date.now()}_${uid}`;
+      
+      console.log("빌키 승인 API 호출 시작");
+      console.log("사용할 authToken:", authToken);
+      console.log("새로운 orderId:", orderId);
+
+      const approvalResponse = await fetch('https://api.nicepay.co.kr/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${authHeader}`
+        },
+        body: JSON.stringify({
+          clientId: clientId,
+          method: "BILL",
+          orderId: orderId,
+          amount: 14900,
+          goodsName: "카드 등록 (수동승인)",
+          billingKey: authToken,
+          useEscrow: false,
+          currency: "KRW",
+          taxFreeAmount: 0,
+          supplyAmount: 13545,
+          taxAmount: 1355
+        })
+      });
+
+      const approvalResult = await approvalResponse.json();
+      console.log("빌키 승인 API 응답:", approvalResult);
+
+      if (approvalResponse.ok && approvalResult.resultCode === '0000') {
+        console.log("빌키 승인 성공");
+        
+        // 승인 성공 시 빌키 정보 업데이트
+        await billingKeyDoc.ref.update({
+          billingKey: authToken, // authToken을 실제 billingKey로 설정
+          approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          approvalTid: approvalResult.tid,
+          approvalResultCode: approvalResult.resultCode,
+          approvalOrderId: orderId
+        });
+
+        res.json({
+          success: true,
+          message: "빌키 승인 성공",
+          billingKey: authToken,
+          tid: approvalResult.tid,
+          orderId: orderId
+        });
+      } else {
+        console.error("빌키 승인 실패:", approvalResult);
+        res.status(400).json({
+          success: false,
+          error: "빌키 승인 실패",
+          detail: approvalResult
+        });
+      }
+
+    } catch (error: any) {
+      console.error("빌키 수동 승인 오류:", error);
+      res.status(500).json({
+        success: false,
+        error: "Internal server error",
+        message: error.message
+      });
+    }
+  });
+
   // 빌키 상태 확인
   app.get("/api/nicepay/billing-key/:uid", async (req, res) => {
     try {
@@ -1259,13 +1372,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Basic 인증 헤더 생성
       const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
 
+      // billingKey가 없으면 authToken을 사용
+      const actualBillingKey = billingKeyData.billingKey || billingKeyData.authToken;
+      
+      if (!actualBillingKey) {
+        return res.status(400).json({ 
+          error: "Billing key not available", 
+          message: "Billing key or auth token not found" 
+        });
+      }
+
       const paymentData = {
         clientId: clientId,
         method: "BILL",
         orderId: orderId,
         amount: amount,
         goodsName: goodsName,
-        billingKey: billingKeyData.billingKey,
+        authToken: actualBillingKey, // billingKey 대신 authToken 사용
         returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/webhook`,
         useEscrow: false,
         currency: "KRW",
@@ -1274,8 +1397,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taxAmount: Math.ceil(amount * 0.09) // 10% 부가세
       };
 
-      // 나이스페이 결제 API 호출
-      const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
+      // 나이스페이 빌키 결제 API 호출
+      const response = await fetch('https://api.nicepay.co.kr/v1/billing/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1447,7 +1570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
       
       try {
-        const approvalResponse = await fetch('https://api.nicepay.co.kr/v1/payments', {
+        const approvalResponse = await fetch('https://api.nicepay.co.kr/v1/billing/payments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1459,7 +1582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             orderId: orderId,
             amount: 14900,
             goodsName: "카드 등록",
-            billingKey: actualBillingKey,
+            authToken: actualBillingKey, // billingKey 대신 authToken 사용
             useEscrow: false,
             currency: "KRW",
             taxFreeAmount: 0,

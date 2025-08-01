@@ -7,7 +7,8 @@ if (!admin.apps.length) {
 }
 
 interface BillingKeyData {
-  billingKey: string;
+  billingKey?: string;
+  authToken?: string;
   cardName?: string;
   cardNo?: string;
   expiry?: string;
@@ -137,6 +138,14 @@ export class AutoPaymentScheduler {
       }
 
       const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      // billingKey가 없으면 authToken을 사용
+      const actualBillingKey = billingKeyData.billingKey || billingKeyData.authToken;
+      
+      if (!actualBillingKey) {
+        console.error(`빌키가 없음: ${uid}`);
+        return;
+      }
+
       const orderId = `AUTO_${Date.now()}_${uid}`;
       
       const paymentData = {
@@ -145,7 +154,7 @@ export class AutoPaymentScheduler {
         orderId: orderId,
         amount: 14900,
         goodsName: "스토어부스터 부스터 플랜 (자동결제)",
-        billingKey: billingKeyData.billingKey,
+        authToken: actualBillingKey, // billingKey 대신 authToken 사용
         returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/webhook`,
         useEscrow: false,
         currency: "KRW",
@@ -157,7 +166,7 @@ export class AutoPaymentScheduler {
       console.log(`자동 결제 요청: ${orderId}`);
 
       // 나이스페이 빌키 결제 API 호출
-      const response = await fetch('https://api.nicepay.co.kr/v1/payments', {
+      const response = await fetch('https://api.nicepay.co.kr/v1/billing/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
