@@ -903,13 +903,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Authorization': `Basic ${authHeader.substring(0, 20)}...`
       });
       
+      // ediDate 생성 (ISO 8601 형식)
+      const ediDate = new Date().toISOString();
+      
+      // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
+      const crypto = require('crypto');
+      const signData = crypto.createHash('sha256')
+        .update(testOrderId + actualBillingKey + ediDate + secretKey)
+        .digest('hex');
+      
       // 빌키 결제용 요청 데이터 (필드명 변경)
       const billingPaymentData = {
         orderId: testOrderId,
         amount: 14900,
         goodsName: "스토어부스터 부스터 플랜 (테스트)",
         cardQuota: 0,
-        useShopInterest: false
+        useShopInterest: false,
+        ediDate: ediDate,
+        signData: signData
       };
       
       console.log("테스트 결제 요청 데이터:", JSON.stringify(billingPaymentData, null, 2));
@@ -1424,13 +1435,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Authorization': `Basic ${authHeader.substring(0, 20)}...`
       });
       
+      // ediDate 생성 (ISO 8601 형식)
+      const ediDate = new Date().toISOString();
+      
+      // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
+      const crypto = require('crypto');
+      const signData = crypto.createHash('sha256')
+        .update(orderId + actualBillingKey + ediDate + secretKey)
+        .digest('hex');
+      
       // 빌키 결제용 요청 데이터 (필드명 변경)
       const billingPaymentData = {
         orderId: orderId,
         amount: amount,
         goodsName: goodsName,
         cardQuota: 0,
-        useShopInterest: false
+        useShopInterest: false,
+        ediDate: ediDate,
+        signData: signData
       };
       
       console.log("요청 본문:", JSON.stringify(billingPaymentData, null, 2));
@@ -1626,12 +1648,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'Authorization': `Basic ${authHeader.substring(0, 20)}...`
         });
         
+        // ediDate 생성 (ISO 8601 형식)
+        const ediDate = new Date().toISOString();
+        
+        // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
+        const crypto = require('crypto');
+        const signData = crypto.createHash('sha256')
+          .update(orderId + actualBillingKey + ediDate + secretKey)
+          .digest('hex');
+        
         const approvalRequestData = {
           orderId: orderId,
           amount: 14900,
           goodsName: "카드 등록",
           cardQuota: 0,
-          useShopInterest: false
+          useShopInterest: false,
+          ediDate: ediDate,
+          signData: signData
         };
         
         console.log("승인 요청 본문:", JSON.stringify(approvalRequestData, null, 2));
