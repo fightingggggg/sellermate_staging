@@ -1047,189 +1047,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
-  // 빌키 발급 요청 (결제창 방식 - 기존 호환성 유지)
+  // 빌키 발급 요청 (나이스페이 공식 문서 준수)
   app.post("/api/nicepay/billing-key", async (req, res) => {
     try {
-      console.log("=== 빌키 발급 요청 시작 (결제창 방식) ===");
+      console.log("=== 빌키 발급 요청 시작 ===");
       console.log("요청 본문:", JSON.stringify(req.body, null, 2));
       
       const { uid, cardNo, expYear, expMonth, idNo, cardPw } = req.body;
       
-      // 카드 정보가 있으면 API 방식으로 처리
-      if (cardNo && expYear && expMonth && idNo && cardPw) {
-        console.log("카드 정보가 제공됨 - API 방식으로 처리");
-        
-        // 필수 필드 검증
-        if (!uid || !cardNo || !expYear || !expMonth || !idNo || !cardPw) {
-          console.error("필수 필드 누락:", { uid, cardNo: cardNo ? "있음" : "없음", expYear, expMonth, idNo: idNo ? "있음" : "없음", cardPw: cardPw ? "있음" : "없음" });
-          return res.status(400).json({ 
-            error: "Missing required fields", 
-            message: "uid, cardNo, expYear, expMonth, idNo, cardPw are required" 
-          });
-        }
-
-        const clientId = process.env.NICEPAY_CLIENT_ID;
-        const secretKey = process.env.NICEPAY_SECRET_KEY;
-        
-        if (!clientId || !secretKey) {
-          console.error("NicePay 인증 정보가 설정되지 않음");
-          return res.status(500).json({ error: "NicePay credentials not configured" });
-        }
-
-        const orderId = `BILL_${Date.now()}_${uid}`;
-        
-        // 카드 정보 암호화 (AES-128)
-        const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
-        const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
-        
-        console.log("암호화 정보:", {
-          plainText: plainText.replace(/cardPw=\d+/, 'cardPw=**'),
-          encryptionKey: encryptionKey.substring(0, 8) + '...'
-        });
-
-        // AES-128 암호화 (AES/ECB/PKCS5padding)
-        const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
-        let encData = cipher.update(plainText, 'utf8', 'hex');
-        encData += cipher.final('hex');
-
-        // ediDate 생성
-        const ediDate = new Date().toISOString();
-        
-        // signData 생성
-        const signData = crypto.createHash('sha256')
-          .update(orderId + ediDate + secretKey)
-          .digest('hex');
-
-        // 빌키 발급 API 요청
-        const billingKeyRequestData = {
-          encData: encData,
-          orderId: orderId,
-          ediDate: ediDate,
-          signData: signData
-        };
-
-        console.log("빌키 발급 API 요청 데이터:", {
-          ...billingKeyRequestData,
-          encData: encData.substring(0, 20) + '...'
-        });
-
-        const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
-        
-        const response = await fetch('https://api.nicepay.co.kr/v1/subscribe/regist', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Basic ${authHeader}`
-          },
-          body: JSON.stringify(billingKeyRequestData)
-        });
-
-        const result = await response.json();
-        console.log("빌키 발급 API 응답:", result);
-
-        if (response.ok && result.resultCode === '0000') {
-          // 빌키 발급 성공
-          const db = admin.firestore();
-          await db.collection("billingKeys").doc(uid).set({
-            billingKey: result.bid,
-            orderId: orderId,
-            status: "ACTIVE",
-            tid: result.tid,
-            cardCode: result.cardCode,
-            cardName: result.cardName,
-            authDate: result.authDate,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-
-          console.log("=== 빌키 발급 완료 (API 방식) ===");
-          res.json({
-            success: true,
-            billingKey: result.bid,
-            message: "빌키가 성공적으로 발급되었습니다."
-          });
-        } else {
-          console.error("빌키 발급 실패:", result);
-          res.status(400).json({
-            success: false,
-            error: result.resultMsg || "빌키 발급에 실패했습니다."
-          });
-        }
-        return;
-      }
-      
-      // 기존 결제창 방식 (카드 정보가 없는 경우)
-      if (!uid) {
-        console.error("필수 필드 누락:", { uid });
+      // 필수 필드 검증
+      if (!uid || !cardNo || !expYear || !expMonth || !idNo || !cardPw) {
+        console.error("필수 필드 누락:", { uid, cardNo: cardNo ? "있음" : "없음", expYear, expMonth, idNo: idNo ? "있음" : "없음", cardPw: cardPw ? "있음" : "없음" });
         return res.status(400).json({ 
           error: "Missing required fields", 
-          message: "uid is required" 
+          message: "uid, cardNo, expYear, expMonth, idNo, cardPw are required" 
         });
       }
-
-      console.log("기존 결제창 방식으로 처리");
 
       const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
-      
-      console.log("환경 변수 확인:", {
-        clientId: clientId ? "설정됨" : "설정되지 않음",
-        secretKey: secretKey ? "설정됨" : "설정되지 않음"
-      });
       
       if (!clientId || !secretKey) {
         console.error("NicePay 인증 정보가 설정되지 않음");
         return res.status(500).json({ error: "NicePay credentials not configured" });
       }
 
-      console.log("인증 정보 확인 완료");
-
       const orderId = `BILL_${Date.now()}_${uid}`;
-      const returnUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/webhook`;
-
-      // Firestore에 빌키 발급 요청 정보 저장
-      console.log("Firestore 저장 시작...");
-      const db = admin.firestore();
-      await db.collection("billingKeyRequests").doc(uid).set({
-        orderId: orderId,
-        status: "PENDING",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        returnUrl: returnUrl
-      });
-      console.log("Firestore 저장 완료");
-
-      // 결제창 호출을 위한 데이터 반환 (일반 결제로 진행)
-      const responseData = {
-        success: true,
-        clientId: clientId,
-        method: "card",
-        orderId: orderId,
-        amount: 14900, // 실제 서비스 금액
-        goodsName: "카드 등록",
-        returnUrl: returnUrl,
-        useEscrow: false, // 에스크로 사용 안함
-        currency: "KRW", // 원화
-        taxFreeAmount: 0, // 면세 금액
-        supplyAmount: 13545, // 공급가액 (14,900원의 10% 부가세 제외)
-        taxAmount: 1355 // 부가세 (14,900원의 10%)
-      };
       
-      console.log("응답 데이터:", JSON.stringify(responseData, null, 2));
-      console.log("=== 빌키 발급 요청 완료 (결제창 방식) ===");
+      // 카드 정보 암호화 (AES-128)
+      const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
+      const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
+      
+      console.log("암호화 정보:", {
+        plainText: plainText.replace(/cardPw=\d+/, 'cardPw=**'),
+        encryptionKey: encryptionKey.substring(0, 8) + '...',
+        encryptionKeyLength: encryptionKey.length
+      });
 
-      res.json(responseData);
+      // AES-128 암호화 (AES/ECB/PKCS5padding)
+      const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
+      let encData = cipher.update(plainText, 'utf8', 'hex');
+      encData += cipher.final('hex');
+
+      console.log("암호화 완료:", {
+        encDataLength: encData.length,
+        encDataPreview: encData.substring(0, 20) + '...'
+      });
+
+      // ediDate 생성
+      const ediDate = new Date().toISOString();
+      
+      // signData 생성
+      const signData = crypto.createHash('sha256')
+        .update(orderId + ediDate + secretKey)
+        .digest('hex');
+
+      // 빌키 발급 API 요청
+      const billingKeyRequestData = {
+        encData: encData,
+        orderId: orderId,
+        ediDate: ediDate,
+        signData: signData
+      };
+
+      console.log("빌키 발급 API 요청 데이터:", {
+        orderId: billingKeyRequestData.orderId,
+        ediDate: billingKeyRequestData.ediDate,
+        signData: billingKeyRequestData.signData.substring(0, 20) + '...',
+        encDataLength: billingKeyRequestData.encData.length
+      });
+
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      
+      console.log("API 호출 시작:", 'https://api.nicepay.co.kr/v1/subscribe/regist');
+      
+      const response = await fetch('https://api.nicepay.co.kr/v1/subscribe/regist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${authHeader}`
+        },
+        body: JSON.stringify(billingKeyRequestData)
+      });
+
+      console.log("API 응답 상태:", response.status);
+      const result = await response.json();
+      console.log("빌키 발급 API 응답:", result);
+
+      if (response.ok && result.resultCode === '0000') {
+        // 빌키 발급 성공
+        const db = admin.firestore();
+        await db.collection("billingKeys").doc(uid).set({
+          billingKey: result.bid,
+          orderId: orderId,
+          status: "ACTIVE",
+          tid: result.tid,
+          cardCode: result.cardCode,
+          cardName: result.cardName,
+          authDate: result.authDate,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log("=== 빌키 발급 완료 ===");
+        res.json({
+          success: true,
+          billingKey: result.bid,
+          message: "빌키가 성공적으로 발급되었습니다.",
+          result: result
+        });
+      } else {
+        console.error("빌키 발급 실패:", result);
+        res.status(400).json({
+          success: false,
+          error: result.resultMsg || "빌키 발급에 실패했습니다.",
+          result: result
+        });
+      }
 
     } catch (error: any) {
       console.error("=== 빌키 발급 요청 에러 ===");
-      console.error("에러 타입:", error.constructor.name);
-      console.error("에러 메시지:", error.message);
-      console.error("에러 스택:", error.stack);
-      console.error("전체 에러 객체:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      console.error("=== 빌키 발급 요청 에러 끝 ===");
-      
+      console.error("에러:", error);
       res.status(500).json({ 
         error: "Internal server error", 
-        message: error.message,
-        stack: error.stack
+        message: error.message 
       });
     }
   });
@@ -1596,83 +1536,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 빌키로 결제 요청 (구독 결제용)
+  // 빌키로 결제 요청 (나이스페이 공식 문서 준수)
   app.post("/api/nicepay/payment/billing", async (req, res) => {
     try {
+      console.log("=== 빌키 결제 요청 시작 ===");
+      console.log("요청 본문:", JSON.stringify(req.body, null, 2));
+      
       const { uid, amount, goodsName, orderId } = req.body;
       
       if (!uid || !amount || !goodsName || !orderId) {
+        console.error("필수 필드 누락:", { uid, amount, goodsName, orderId });
         return res.status(400).json({ 
           error: "Missing required fields", 
           message: "uid, amount, goodsName, orderId are required" 
         });
       }
 
-      const db = admin.firestore();
-      const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
-      
-      if (!billingKeyDoc.exists) {
-        return res.status(404).json({ error: "Billing key not found" });
-      }
-
-      const billingKeyData = billingKeyDoc.data();
-      if (!billingKeyData) {
-        return res.status(404).json({ error: "Billing key data not found" });
-      }
-      
       const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
       
       if (!clientId || !secretKey) {
+        console.error("NicePay 인증 정보가 설정되지 않음");
         return res.status(500).json({ error: "NicePay credentials not configured" });
       }
 
-      // Basic 인증 헤더 생성
-      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
-
-      // billingKey가 없으면 authToken을 사용
-      const actualBillingKey = billingKeyData.billingKey || billingKeyData.authToken;
+      // Firestore에서 빌키 정보 조회
+      const db = admin.firestore();
+      const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
       
-      if (!actualBillingKey) {
-        return res.status(400).json({ 
-          error: "Billing key not available", 
-          message: "Billing key or auth token not found" 
+      if (!billingKeyDoc.exists) {
+        console.error("빌키 정보를 찾을 수 없음:", uid);
+        return res.status(404).json({ 
+          error: "Billing key not found", 
+          message: "등록된 카드 정보가 없습니다." 
         });
       }
 
-      const paymentData = {
-        clientId: clientId,
-        method: "BILL",
-        orderId: orderId,
-        amount: amount,
-        goodsName: goodsName,
-        billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
-        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/webhook`,
-        useEscrow: false,
-        currency: "KRW",
-        taxFreeAmount: 0,
-        supplyAmount: Math.floor(amount * 0.91), // 10% 부가세 제외
-        taxAmount: Math.ceil(amount * 0.09) // 10% 부가세
-      };
+      const billingKeyData = billingKeyDoc.data();
+      if (!billingKeyData || !billingKeyData.billingKey) {
+        console.error("유효한 빌키가 없음:", uid);
+        return res.status(400).json({ 
+          error: "Invalid billing key", 
+          message: "유효하지 않은 카드 정보입니다." 
+        });
+      }
 
-      console.log("=== 빌키 결제 API 호출 시작 ===");
-      console.log("빌키 ID:", actualBillingKey);
-      console.log("API URL:", `https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`);
-      console.log("요청 헤더:", {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${authHeader.substring(0, 20)}...`
+      const billingKey = billingKeyData.billingKey;
+
+      console.log("결제 정보:", {
+        orderId,
+        amount,
+        goodsName,
+        billingKey: billingKey.substring(0, 10) + '...'
       });
-      
-      // ediDate 생성 (ISO 8601 형식)
+
+      // ediDate 생성
       const ediDate = new Date().toISOString();
       
       // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
       const signData = crypto.createHash('sha256')
-        .update(orderId + actualBillingKey + ediDate + secretKey)
+        .update(orderId + billingKey + ediDate + secretKey)
         .digest('hex');
-      
-      // 빌키 결제용 요청 데이터 (필드명 변경)
-      const billingPaymentData = {
+
+      // 결제 요청 데이터
+      const paymentRequestData = {
         orderId: orderId,
         amount: amount,
         goodsName: goodsName,
@@ -1681,61 +1608,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ediDate: ediDate,
         signData: signData
       };
-      
-      console.log("요청 본문:", JSON.stringify(billingPaymentData, null, 2));
 
-      // 나이스페이 빌키 결제 API 호출
-      const response = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`, {
+      console.log("결제 요청 데이터:", JSON.stringify(paymentRequestData, null, 2));
+
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      
+      console.log("API 호출 시작:", `https://api.nicepay.co.kr/v1/subscribe/${billingKey}/payments`);
+      
+      const response = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${billingKey}/payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${authHeader}`
         },
-        body: JSON.stringify(billingPaymentData)
+        body: JSON.stringify(paymentRequestData)
       });
 
-      console.log("API 응답 상태:", response.status);
-      console.log("API 응답 헤더:", Object.fromEntries(response.headers.entries()));
-      
+      console.log("결제 API 응답 상태:", response.status);
       const result = await response.json();
-      console.log("API 응답 본문:", JSON.stringify(result, null, 2));
-      console.log("=== 빌키 결제 API 호출 완료 ===");
-      
-      if (!response.ok) {
-        console.error("API 호출 실패:", {
-          status: response.status,
-          statusText: response.statusText,
+      console.log("결제 API 응답:", result);
+
+      if (response.ok && result.resultCode === '0000') {
+        // 결제 성공
+        await db.collection("payments").doc(orderId).set({
+          uid: uid,
+          orderId: orderId,
+          amount: amount,
+          goodsName: goodsName,
+          status: "SUCCESS",
+          tid: result.tid,
+          billingKey: billingKey,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          completedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log("=== 빌키 결제 완료 ===");
+        res.json({
+          success: true,
+          orderId: orderId,
+          tid: result.tid,
+          message: "결제가 성공적으로 완료되었습니다.",
           result: result
         });
-        return res.status(response.status).json({ 
-          error: "NicePay API error", 
-          detail: result 
+      } else {
+        console.error("결제 실패:", result);
+        
+        // 결제 실패 기록
+        await db.collection("payments").doc(orderId).set({
+          uid: uid,
+          orderId: orderId,
+          amount: amount,
+          goodsName: goodsName,
+          status: "FAILED",
+          billingKey: billingKey,
+          errorMessage: result.resultMsg,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          failedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        res.status(400).json({
+          success: false,
+          error: result.resultMsg || "결제에 실패했습니다.",
+          result: result
         });
       }
 
-      // 결제 요청 정보 저장 (undefined 값 필터링)
-      const paymentRecord: any = {
-        uid: uid,
-        orderId: orderId,
-        amount: amount,
-        goodsName: goodsName,
-        status: "PENDING",
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      };
-
-      if (billingKeyData.billingKey !== undefined) paymentRecord.billingKey = billingKeyData.billingKey;
-
-      await db.collection("payments").doc(orderId).set(paymentRecord);
-
-      res.json({
-        success: true,
-        orderId: orderId,
-        tid: result.tid,
-        status: "PENDING"
-      });
-
     } catch (error: any) {
-      console.error("Billing payment error:", error);
+      console.error("=== 빌키 결제 요청 에러 ===");
+      console.error("에러:", error);
       res.status(500).json({ 
         error: "Internal server error", 
         message: error.message 
@@ -1743,37 +1683,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 통합 웹훅 콜백 처리 (빌키 발급 + 결제)
+  // 테스트용 빌키 발급 엔드포인트
+  app.post("/api/nicepay/billing-key/test", async (req, res) => {
+    try {
+      console.log("=== 테스트 빌키 발급 요청 시작 ===");
+      console.log("요청 본문:", JSON.stringify(req.body, null, 2));
+      
+      const { uid, cardNo, expYear, expMonth, idNo, cardPw } = req.body;
+      
+      // 필수 필드 검증
+      if (!uid || !cardNo || !expYear || !expMonth || !idNo || !cardPw) {
+        console.error("필수 필드 누락:", { uid, cardNo: cardNo ? "있음" : "없음", expYear, expMonth, idNo: idNo ? "있음" : "없음", cardPw: cardPw ? "있음" : "없음" });
+        return res.status(400).json({ 
+          error: "Missing required fields", 
+          message: "uid, cardNo, expYear, expMonth, idNo, cardPw are required" 
+        });
+      }
+
+      const clientId = process.env.NICEPAY_CLIENT_ID;
+      const secretKey = process.env.NICEPAY_SECRET_KEY;
+      
+      if (!clientId || !secretKey) {
+        console.error("NicePay 인증 정보가 설정되지 않음");
+        return res.status(500).json({ error: "NicePay credentials not configured" });
+      }
+
+      const orderId = `TEST_BILL_${Date.now()}_${uid}`;
+      
+      // 카드 정보 암호화 (AES-128)
+      const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
+      const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
+      
+      console.log("암호화 정보:", {
+        plainText: plainText.replace(/cardPw=\d+/, 'cardPw=**'),
+        encryptionKey: encryptionKey.substring(0, 8) + '...',
+        encryptionKeyLength: encryptionKey.length
+      });
+
+      // AES-128 암호화 (AES/ECB/PKCS5padding)
+      const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
+      let encData = cipher.update(plainText, 'utf8', 'hex');
+      encData += cipher.final('hex');
+
+      console.log("암호화 완료:", {
+        encDataLength: encData.length,
+        encDataPreview: encData.substring(0, 20) + '...'
+      });
+
+      // ediDate 생성
+      const ediDate = new Date().toISOString();
+      
+      // signData 생성
+      const signData = crypto.createHash('sha256')
+        .update(orderId + ediDate + secretKey)
+        .digest('hex');
+
+      // 빌키 발급 API 요청
+      const billingKeyRequestData = {
+        encData: encData,
+        orderId: orderId,
+        ediDate: ediDate,
+        signData: signData
+      };
+
+      console.log("빌키 발급 API 요청 데이터:", {
+        orderId: billingKeyRequestData.orderId,
+        ediDate: billingKeyRequestData.ediDate,
+        signData: billingKeyRequestData.signData.substring(0, 20) + '...',
+        encDataLength: billingKeyRequestData.encData.length
+      });
+
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      
+      console.log("API 호출 시작:", 'https://api.nicepay.co.kr/v1/subscribe/regist');
+      
+      const response = await fetch('https://api.nicepay.co.kr/v1/subscribe/regist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${authHeader}`
+        },
+        body: JSON.stringify(billingKeyRequestData)
+      });
+
+      console.log("API 응답 상태:", response.status);
+      const result = await response.json();
+      console.log("빌키 발급 API 응답:", result);
+
+      if (response.ok && result.resultCode === '0000') {
+        // 빌키 발급 성공
+        const db = admin.firestore();
+        await db.collection("billingKeys").doc(uid).set({
+          billingKey: result.bid,
+          orderId: orderId,
+          status: "ACTIVE",
+          tid: result.tid,
+          cardCode: result.cardCode,
+          cardName: result.cardName,
+          authDate: result.authDate,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log("=== 테스트 빌키 발급 완료 ===");
+        res.json({
+          success: true,
+          billingKey: result.bid,
+          message: "테스트 빌키가 성공적으로 발급되었습니다.",
+          result: result
+        });
+      } else {
+        console.error("테스트 빌키 발급 실패:", result);
+        res.status(400).json({
+          success: false,
+          error: result.resultMsg || "테스트 빌키 발급에 실패했습니다.",
+          result: result
+        });
+      }
+
+    } catch (error: any) {
+      console.error("=== 테스트 빌키 발급 요청 에러 ===");
+      console.error("에러:", error);
+      res.status(500).json({ 
+        error: "Internal server error", 
+        message: error.message 
+      });
+    }
+  });
+
+  // 웹훅 콜백 처리 (결제 완료 알림)
   app.post("/api/nicepay/webhook", async (req, res) => {
     try {
       const { 
-        authResultCode, 
-        authResultMsg, 
+        resultCode, 
+        resultMsg, 
         tid, 
         orderId, 
         amount,
-        goodsName
+        goodsName,
+        status,
+        paidAt
       } = req.body;
 
-      console.log("Webhook received:", { orderId, authResultCode, authResultMsg });
+      console.log("Webhook received:", { orderId, resultCode, resultMsg, status });
 
-      // 빌키 발급인지 결제인지 구분
-      const isBillingKeyRequest = orderId && orderId.startsWith('BILL_');
-      const isPaymentRequest = orderId && (orderId.startsWith('TEST_') || orderId.startsWith('AUTO_') || orderId.startsWith('PAY_'));
-
-      if (isBillingKeyRequest) {
-        // 빌키 발급 콜백 처리
-        console.log("Processing billing key callback");
-        return await handleBillingKeyCallback(req, res);
-      } else if (isPaymentRequest) {
-        // 결제 콜백 처리
-        console.log("Processing payment callback");
-        return await handlePaymentCallback(req, res);
+      // 결제 완료 처리
+      if (resultCode === '0000' && status === 'paid') {
+        console.log("Payment completed successfully");
+        
+        const db = admin.firestore();
+        const paymentDoc = await db.collection("payments").doc(orderId).get();
+        
+        if (paymentDoc.exists) {
+          await paymentDoc.ref.update({
+            status: "SUCCESS",
+            tid: tid,
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+            paidAt: paidAt
+          });
+          
+          console.log("Payment status updated to SUCCESS");
+        }
       } else {
-        console.warn("Unknown callback type:", orderId);
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send("OK");
+        console.log("Payment failed or pending");
+        
+        const db = admin.firestore();
+        const paymentDoc = await db.collection("payments").doc(orderId).get();
+        
+        if (paymentDoc.exists) {
+          await paymentDoc.ref.update({
+            status: "FAILED",
+            errorMessage: resultMsg,
+            failedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          
+          console.log("Payment status updated to FAILED");
+        }
       }
+
+      res.setHeader('Content-Type', 'text/plain');
+      res.status(200).send("OK");
 
     } catch (error: any) {
       console.error("Webhook error:", error);
@@ -1782,247 +1870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 빌키 발급 콜백 처리 함수
-  async function handleBillingKeyCallback(req: any, res: any) {
-    try {
-      const { 
-        authResultCode, 
-        authResultMsg, 
-        tid, 
-        orderId, 
-        billingKey,
-        cardCode,
-        cardName,
-        cardNo,
-        expiry,
-        authToken
-      } = req.body;
 
-      console.log("Billing key callback received:", { 
-        orderId, 
-        authResultCode, 
-        authResultMsg,
-        billingKey,
-        cardCode,
-        cardName,
-        cardNo,
-        expiry,
-        authToken,
-        tid
-      });
-
-      // 성공 여부 확인
-      if (authResultCode !== "0000") {
-        console.error("Billing key failed:", authResultMsg);
-        // 실패 시 결제 성공 페이지로 리다이렉트 (실패 정보 포함)
-        const failureUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}`;
-        return res.redirect(failureUrl);
-      }
-
-      // Firestore에서 해당 요청 찾기
-      const db = admin.firestore();
-      const billingKeyQuery = await db.collection("billingKeyRequests")
-        .where("orderId", "==", orderId)
-        .limit(1)
-        .get();
-
-      if (billingKeyQuery.empty) {
-        console.warn("Billing key request not found:", orderId);
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send("OK");
-      }
-
-      const doc = billingKeyQuery.docs[0];
-      const uid = doc.id;
-
-      // billingKey가 없으면 authToken을 billingKey로 사용
-      const actualBillingKey = billingKey || authToken;
-      
-      // undefined 값 필터링하여 빌키 정보 저장
-      const billingKeyData: any = {
-        orderId: orderId,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: "ACTIVE"
-      };
-
-      // undefined가 아닌 값만 추가
-      if (actualBillingKey !== undefined) billingKeyData.billingKey = actualBillingKey;
-      if (cardCode !== undefined) billingKeyData.cardCode = cardCode;
-      if (cardName !== undefined) billingKeyData.cardName = cardName;
-      if (cardNo !== undefined) billingKeyData.cardNo = cardNo;
-      if (expiry !== undefined) billingKeyData.expiry = expiry;
-      if (authToken !== undefined) billingKeyData.authToken = authToken;
-      if (tid !== undefined) billingKeyData.tid = tid;
-
-      // 빌키 승인 API 호출
-      const clientId = process.env.NICEPAY_CLIENT_ID;
-      const secretKey = process.env.NICEPAY_SECRET_KEY;
-      
-      if (!clientId || !secretKey) {
-        console.error("NicePay 인증 정보가 설정되지 않음");
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send("OK");
-      }
-
-      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
-      
-      try {
-        console.log("=== 빌키 승인 API 호출 시작 ===");
-        console.log("빌키 ID:", actualBillingKey);
-        console.log("API URL:", `https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`);
-        console.log("요청 헤더:", {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${authHeader.substring(0, 20)}...`
-        });
-        
-        // ediDate 생성 (ISO 8601 형식)
-        const ediDate = new Date().toISOString();
-        
-        // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
-        const signData = crypto.createHash('sha256')
-          .update(orderId + actualBillingKey + ediDate + secretKey)
-          .digest('hex');
-        
-        const approvalRequestData = {
-          orderId: orderId,
-          amount: 14900,
-          goodsName: "카드 등록",
-          cardQuota: 0,
-          useShopInterest: false,
-          ediDate: ediDate,
-          signData: signData
-        };
-        
-        console.log("승인 요청 본문:", JSON.stringify(approvalRequestData, null, 2));
-
-        const approvalResponse = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Basic ${authHeader}`
-          },
-          body: JSON.stringify(approvalRequestData)
-        });
-
-        console.log("승인 API 응답 상태:", approvalResponse.status);
-        console.log("승인 API 응답 헤더:", Object.fromEntries(approvalResponse.headers.entries()));
-        const approvalResult = await approvalResponse.json();
-        console.log("승인 API 응답 본문:", JSON.stringify(approvalResult, null, 2));
-        console.log("=== 빌키 승인 API 호출 완료 ===");
-
-        if (approvalResponse.ok && approvalResult.resultCode === '0000') {
-          console.log("빌키 승인 성공");
-          // 승인 성공 시 빌키 정보에 승인 결과 추가
-          billingKeyData.approvedAt = admin.firestore.FieldValue.serverTimestamp();
-          billingKeyData.approvalTid = approvalResult.tid;
-          billingKeyData.approvalResultCode = approvalResult.resultCode;
-        } else {
-          console.error("빌키 승인 실패:", approvalResult);
-          billingKeyData.approvalError = approvalResult.resultMsg;
-        }
-      } catch (error) {
-        console.error("빌키 승인 API 호출 오류:", error);
-        billingKeyData.approvalError = error instanceof Error ? error.message : 'Unknown error';
-      }
-
-      await db.collection("billingKeys").doc(uid).set(billingKeyData);
-
-      // 요청 상태 업데이트 (undefined 값 필터링)
-      const updateData: any = {
-        status: "COMPLETED",
-        completedAt: admin.firestore.FieldValue.serverTimestamp()
-      };
-
-      if (actualBillingKey !== undefined) updateData.billingKey = actualBillingKey;
-
-      await doc.ref.update(updateData);
-
-      // 사용자 정보에 빌키 상태 업데이트
-      await db.collection("usersInfo").doc(uid).update({
-        hasBillingKey: true,
-        billingKeyUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      // 성공 시 결제 성공 페이지로 리다이렉트
-      const successUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?orderId=${orderId}&authResultCode=${authResultCode}&authResultMsg=${encodeURIComponent(authResultMsg)}&billingKey=${actualBillingKey}&cardName=${encodeURIComponent(cardName || '')}&cardNo=${cardNo || ''}`;
-      
-      res.redirect(successUrl);
-
-    } catch (error: any) {
-      console.error("Billing key callback error:", error);
-      // 에러 시에도 결제 성공 페이지로 리다이렉트 (실패 정보 포함)
-      const errorUrl = `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/payment-success?authResultCode=ERROR&authResultMsg=${encodeURIComponent(error.message)}`;
-      res.redirect(errorUrl);
-    }
-  }
-
-  // 결제 콜백 처리 함수
-  async function handlePaymentCallback(req: any, res: any) {
-    try {
-      const { 
-        authResultCode, 
-        authResultMsg, 
-        tid, 
-        orderId, 
-        amount,
-        goodsName
-      } = req.body;
-
-      console.log("Payment callback received:", { orderId, authResultCode, authResultMsg });
-
-      const db = admin.firestore();
-      const paymentDoc = await db.collection("payments").doc(orderId).get();
-      
-      if (!paymentDoc.exists) {
-        console.warn("Payment not found:", orderId);
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send("OK");
-      }
-
-      const paymentData = paymentDoc.data();
-      if (!paymentData) {
-        console.warn("Payment data not found:", orderId);
-        res.setHeader('Content-Type', 'text/plain');
-        return res.status(200).send("OK");
-      }
-
-      if (authResultCode === "0000") {
-        // 결제 성공
-        await paymentDoc.ref.update({
-          status: "SUCCESS",
-          tid: tid,
-          completedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        // 구독 정보 업데이트 (실제 구현에서는 구독 로직 추가)
-        await db.collection("subscriptions").doc(paymentData.uid).set({
-          uid: paymentData.uid,
-          orderId: orderId,
-          amount: amount,
-          status: "ACTIVE",
-          startDate: admin.firestore.FieldValue.serverTimestamp(),
-          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후
-          plan: "BOOSTER"
-        }, { merge: true });
-
-      } else {
-        // 결제 실패
-        await paymentDoc.ref.update({
-          status: "FAILED",
-          errorMessage: authResultMsg,
-          failedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      }
-
-      res.setHeader('Content-Type', 'text/plain');
-      res.status(200).send("OK");
-
-    } catch (error: any) {
-      console.error("Payment callback error:", error);
-      res.setHeader('Content-Type', 'text/plain');
-      res.status(200).send("OK");
-    }
-  }
 
   const port = Number(process.env.PORT) || 5005;
   const httpServer = createServer(app);

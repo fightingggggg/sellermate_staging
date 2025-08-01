@@ -3,6 +3,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface BillingKeyRequest {
   uid: string;
+  cardNo?: string;
+  expYear?: string;
+  expMonth?: string;
+  idNo?: string;
+  cardPw?: string;
 }
 
 interface PaymentRequest {
@@ -34,8 +39,14 @@ export const useNicePay = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 빌키 발급 요청 (결제창 방식)
-  const requestBillingKey = async (): Promise<BillingKeyResponse | null> => {
+  // 빌키 발급 요청 (API 방식)
+  const requestBillingKey = async (cardInfo?: {
+    cardNo: string;
+    expYear: string;
+    expMonth: string;
+    idNo: string;
+    cardPw: string;
+  }): Promise<BillingKeyResponse | null> => {
     if (!currentUser?.uid) {
       setError('로그인이 필요합니다.');
       return null;
@@ -45,14 +56,21 @@ export const useNicePay = () => {
     setError(null);
 
     try {
+      const requestData: BillingKeyRequest = {
+        uid: currentUser.uid
+      };
+
+      // 카드 정보가 제공되면 API 방식으로 처리
+      if (cardInfo) {
+        Object.assign(requestData, cardInfo);
+      }
+
       const response = await fetch('/api/nicepay/billing-key', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          uid: currentUser.uid
-        }),
+        body: JSON.stringify(requestData),
       });
 
       const data = await response.json();
@@ -61,7 +79,13 @@ export const useNicePay = () => {
         throw new Error(data.message || '빌키 발급 요청에 실패했습니다.');
       }
 
-      // 결제창 호출
+      // API 방식으로 성공한 경우
+      if (data.success && data.billingKey) {
+        console.log('빌키 발급 성공:', data.billingKey);
+        return data;
+      }
+
+      // 결제창 방식으로 처리해야 하는 경우 (카드 정보가 없는 경우)
       if (data.success && data.clientId) {
         // 나이스페이 JS SDK가 로드되어 있는지 확인
         if (typeof (window as any).AUTHNICE === 'undefined') {
