@@ -55,8 +55,8 @@ export class AutoPaymentScheduler {
     this.isRunning = true;
     console.log('자동 결제 스케줄러 시작됨');
 
-    // 5분마다 모든 만료된 구독을 배치로 처리
-    cron.schedule('*/5 * * * *', async () => {
+    // 매일 오전 9시에 모든 만료된 구독을 배치로 처리
+    cron.schedule('0 9 * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -169,8 +169,8 @@ export class AutoPaymentScheduler {
       
       // 구독 시작 시간 (현재 시간)
       const startDate = new Date();
-      // 구독 종료 시간 (테스트용: 5분 후)
-      const endDate = new Date(startDate.getTime() + (5 * 60 * 1000));
+      // 구독 종료 시간 (24시간 후)
+      const endDate = new Date(startDate.getTime() + (24 * 60 * 60 * 1000));
       
       // 구독 정보 생성
       const subscriptionData = {
@@ -335,7 +335,7 @@ export class AutoPaymentScheduler {
   // 구독 연장
   private async extendSubscription(db: admin.firestore.Firestore, uid: string, orderId: string) {
     const newEndDate = new Date();
-    newEndDate.setMinutes(newEndDate.getMinutes() + 5); // 테스트용: 5분 연장
+    newEndDate.setDate(newEndDate.getDate() + 1); // 24시간 연장
 
     await db.collection('subscriptions').doc(uid).set({
       status: "ACTIVE",

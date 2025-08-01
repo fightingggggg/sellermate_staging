@@ -1042,8 +1042,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const status = autoPaymentScheduler.getStatus();
     res.json({
       ...status,
-      schedule: "5분마다 실행 (테스트 모드)",
-      nextRun: "5분 후",
+      schedule: "매일 오전 9시 실행",
+      nextRun: "다음날 오전 9시",
       message: "자동 결제 스케줄러가 실행 중입니다.",
       timestamp: new Date().toISOString()
     });

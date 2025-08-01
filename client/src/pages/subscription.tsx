@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle, CreditCard } from "lucide-react";
+import { AlertCircle, CheckCircle, CreditCard, ArrowLeft, Leaf, Zap, Users, Bell, BarChart, TrendingUp, MessageCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNicePay } from "@/hooks/useNicePay";
 import BillingKeyForm from "@/components/BillingKeyForm";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function SubscriptionPage() {
   const { currentUser } = useAuth();
@@ -16,8 +17,11 @@ export default function SubscriptionPage() {
   
   const [billingKeyStatus, setBillingKeyStatus] = useState<any>(null);
   const [showBillingKeyForm, setShowBillingKeyForm] = useState(false);
+  const [showBillingKeyModal, setShowBillingKeyModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
   const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'naver' | 'kakao' | 'card'>('card');
+  const [paymentPeriod, setPaymentPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
   useEffect(() => {
     checkBillingKeyStatus();
@@ -30,12 +34,23 @@ export default function SubscriptionPage() {
 
   const handleBillingKeySuccess = () => {
     setShowBillingKeyForm(false);
+    setShowBillingKeyModal(false);
     checkBillingKeyStatus();
   };
 
+  const handlePaymentMethodSelect = (method: 'naver' | 'kakao' | 'card') => {
+    setSelectedPaymentMethod(method);
+    
+    // 일반 카드 선택 시 등록된 카드가 없으면 모달 표시
+    if (method === 'card' && !billingKeyStatus?.hasBillingKey) {
+      setShowBillingKeyModal(true);
+    }
+  };
+
   const handleSubscribe = async () => {
-    if (!billingKeyStatus?.hasBillingKey) {
-      setShowBillingKeyForm(true);
+    // 일반 카드 선택 시 등록된 카드가 없으면 모달 표시
+    if (selectedPaymentMethod === 'card' && !billingKeyStatus?.hasBillingKey) {
+      setShowBillingKeyModal(true);
       return;
     }
 
@@ -43,15 +58,15 @@ export default function SubscriptionPage() {
 
     try {
       const orderId = `SUB_${Date.now()}_${currentUser?.uid}`;
+      const amount = 14900;
       const result = await requestPayment({
-        amount: 500, // 테스트 금액
-        goodsName: "스토어부스터 부스터 플랜",
+        amount: amount,
+        goodsName: "부스터 플랜 구독",
         orderId: orderId
       });
 
       if (result?.success) {
         setPaymentStatus('success');
-        // 성공 시 프로필 페이지로 이동
         setTimeout(() => {
           navigate("/profile");
         }, 2000);
@@ -65,29 +80,8 @@ export default function SubscriptionPage() {
 
   const handleCancel = () => {
     setShowBillingKeyForm(false);
+    setShowBillingKeyModal(false);
     navigate("/membership");
-  };
-
-  const handleTestPayment = async () => {
-    const result = await testBillingPayment();
-    if (result?.success) {
-      alert('테스트 결제가 요청되었습니다. 서버 로그를 확인하세요.');
-    }
-  };
-
-  const handleCheckSubscription = async () => {
-    const info = await getSubscriptionInfo();
-    if (info) {
-      setSubscriptionInfo(info);
-      console.log('구독 정보:', info);
-    }
-  };
-
-  const handleRunAutoPayment = async () => {
-    const result = await runAutoPayment();
-    if (result?.success) {
-      alert('자동 결제가 실행되었습니다. 서버 로그를 확인하세요.');
-    }
   };
 
   if (showBillingKeyForm) {
@@ -110,197 +104,233 @@ export default function SubscriptionPage() {
     );
   }
 
+  const monthlyPrice = 14900;
+  const finalPrice = monthlyPrice;
+
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto py-16 px-4">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-            부스터 플랜 구독
-          </h1>
-          <p className="text-lg text-gray-600">
-            테스트 금액 500원으로 더 많은 기능을 이용해보세요
-          </p>
+      <div className="max-w-7xl mx-auto py-8 px-4">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-8">
+          <button 
+            onClick={() => navigate("/membership")}
+            className="flex items-center text-gray-600 hover:text-blue-600 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            뒤로가기
+          </button>
+          
+          {/* 진행 단계 */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center">
+              <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+              <span className="ml-2 text-sm font-medium text-blue-600">주문/결제</span>
+            </div>
+            <div className="w-8 h-px bg-gray-300"></div>
+            <div className="flex items-center">
+              <div className="w-6 h-6 bg-gray-200 text-gray-500 rounded-full flex items-center justify-center text-sm font-bold">2</div>
+              <span className="ml-2 text-sm font-medium text-gray-500">완료</span>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* 구독 정보 */}
-          <Card className="border-blue-500 shadow-lg">
-            <CardHeader className="bg-blue-50 border-b border-blue-100">
-              <CardTitle className="text-2xl font-bold text-blue-600">부스터 플랜</CardTitle>
-              <CardDescription className="text-gray-600">
-                월 14,900원 • 자동 결제
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="py-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span>키워드 경쟁률 분석 50회/일</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span>상품 최적화 30회/일</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span>최근 내역 50개 저장</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span>확장프로그램 무제한</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span>신규 기능 우선 이용</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 결제 정보 */}
-          <Card className="border-gray-200 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold">결제 정보</CardTitle>
-              <CardDescription>
-                등록된 카드로 자동 결제됩니다
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* 카드 정보 표시 */}
-              {billingKeyStatus?.hasBillingKey ? (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-3 mb-3">
-                    <CreditCard className="w-5 h-5 text-green-600" />
-                    <span className="font-medium text-green-800">등록된 카드</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 왼쪽 컬럼 - 주문 상품 및 결제 방법 (2/3) */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* 주문 상품 */}
+            <Card className="border border-gray-200 shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-gray-800">주문 상품</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Leaf className="w-6 h-6 text-blue-600" />
                   </div>
-                  <p className="text-sm text-green-700">
-                    {billingKeyStatus.cardInfo?.cardName || '카드'} • 
-                    {billingKeyStatus.cardInfo?.cardNo || '****-****-****-****'}
-                  </p>
-                </div>
-              ) : (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-center gap-3 mb-3">
-                    <AlertCircle className="w-5 h-5 text-yellow-600" />
-                    <span className="font-medium text-yellow-800">카드 미등록</span>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-800 mb-1">부스터 플랜 구독</h3>
+                    <p className="text-sm text-gray-600 mb-4">입문자를 위한 기본 종합 세트</p>
+                    
+                    {/* 공통 기능 */}
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <Zap className="w-4 h-4 mr-2 text-blue-500" />
+                        공통 기능
+                      </h4>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div>• AI 매일 30회</div>
+                        <div>• 아카데미 강의 무제한 시청</div>
+                      </div>
+                    </div>
+
+                    {/* 셀러 기능 */}
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <BarChart className="w-4 h-4 mr-2 text-blue-500" />
+                        셀러 기능
+                      </h4>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div>• 키워드 분석 무제한</div>
+                        <div>• 키워드 알림 매일</div>
+                        <div>• 상품 분석 및 실시간 순위 추적 (월 50회)</div>
+                        <div>• 상품 순위 확인 (일 30개)</div>
+                        <div>• 카카오톡 알림 (등록 키워드 100개)</div>
+                      </div>
+                    </div>
+
+                    {/* 인플루언서 기능 */}
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <Users className="w-4 h-4 mr-2 text-blue-500" />
+                        인플루언서 기능
+                      </h4>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div>• 키워드 분석 무제한</div>
+                        <div>• 채널 영향력 확인 (일 10회)</div>
+                        <div>• 블로그/포스트 진단 (일 10개)</div>
+                        <div>• 포스트 순위 확인 (일 10회)</div>
+                        <div>• 카카오톡 알림 (등록 키워드 20개)</div>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-yellow-700">
-                    구독을 위해 카드를 등록해주세요
-                  </p>
                 </div>
-              )}
+              </CardContent>
+            </Card>
 
-              {/* 결제 상태 표시 */}
-              {paymentStatus === 'success' && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    구독이 성공적으로 완료되었습니다! 잠시 후 프로필 페이지로 이동합니다.
-                  </AlertDescription>
-                </Alert>
-              )}
+            {/* 결제 방법 */}
+            <Card className="border border-gray-200 shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-gray-800">결제 방법</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-3">
+                  {/* 네이버페이 */}
+                  <button
+                    onClick={() => handlePaymentMethodSelect('naver')}
+                    className={`p-4 border rounded-lg text-center transition-all ${
+                      selectedPaymentMethod === 'naver' 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="w-8 h-8 bg-green-500 rounded mx-auto mb-2 flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">N</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">네이버페이</span>
+                  </button>
 
-              {paymentStatus === 'failed' && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    결제 처리 중 오류가 발생했습니다. 다시 시도해주세요.
-                  </AlertDescription>
-                </Alert>
-              )}
+                  {/* 카카오페이 */}
+                  <button
+                    onClick={() => handlePaymentMethodSelect('kakao')}
+                    className={`p-4 border rounded-lg text-center transition-all ${
+                      selectedPaymentMethod === 'kakao' 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="w-8 h-8 bg-yellow-400 rounded mx-auto mb-2 flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">K</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">카카오페이</span>
+                  </button>
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+                  {/* 일반 카드 */}
+                  <button
+                    onClick={() => handlePaymentMethodSelect('card')}
+                    className={`p-4 border rounded-lg text-center transition-all ${
+                      selectedPaymentMethod === 'card' 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="w-8 h-8 bg-blue-100 rounded mx-auto mb-2 flex items-center justify-center">
+                      <CreditCard className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">일반 카드</span>
+                    {selectedPaymentMethod === 'card' && !billingKeyStatus?.hasBillingKey && (
+                      <div className="text-xs text-red-500 mt-1">카드 등록 필요</div>
+                    )}
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-                             {/* 구독 버튼 */}
-               <div className="space-y-3">
-                 <Button 
-                   onClick={handleSubscribe}
-                   className="w-full py-3 text-lg font-semibold"
-                   disabled={loading || paymentStatus === 'processing'}
-                 >
-                   {paymentStatus === 'processing' ? '처리중...' : 
-                    billingKeyStatus?.hasBillingKey ? '구독 시작하기' : '카드 등록하기'}
-                 </Button>
-                 
-                 {/* 디버그 버튼들 */}
-                 {billingKeyStatus?.hasBillingKey && (
-                   <div className="space-y-2 pt-4 border-t border-gray-200">
-                     <p className="text-sm text-gray-600 text-center">디버그 기능</p>
-                     <div className="grid grid-cols-2 gap-2">
-                       <Button 
-                         onClick={handleTestPayment}
-                         variant="outline"
-                         size="sm"
-                         disabled={loading}
-                       >
-                         테스트 결제
-                       </Button>
-                       <Button 
-                         onClick={handleCheckSubscription}
-                         variant="outline"
-                         size="sm"
-                         disabled={loading}
-                       >
-                         구독 정보 확인
-                       </Button>
-                     </div>
-                     <div className="grid grid-cols-1 gap-2">
-                       <Button 
-                         onClick={handleRunAutoPayment}
-                         variant="outline"
-                         size="sm"
-                         disabled={loading}
-                         className="bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100"
-                       >
-                         수동 자동 결제 실행
-                       </Button>
-                     </div>
-                   </div>
-                 )}
-                 
-                 <Button 
-                   onClick={() => navigate("/membership")}
-                   variant="outline"
-                   className="w-full"
-                 >
-                   돌아가기
-                 </Button>
-               </div>
-            </CardContent>
-          </Card>
+          {/* 오른쪽 컬럼 - 결제 상세 (1/3) */}
+          <div className="lg:col-span-1">
+            <Card className="border border-gray-200 shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-gray-800">결제 상세</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* 주문 상품 가격 */}
+                <div className="flex justify-between items-center py-3 border-b border-gray-200">
+                  <span className="text-gray-700">주문 상품</span>
+                  <span className="font-medium">{monthlyPrice.toLocaleString()}원</span>
+                </div>
+
+                {/* 최종 결제 금액 */}
+                <div className="flex justify-between items-center py-3">
+                  <span className="text-lg font-semibold text-gray-800">최종 결제 금액</span>
+                  <span className="text-xl font-bold text-blue-600">{finalPrice.toLocaleString()}원</span>
+                </div>
+
+                {/* 결제 버튼 */}
+                <Button 
+                  onClick={handleSubscribe}
+                  className="w-full py-4 text-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                  disabled={loading || paymentStatus === 'processing'}
+                >
+                  {paymentStatus === 'processing' ? '처리중...' : `${finalPrice.toLocaleString()}원 결제하기`}
+                </Button>
+
+                {/* 결제 상태 표시 */}
+                {paymentStatus === 'success' && (
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      구독이 성공적으로 완료되었습니다! 잠시 후 프로필 페이지로 이동합니다.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {paymentStatus === 'failed' && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      결제 처리 중 오류가 발생했습니다. 다시 시도해주세요.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        {/* 유의사항 */}
-        <div className="mt-12 p-6 bg-gray-50 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">유의사항</h3>
-          <ul className="space-y-2 text-sm text-gray-600">
-            <li className="flex items-start gap-2">
-              <span className="text-gray-400 mt-1">•</span>
-              <span>구독은 즉시 시작되며, 매월 자동으로 결제됩니다</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-gray-400 mt-1">•</span>
-              <span>결제 주기는 30일입니다</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-gray-400 mt-1">•</span>
-              <span>환불은 7일 내 미사용자일 경우에만 가능하며, 전액환불됩니다</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-gray-400 mt-1">•</span>
-              <span>해지는 언제든 가능하며, 해지 시 남은 기간 동안 사용가능합니다</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-gray-400 mt-1">•</span>
-              <span>카드 정보는 안전하게 암호화되어 저장됩니다</span>
-            </li>
-          </ul>
-        </div>
+        {/* 카드 등록 모달 */}
+        <Dialog open={showBillingKeyModal} onOpenChange={setShowBillingKeyModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold">카드 등록</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-gray-600 mb-4">
+                일반 카드 결제를 위해 카드 정보를 등록해주세요.
+              </p>
+              <BillingKeyForm 
+                onSuccess={handleBillingKeySuccess}
+                onCancel={() => setShowBillingKeyModal(false)}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
