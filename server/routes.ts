@@ -1047,15 +1047,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
-  // 빌키 발급 요청 (결제창 방식)
+  // 빌키 발급 요청 (결제창 방식 - 기존 호환성 유지)
   app.post("/api/nicepay/billing-key", async (req, res) => {
     try {
       console.log("=== 빌키 발급 요청 시작 (결제창 방식) ===");
       console.log("요청 본문:", JSON.stringify(req.body, null, 2));
       
-      const { uid } = req.body;
+      const { uid, cardNo, expYear, expMonth, idNo, cardPw } = req.body;
       
-      // 필수 필드 검증
+      // 카드 정보가 있으면 API 방식으로 처리
+      if (cardNo && expYear && expMonth && idNo && cardPw) {
+        console.log("카드 정보가 제공됨 - API 방식으로 처리");
+        
+        // 필수 필드 검증
+        if (!uid || !cardNo || !expYear || !expMonth || !idNo || !cardPw) {
+          console.error("필수 필드 누락:", { uid, cardNo: cardNo ? "있음" : "없음", expYear, expMonth, idNo: idNo ? "있음" : "없음", cardPw: cardPw ? "있음" : "없음" });
+          return res.status(400).json({ 
+            error: "Missing required fields", 
+            message: "uid, cardNo, expYear, expMonth, idNo, cardPw are required" 
+          });
+        }
+
+        const clientId = process.env.NICEPAY_CLIENT_ID;
+        const secretKey = process.env.NICEPAY_SECRET_KEY;
+        
+        if (!clientId || !secretKey) {
+          console.error("NicePay 인증 정보가 설정되지 않음");
+          return res.status(500).json({ error: "NicePay credentials not configured" });
+        }
+
+        const orderId = `BILL_${Date.now()}_${uid}`;
+        
+        // 카드 정보 암호화 (AES-128)
+        const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
+        const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
+        
+        console.log("암호화 정보:", {
+          plainText: plainText.replace(/cardPw=\d+/, 'cardPw=**'),
+          encryptionKey: encryptionKey.substring(0, 8) + '...'
+        });
+
+        // AES-128 암호화
+        const cipher = crypto.createCipher('aes-128-ecb', encryptionKey);
+        let encData = cipher.update(plainText, 'utf8', 'hex');
+        encData += cipher.final('hex');
+
+        // ediDate 생성
+        const ediDate = new Date().toISOString();
+        
+        // signData 생성
+        const signData = crypto.createHash('sha256')
+          .update(orderId + ediDate + secretKey)
+          .digest('hex');
+
+        // 빌키 발급 API 요청
+        const billingKeyRequestData = {
+          encData: encData,
+          orderId: orderId,
+          ediDate: ediDate,
+          signData: signData
+        };
+
+        console.log("빌키 발급 API 요청 데이터:", {
+          ...billingKeyRequestData,
+          encData: encData.substring(0, 20) + '...'
+        });
+
+        const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+        
+        const response = await fetch('https://api.nicepay.co.kr/v1/subscribe/regist', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${authHeader}`
+          },
+          body: JSON.stringify(billingKeyRequestData)
+        });
+
+        const result = await response.json();
+        console.log("빌키 발급 API 응답:", result);
+
+        if (response.ok && result.resultCode === '0000') {
+          // 빌키 발급 성공
+          const db = admin.firestore();
+          await db.collection("billingKeys").doc(uid).set({
+            billingKey: result.bid,
+            orderId: orderId,
+            status: "ACTIVE",
+            tid: result.tid,
+            cardCode: result.cardCode,
+            cardName: result.cardName,
+            authDate: result.authDate,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          console.log("=== 빌키 발급 완료 (API 방식) ===");
+          res.json({
+            success: true,
+            billingKey: result.bid,
+            message: "빌키가 성공적으로 발급되었습니다."
+          });
+        } else {
+          console.error("빌키 발급 실패:", result);
+          res.status(400).json({
+            success: false,
+            error: result.resultMsg || "빌키 발급에 실패했습니다."
+          });
+        }
+        return;
+      }
+      
+      // 기존 결제창 방식 (카드 정보가 없는 경우)
       if (!uid) {
         console.error("필수 필드 누락:", { uid });
         return res.status(400).json({ 
@@ -1064,7 +1166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log("필수 필드 검증 통과");
+      console.log("기존 결제창 방식으로 처리");
 
       const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
