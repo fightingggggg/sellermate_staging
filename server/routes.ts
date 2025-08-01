@@ -1434,6 +1434,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (authToken !== undefined) billingKeyData.authToken = authToken;
       if (tid !== undefined) billingKeyData.tid = tid;
 
+      // 빌키 승인 API 호출
+      const clientId = process.env.NICEPAY_CLIENT_ID;
+      const secretKey = process.env.NICEPAY_SECRET_KEY;
+      
+      if (!clientId || !secretKey) {
+        console.error("NicePay 인증 정보가 설정되지 않음");
+        res.setHeader('Content-Type', 'text/plain');
+        return res.status(200).send("OK");
+      }
+
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      
+      try {
+        const approvalResponse = await fetch('https://api.nicepay.co.kr/v1/payments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${authHeader}`
+          },
+          body: JSON.stringify({
+            clientId: clientId,
+            method: "BILL",
+            orderId: orderId,
+            amount: 14900,
+            goodsName: "카드 등록",
+            billingKey: actualBillingKey,
+            useEscrow: false,
+            currency: "KRW",
+            taxFreeAmount: 0,
+            supplyAmount: 13545,
+            taxAmount: 1355
+          })
+        });
+
+        const approvalResult = await approvalResponse.json();
+        console.log("빌키 승인 API 응답:", approvalResult);
+
+        if (approvalResponse.ok && approvalResult.resultCode === '0000') {
+          console.log("빌키 승인 성공");
+          // 승인 성공 시 빌키 정보에 승인 결과 추가
+          billingKeyData.approvedAt = admin.firestore.FieldValue.serverTimestamp();
+          billingKeyData.approvalTid = approvalResult.tid;
+          billingKeyData.approvalResultCode = approvalResult.resultCode;
+        } else {
+          console.error("빌키 승인 실패:", approvalResult);
+          billingKeyData.approvalError = approvalResult.resultMsg;
+        }
+      } catch (error) {
+        console.error("빌키 승인 API 호출 오류:", error);
+        billingKeyData.approvalError = error instanceof Error ? error.message : 'Unknown error';
+      }
+
       await db.collection("billingKeys").doc(uid).set(billingKeyData);
 
       // 요청 상태 업데이트 (undefined 값 필터링)
