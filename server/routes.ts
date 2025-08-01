@@ -823,28 +823,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Content-Type', 'text/plain');
     res.status(200).send("OK");
   });
+
+  // 환경 변수 확인용 엔드포인트 (디버그용)
+  app.get("/api/debug/env", (req, res) => {
+    console.log("=== 환경 변수 확인 ===");
+    const envInfo = {
+      NICEPAY_CLIENT_ID: process.env.NICEPAY_CLIENT_ID ? "설정됨" : "설정되지 않음",
+      NICEPAY_SECRET_KEY: process.env.NICEPAY_SECRET_KEY ? "설정됨" : "설정되지 않음",
+      BASE_URL: process.env.BASE_URL || "설정되지 않음",
+      NODE_ENV: process.env.NODE_ENV || "설정되지 않음"
+    };
+    console.log("환경 변수 정보:", envInfo);
+    console.log("=== 환경 변수 확인 완료 ===");
+    res.json(envInfo);
+  });
   
   // 빌키 발급 요청
   app.post("/api/nicepay/billing-key", async (req, res) => {
     try {
+      console.log("=== 빌키 발급 요청 시작 ===");
+      console.log("요청 본문:", JSON.stringify(req.body, null, 2));
+      
       const { uid, cardNo, expiry, birth, pwd_2digit } = req.body;
       
+      // 필수 필드 검증
       if (!uid || !cardNo || !expiry || !birth || !pwd_2digit) {
+        console.error("필수 필드 누락:", { uid, cardNo: cardNo ? "있음" : "없음", expiry, birth, pwd_2digit: pwd_2digit ? "있음" : "없음" });
         return res.status(400).json({ 
           error: "Missing required fields", 
           message: "uid, cardNo, expiry, birth, pwd_2digit are required" 
         });
       }
 
+      console.log("필수 필드 검증 통과");
+
       const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
       
+      console.log("환경 변수 확인:", {
+        clientId: clientId ? "설정됨" : "설정되지 않음",
+        secretKey: secretKey ? "설정됨" : "설정되지 않음"
+      });
+      
       if (!clientId || !secretKey) {
+        console.error("NicePay 인증 정보가 설정되지 않음");
         return res.status(500).json({ error: "NicePay credentials not configured" });
       }
 
       // Basic 인증 헤더 생성
       const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      console.log("인증 헤더 생성 완료");
 
       const billingKeyData = {
         clientId: clientId,
@@ -858,7 +886,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
+      console.log("빌키 발급 요청 데이터:", JSON.stringify(billingKeyData, null, 2));
+
       // 나이스페이 빌키 발급 API 호출
+      console.log("나이스페이 API 호출 시작...");
       const response = await fetch('https://api.nicepay.co.kr/v1/billing/authorizations', {
         method: 'POST',
         headers: {
@@ -868,16 +899,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body: JSON.stringify(billingKeyData)
       });
 
+      console.log("나이스페이 API 응답 상태:", response.status);
+      console.log("나이스페이 API 응답 헤더:", Object.fromEntries(response.headers.entries()));
+
       const result = await response.json();
+      console.log("나이스페이 API 응답 본문:", JSON.stringify(result, null, 2));
       
       if (!response.ok) {
+        console.error("나이스페이 API 호출 실패:", {
+          status: response.status,
+          statusText: response.statusText,
+          result: result
+        });
         return res.status(response.status).json({ 
           error: "NicePay API error", 
           detail: result 
         });
       }
 
+      console.log("나이스페이 API 호출 성공");
+
       // Firestore에 빌키 발급 요청 정보 저장
+      console.log("Firestore 저장 시작...");
       const db = admin.firestore();
       await db.collection("billingKeyRequests").doc(uid).set({
         orderId: billingKeyData.orderId,
@@ -888,18 +931,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiry: expiry
         }
       });
+      console.log("Firestore 저장 완료");
 
-      res.json({
+      const responseData = {
         success: true,
         orderId: billingKeyData.orderId,
         redirectUrl: result.redirectUrl || null
-      });
+      };
+      
+      console.log("응답 데이터:", JSON.stringify(responseData, null, 2));
+      console.log("=== 빌키 발급 요청 완료 ===");
+
+      res.json(responseData);
 
     } catch (error: any) {
-      console.error("Billing key request error:", error);
+      console.error("=== 빌키 발급 요청 에러 ===");
+      console.error("에러 타입:", error.constructor.name);
+      console.error("에러 메시지:", error.message);
+      console.error("에러 스택:", error.stack);
+      console.error("전체 에러 객체:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error("=== 빌키 발급 요청 에러 끝 ===");
+      
       res.status(500).json({ 
         error: "Internal server error", 
-        message: error.message 
+        message: error.message,
+        stack: error.stack
       });
     }
   });
@@ -985,21 +1041,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 빌키 상태 확인
   app.get("/api/nicepay/billing-key/:uid", async (req, res) => {
     try {
+      console.log("=== 빌키 상태 확인 시작 ===");
       const { uid } = req.params;
+      console.log("요청된 UID:", uid);
       
       const db = admin.firestore();
+      console.log("Firestore 연결 완료");
+      
       const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
+      console.log("Firestore 조회 완료, 문서 존재 여부:", billingKeyDoc.exists);
       
       if (!billingKeyDoc.exists) {
-        return res.json({ 
+        console.log("빌키 문서가 존재하지 않음");
+        const response = { 
           hasBillingKey: false,
           status: "NOT_FOUND" 
-        });
+        };
+        console.log("응답 데이터:", JSON.stringify(response, null, 2));
+        console.log("=== 빌키 상태 확인 완료 ===");
+        return res.json(response);
       }
 
       const billingKeyData = billingKeyDoc.data();
+      console.log("빌키 데이터:", JSON.stringify(billingKeyData, null, 2));
       
-      res.json({
+      const response = {
         hasBillingKey: true,
         status: billingKeyData?.status || "UNKNOWN",
         cardInfo: {
@@ -1008,13 +1074,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expiry: billingKeyData?.expiry
         },
         createdAt: billingKeyData?.createdAt
-      });
+      };
+      
+      console.log("응답 데이터:", JSON.stringify(response, null, 2));
+      console.log("=== 빌키 상태 확인 완료 ===");
+      
+      res.json(response);
 
     } catch (error: any) {
-      console.error("Get billing key error:", error);
+      console.error("=== 빌키 상태 확인 에러 ===");
+      console.error("에러 타입:", error.constructor.name);
+      console.error("에러 메시지:", error.message);
+      console.error("에러 스택:", error.stack);
+      console.error("전체 에러 객체:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error("=== 빌키 상태 확인 에러 끝 ===");
+      
       res.status(500).json({ 
         error: "Internal server error", 
-        message: error.message 
+        message: error.message,
+        stack: error.stack
       });
     }
   });
