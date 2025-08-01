@@ -9,6 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNicePay } from "@/hooks/useNicePay";
 import BillingKeyForm from "@/components/BillingKeyForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function SubscriptionPage() {
   const { currentUser } = useAuth();
@@ -50,6 +52,29 @@ export default function SubscriptionPage() {
       });
 
       if (result?.success) {
+        // 구독 정보를 Firestore에 저장
+        try {
+          const subscriptionData = {
+            userId: currentUser?.uid,
+            planType: 'booster',
+            status: 'active',
+            startDate: serverTimestamp(),
+            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후
+            nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            amount: amount,
+            paymentMethod: selectedPaymentMethod,
+            autoRenew: true,
+            orderId: orderId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
+
+          await addDoc(collection(db, 'subscriptions'), subscriptionData);
+        } catch (error) {
+          console.error('구독 정보 저장 실패:', error);
+          // 구독 정보 저장 실패해도 결제는 성공했으므로 계속 진행
+        }
+
         setPaymentStatus('success');
         setTimeout(() => {
           navigate("/profile");
@@ -85,6 +110,29 @@ export default function SubscriptionPage() {
       });
 
       if (result?.success) {
+        // 구독 정보를 Firestore에 저장
+        try {
+          const subscriptionData = {
+            userId: currentUser?.uid,
+            planType: 'booster',
+            status: 'active',
+            startDate: serverTimestamp(),
+            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후
+            nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            amount: amount,
+            paymentMethod: selectedPaymentMethod,
+            autoRenew: true,
+            orderId: orderId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
+
+          await addDoc(collection(db, 'subscriptions'), subscriptionData);
+        } catch (error) {
+          console.error('구독 정보 저장 실패:', error);
+          // 구독 정보 저장 실패해도 결제는 성공했으므로 계속 진행
+        }
+
         setPaymentStatus('success');
         setTimeout(() => {
           navigate("/profile");

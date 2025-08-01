@@ -9,7 +9,7 @@ import { useHistoryLimit } from "@/hooks/useHistoryLimit";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile } from "@/types";
 import { db, auth } from "@/lib/firebase"; // db는 initializeApp 후에 만든 Firestore 인스턴스
-import { collection, addDoc, serverTimestamp, setDoc, doc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, setDoc, doc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 
 // UI 컴포넌트 import
 import {
@@ -76,6 +76,10 @@ export default function ProfilePage() {
   const [cancelMembershipOpen, setCancelMembershipOpen] = useState(false);
   const [isCancellingMembership, setIsCancellingMembership] = useState(false);
   const { toast } = useToast();
+
+  // 구독 정보 상태
+  const [subscriptionInfo, setSubscriptionInfo] = useState<any>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 
   // 프로필 폼
   const profileForm = useForm<ProfileFormValues>({
@@ -210,6 +214,39 @@ export default function ProfilePage() {
     }
   };
 
+  // 구독 정보 가져오기
+  const fetchSubscriptionInfo = async () => {
+    if (!userProfile?.uid) return;
+    
+    setSubscriptionLoading(true);
+    try {
+      const subscriptionsRef = collection(db, 'subscriptions');
+      const q = query(
+        subscriptionsRef,
+        where('userId', '==', userProfile.uid),
+        where('status', '==', 'active'),
+        orderBy('createdAt', 'desc'),
+        limit(1)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        const subscriptionDoc = querySnapshot.docs[0];
+        setSubscriptionInfo({
+          id: subscriptionDoc.id,
+          ...subscriptionDoc.data()
+        });
+      } else {
+        setSubscriptionInfo(null);
+      }
+    } catch (error) {
+      console.error('구독 정보 가져오기 실패:', error);
+      setSubscriptionInfo(null);
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
   // 프로필 로딩 시 폼 초기값 업데이트
   useEffect(() => {
     if (userProfile) {
@@ -218,6 +255,9 @@ export default function ProfilePage() {
         businessLink: userProfile.businessLink || "",
         number: userProfile.number || "",
       });
+      
+      // 구독 정보도 함께 가져오기
+      fetchSubscriptionInfo();
     }
   }, [userProfile]);
 
@@ -484,47 +524,100 @@ export default function ProfilePage() {
                       멤버십 관리
                     </h3>
                     <div className="space-y-4">
-                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="font-semibold text-gray-800">현재 플랜</h4>
-                            <p className="text-sm text-gray-600">베이직 (무료)</p>
+                      {subscriptionLoading ? (
+                        <div className="flex justify-center items-center h-20">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      ) : subscriptionInfo ? (
+                        // 부스터 플랜 구독 중인 경우
+                        <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <h4 className="font-semibold text-gray-800">현재 플랜</h4>
+                              <p className="text-sm text-gray-600">부스터 플랜 (유료)</p>
+                            </div>
+                            <Badge className="bg-purple-100 text-purple-800">부스터</Badge>
                           </div>
-                          <Badge className="bg-blue-100 text-blue-800">무료</Badge>
+                          <div className="text-sm text-gray-600 mb-3 space-y-1">
+                            <p>• 키워드 분석 무제한</p>
+                            <p>• 상품 최적화 30회/일</p>
+                            <p>• 최근 내역 50개 저장</p>
+                            <p>• 확장 프로그램 무제한 사용</p>
+                            <p>• 신규 기능 우선 이용</p>
+                          </div>
+                          <div className="text-sm text-gray-600 mb-3">
+                            <p>다음 결제일: {subscriptionInfo.nextBillingDate?.toDate?.()?.toLocaleDateString() || '정보 없음'}</p>
+                            <p>결제 금액: {subscriptionInfo.amount?.toLocaleString()}원/월</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => navigate("/membership")}
+                            >
+                              플랜 변경
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => navigate("/subscription")}
+                            >
+                              결제 내역
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="border-red-300 text-red-500 hover:bg-red-50"
+                              onClick={() => setCancelMembershipOpen(true)}
+                            >
+                              멤버십 해지
+                            </Button>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-600 mb-3">
-                          키워드 분석 10회/일, 상품 최적화 10회/일, 최근 내역 10개 저장, 확장 프로그램 무제한 사용 제공
-                        </p>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => navigate("/membership")}
-                          >
-                            플랜 변경
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            disabled={true}
-                            className="opacity-50 cursor-not-allowed"
-                            onClick={() => navigate("/subscription")}
-                          >
-                            결제 내역
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            disabled={true}
-                            className="opacity-50 cursor-not-allowed border-gray-300 text-gray-500"
-                            onClick={() => setCancelMembershipOpen(true)}
-                          >
-                            멤버십 해지
-                          </Button>
+                      ) : (
+                        // 무료 플랜인 경우
+                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <h4 className="font-semibold text-gray-800">현재 플랜</h4>
+                              <p className="text-sm text-gray-600">베이직 (무료)</p>
+                            </div>
+                            <Badge className="bg-blue-100 text-blue-800">무료</Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-3">
+                            키워드 분석 10회/일, 상품 최적화 10회/일, 최근 내역 10개 저장, 확장 프로그램 무제한 사용 제공
+                          </p>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => navigate("/membership")}
+                            >
+                              플랜 변경
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              disabled={true}
+                              className="opacity-50 cursor-not-allowed"
+                              onClick={() => navigate("/subscription")}
+                            >
+                              결제 내역
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              disabled={true}
+                              className="opacity-50 cursor-not-allowed border-gray-300 text-gray-500"
+                              onClick={() => setCancelMembershipOpen(true)}
+                            >
+                              멤버십 해지
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
-                                     </div>
+                  </div>
 
                    {/* 결제 수단 관리 섹션 */}
                    <div className="border-b pb-6">
