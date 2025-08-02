@@ -288,7 +288,7 @@ export class AutoPaymentScheduler {
     
     const paymentData = {
       orderId: orderId,
-      amount: 500,
+      amount: 14900,
       goodsName: "스토어부스터 부스터 플랜 (자동결제)",
       cardQuota: 0,
       useShopInterest: false,
@@ -343,7 +343,7 @@ export class AutoPaymentScheduler {
       endDate: admin.firestore.Timestamp.fromDate(newEndDate),
       paymentHistory: admin.firestore.FieldValue.arrayUnion({
         orderId: orderId,
-        amount: 500,
+        amount: 14900,
         date: admin.firestore.Timestamp.fromDate(new Date()),
         status: "SUCCESS"
       })
@@ -369,7 +369,7 @@ export class AutoPaymentScheduler {
     const errorData = {
       uid: uid,
       orderId: orderId,
-      amount: 500,
+      amount: 14900,
       goodsName: "스토어부스터 부스터 플랜 (자동결제)",
       status: "ERROR",
       errorMessage: error instanceof Error ? error.message : 'Unknown error',

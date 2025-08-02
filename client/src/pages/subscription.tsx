@@ -109,7 +109,7 @@ export default function SubscriptionPage() {
 
         setPaymentStatus('success');
         setTimeout(() => {
-          navigate("/profile");
+          navigate("/subscription-complete");
         }, 2000);
       } else {
         setPaymentStatus('failed');
@@ -171,7 +171,7 @@ export default function SubscriptionPage() {
 
         setPaymentStatus('success');
         setTimeout(() => {
-          navigate("/profile");
+          navigate("/subscription-complete");
         }, 2000);
       } else {
         setPaymentStatus('failed');
