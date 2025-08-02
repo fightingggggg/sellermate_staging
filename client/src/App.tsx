@@ -16,8 +16,8 @@ import QuickProductOptimizerPage from "./pages/quick-product-optimizer";
 import KeywordCompetitionAnalysisPage from "@/pages/keyword-competition-analysis";
 import MembershipPage from "@/pages/membership";
 import SubscriptionPage from "@/pages/subscription";
-import SubscriptionCompletePage from "@/pages/subscription-complete";
 import PaymentSuccessPage from "@/pages/payment-success";
+import SubscriptionCompletePage from "@/pages/subscription-complete";
 import NaverOnboarding from "@/pages/naver-onboarding";
 
 function Router() {
