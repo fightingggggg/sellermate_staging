@@ -108,9 +108,7 @@ export default function SubscriptionPage() {
         }
 
         setPaymentStatus('success');
-        setTimeout(() => {
-          navigate("/subscription-complete");
-        }, 2000);
+        navigate("/subscription-complete");
       } else {
         setPaymentStatus('failed');
       }
@@ -170,9 +168,7 @@ export default function SubscriptionPage() {
         }
 
         setPaymentStatus('success');
-        setTimeout(() => {
-          navigate("/subscription-complete");
-        }, 2000);
+        navigate("/subscription-complete");
       } else {
         setPaymentStatus('failed');
       }
@@ -410,14 +406,7 @@ export default function SubscriptionPage() {
                 </Button>
 
                 {/* 결제 상태 표시 */}
-                {paymentStatus === 'success' && (
-                  <Alert className="border-green-200 bg-green-50">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-800">
-                      구독이 성공적으로 완료되었습니다! 잠시 후 완료 페이지로 이동합니다.
-                    </AlertDescription>
-                  </Alert>
-                )}
+
 
                 {paymentStatus === 'failed' && (
                   <Alert variant="destructive">

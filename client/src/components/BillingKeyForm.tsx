@@ -82,7 +82,6 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
     const result = await requestBillingKey(cardInfo);
 
     if (result?.success) {
-      alert('카드가 성공적으로 등록되었습니다!');
       await checkBillingKeyStatus();
       if (onSuccess) onSuccess();
     }
