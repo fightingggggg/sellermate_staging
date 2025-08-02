@@ -414,7 +414,7 @@ export default function SubscriptionPage() {
                   <Alert className="border-green-200 bg-green-50">
                     <CheckCircle className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-800">
-                      구독이 성공적으로 완료되었습니다! 잠시 후 프로필 페이지로 이동합니다.
+                      구독이 성공적으로 완료되었습니다! 잠시 후 완료 페이지로 이동합니다.
                     </AlertDescription>
                   </Alert>
                 )}
