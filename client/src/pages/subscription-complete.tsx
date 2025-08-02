@@ -9,20 +9,10 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function SubscriptionCompletePage() {
   const [, navigate] = useLocation();
   const { currentUser } = useAuth();
-  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          navigate("/profile");
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
+    // 바로 프로필 페이지로 이동
+    navigate("/profile");
   }, [navigate]);
 
   const features = [
@@ -73,7 +63,7 @@ export default function SubscriptionCompletePage() {
             부스터 플랜 구독이 성공적으로 활성화되었습니다.
           </p>
           <p className="text-sm text-gray-500">
-            {countdown}초 후 프로필 페이지로 자동 이동됩니다.
+            잠시 후 프로필 페이지로 이동합니다.
           </p>
         </div>
 

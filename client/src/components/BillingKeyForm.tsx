@@ -8,7 +8,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, CreditCard, AlertCircle, Calendar, User, FileText } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface BillingKeyFormProps {
   onSuccess?: () => void;
@@ -19,7 +18,6 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
   const { loading, error, requestBillingKey, getBillingKeyStatus, deleteBillingKey } = useNicePay();
   const [billingKeyStatus, setBillingKeyStatus] = useState<any>(null);
   const [showForm, setShowForm] = useState(true); // 모달에서 사용되므로 기본값을 true로 설정
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [cardInfo, setCardInfo] = useState({
     cardNo: '',
     expYear: '',
@@ -84,14 +82,9 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
     const result = await requestBillingKey(cardInfo);
 
     if (result?.success) {
-      setShowSuccessModal(true);
       await checkBillingKeyStatus();
+      if (onSuccess) onSuccess();
     }
-  };
-
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false);
-    if (onSuccess) onSuccess();
   };
 
   const handleDeleteBillingKey = async () => {
@@ -329,34 +322,7 @@ export default function BillingKeyForm({ onSuccess, onCancel }: BillingKeyFormPr
         </div>
       </div>
 
-      {/* 카드 등록 성공 모달 */}
-      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="w-6 h-6" />
-              카드 등록 완료
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-6 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              카드가 성공적으로 등록되었습니다!
-            </h3>
-            <p className="text-gray-600 mb-6">
-              이제 안전하게 자동 결제를 이용하실 수 있습니다.
-            </p>
-            <Button 
-              onClick={handleSuccessModalClose}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              확인
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </>
   );
 } 
