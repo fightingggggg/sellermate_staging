@@ -1,0 +1,20 @@
+Warning: Invalid prop `%s` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.%s data-replit-metadata 
+    at QueryCard (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/src/components/Dashboard/QueryCard.tsx:41:37)
+    at div
+    at div
+    at div
+    at Dashboard (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/src/components/Dashboard/index.tsx:29:39)
+    at main
+    at div
+    at DashboardLayout (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/src/components/DashboardLayout.tsx:44:43)
+    at QueryProvider (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/src/contexts/QueryContext.tsx:38:33)
+    at PrivateRoute (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/src/components/PrivateRoute.tsx:24:40)
+    at DashboardPage (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/src/pages/dashboard.tsx:26:3)
+    at Route (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=9af4b093:206:16)
+    at Switch (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=9af4b093:262:17)
+    at Router
+    at Provider (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-U27FYV5Z.js?v=9af4b093:38:15)
+    at TooltipProvider (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=9af4b093:62:5)
+    at AuthProvider (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/src/contexts/AuthContext.tsx:59:32)
+    at QueryClientProvider (https://febb4de3-f51e-4290-8435-b3f13ce42b75-00-70jd8vj87503.pike.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=9af4b093:2881:3)
+    at App
