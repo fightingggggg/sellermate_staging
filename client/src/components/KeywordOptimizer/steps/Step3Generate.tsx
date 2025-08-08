@@ -198,10 +198,9 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
   const checkExtensionInstalled = (): Promise<boolean> => {
     return new Promise((resolve) => {
       let resolved = false;
-      
+
       const messageHandler = (event: MessageEvent) => {
         if (event.data.type === "EXTENSION_STATUS" && !resolved) {
-          console.log('[Step3] 확장프로그램 설치 확인됨 (postMessage):', event.data.installed);
           resolved = true;
           window.removeEventListener("message", messageHandler);
           resolve(event.data.installed === true);
@@ -209,43 +208,54 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       };
 
       window.addEventListener("message", messageHandler);
-      console.log('[Step3] 확장프로그램 설치 확인 요청 전송 (postMessage)');
       window.postMessage({ type: "CHECK_EXTENSION" }, "*");
 
-      const EXTENSION_ID = "plgdaggkagiakemkoclkpkbdiocllbbi";
-      
+      const EXTENSION_IDS = [
+        "eekjgnjcpmcfeikolboahljpboadaojm", // dev
+        "plgdaggkagiakemkoclkpkbdiocllbbi"  // prod
+      ];
       if (typeof (window as any).chrome !== 'undefined' && (window as any).chrome.runtime && (window as any).chrome.runtime.sendMessage) {
-        console.log('[Step3] Chrome Extension API를 통한 확인 시도');
-        
         try {
-          (window as any).chrome.runtime.sendMessage(
-            EXTENSION_ID,
-            { type: "CHECK_EXTENSION_INSTALLED" },
-            (response: any) => {
-              if (!resolved) {
+          let tried = 0;
+          const trySend = (idx: number) => {
+            if (resolved || idx >= EXTENSION_IDS.length) return;
+            (window as any).chrome.runtime.sendMessage(
+              EXTENSION_IDS[idx],
+              { type: "CHECK_EXTENSION_INSTALLED" },
+              (response: any) => {
+                if (resolved) return;
                 if ((window as any).chrome.runtime.lastError) {
-                  console.log('[Step3] 확장프로그램 설치되지 않음 (Chrome API 오류):', (window as any).chrome.runtime.lastError.message);
-                  resolved = true;
-                  window.removeEventListener("message", messageHandler);
-                  resolve(false);
+                  tried++;
+                  if (tried >= EXTENSION_IDS.length) {
+                    resolved = true;
+                    window.removeEventListener("message", messageHandler);
+                    resolve(false);
+                  } else {
+                    trySend(idx + 1);
+                  }
                 } else if (response && response.installed) {
-                  console.log('[Step3] 확장프로그램 설치 확인됨 (Chrome API):', response);
                   resolved = true;
                   window.removeEventListener("message", messageHandler);
                   resolve(true);
+                } else {
+                  tried++;
+                  if (tried >= EXTENSION_IDS.length) {
+                    resolved = true;
+                    window.removeEventListener("message", messageHandler);
+                    resolve(false);
+                  } else {
+                    trySend(idx + 1);
+                  }
                 }
               }
-            }
-          );
-        } catch (error) {
-          console.log('[Step3] Chrome Extension API 오류:', error);
-        }
+            );
+          };
+          trySend(0);
+        } catch {}
       }
 
       setTimeout(() => {
         if (!resolved) {
-          console.log('[Step3] 확장프로그램 설치되지 않음 (타임아웃)');
-          resolved = true;
           window.removeEventListener("message", messageHandler);
           resolve(false);
         }

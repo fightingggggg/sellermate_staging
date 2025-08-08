@@ -541,29 +541,48 @@ export default function KeywordCompetitionAnalysisPage() {
       window.addEventListener("message", messageHandler);
       window.postMessage({ type: "CHECK_EXTENSION" }, "*");
 
-      const EXTENSION_ID = "eekjgnjcpmcfeikolboahljpboadaojm";
+      const EXTENSION_IDS = [
+        "eekjgnjcpmcfeikolboahljpboadaojm", // dev
+        "plgdaggkagiakemkoclkpkbdiocllbbi"  // prod
+      ];
       if (typeof (window as any).chrome !== "undefined" && (window as any).chrome.runtime && (window as any).chrome.runtime.sendMessage) {
         try {
-          (window as any).chrome.runtime.sendMessage(
-            EXTENSION_ID,
-            { type: "CHECK_EXTENSION_INSTALLED" },
-            (response: any) => {
-              if (!resolved) {
+          let tried = 0;
+          const trySend = (idx: number) => {
+            if (resolved || idx >= EXTENSION_IDS.length) return;
+            (window as any).chrome.runtime.sendMessage(
+              EXTENSION_IDS[idx],
+              { type: "CHECK_EXTENSION_INSTALLED" },
+              (response: any) => {
+                if (resolved) return;
                 if ((window as any).chrome.runtime.lastError) {
-                  resolved = true;
-                  window.removeEventListener("message", messageHandler);
-                  resolve(false);
+                  tried++;
+                  if (tried >= EXTENSION_IDS.length) {
+                    resolved = true;
+                    window.removeEventListener("message", messageHandler);
+                    resolve(false);
+                  } else {
+                    trySend(idx + 1);
+                  }
                 } else if (response && response.installed) {
                   resolved = true;
                   window.removeEventListener("message", messageHandler);
                   resolve(true);
+                } else {
+                  tried++;
+                  if (tried >= EXTENSION_IDS.length) {
+                    resolved = true;
+                    window.removeEventListener("message", messageHandler);
+                    resolve(false);
+                  } else {
+                    trySend(idx + 1);
+                  }
                 }
               }
-            }
-          );
-        } catch {
-          /* ignore */
-        }
+            );
+          };
+          trySend(0);
+        } catch (error) {}
       }
 
       setTimeout(() => {
