@@ -3737,11 +3737,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authHeader = req.headers.authorization || '';
       const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
       if (!token) {
+        console.warn('[UsageDebug][Server] consume 요청: 토큰 없음');
         return res.status(401).json({ allowed: false, message: 'Missing Authorization Bearer token' });
       }
       const decoded = await admin.auth().verifyIdToken(token);
       const uid = decoded.uid;
       const db = admin.firestore();
+      console.log('[UsageDebug][Server] consume 요청 수신 ←', { uid, now: new Date().toISOString() });
 
       // 멤버십 타입 확인 (기존 로직 재사용)
       let membershipType = 'basic';
@@ -3756,8 +3758,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
+      console.log('[UsageDebug][Server] consume 멤버십 판정 →', { uid, membershipType });
 
-      const limit = membershipType === 'basic' ? 20 : Number.MAX_SAFE_INTEGER;
+      if (membershipType === 'booster') {
+        // 부스터는 소모 없이 허용
+        console.log('[UsageDebug][Server] consume 부스터 → 카운트 소모 없이 허용');
+        return res.json({ allowed: true, membershipType, currentCount: 0, limit: Number.MAX_SAFE_INTEGER });
+      }
+
+      const limit = 20;
       const now = new Date();
       const monthKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYYMM
       const docId = `${uid}_${monthKey}`;
@@ -3766,6 +3775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.runTransaction(async (tx) => {
         const snap = await tx.get(ref);
         const current = snap.exists ? (snap.data()?.count || 0) : 0;
+        console.log('[UsageDebug][Server] consume 현재 카운트 →', { uid, monthKey, current, limit });
         if (current >= limit) {
           return { allowed: false, currentCount: current, limit, membershipType };
         }
@@ -3778,6 +3788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return { allowed: true, currentCount: next, limit, membershipType };
       });
 
+      console.log('[UsageDebug][Server] consume 결과 →', { uid, result });
       if (!result.allowed) {
         return res.status(429).json(result);
       }
@@ -3794,11 +3805,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authHeader = req.headers.authorization || '';
       const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
       if (!token) {
+        console.warn('[UsageDebug][Server] status 요청: 토큰 없음');
         return res.status(401).json({ message: 'Missing Authorization Bearer token' });
       }
       const decoded = await admin.auth().verifyIdToken(token);
       const uid = decoded.uid;
       const db = admin.firestore();
+      console.log('[UsageDebug][Server] status 요청 수신 ←', { uid, origin: req.headers.origin, ua: req.headers['user-agent'] });
+
+      // 멤버십 타입 확인
+      let membershipType = 'basic';
+      const subscriptionDoc = await db.collection('subscriptions').doc(uid).get();
+      if (subscriptionDoc.exists) {
+        const subscriptionData = subscriptionDoc.data();
+        if (subscriptionData?.plan === 'BOOSTER') {
+          const endDate = subscriptionData.endDate?.toDate?.() || new Date();
+          const now = new Date();
+          if (endDate > now) {
+            membershipType = 'booster';
+          }
+        }
+      }
+      console.log('[UsageDebug][Server] status 멤버십 판정 →', { uid, membershipType });
+
+      const limit = membershipType === 'basic' ? 20 : Number.MAX_SAFE_INTEGER;
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYYMM
+      const docId = `${uid}_${monthKey}`;
+      const ref = db.collection('extensionUsage').doc(docId);
+      const snap = await ref.get();
+      const current = snap.exists ? (snap.data()?.count || 0) : 0;
+      console.log('[UsageDebug][Server] status 현재 카운트 →', { uid, monthKey, exists: snap.exists, current, limit });
+
+      const payload = {
+        success: true,
+        data: {
+          membershipType,
+          month: monthKey,
+          currentCount: current,
+          limit
+        }
+      };
+      console.log('[UsageDebug][Server] status 응답 →', payload);
+      return res.json(payload);
+    } catch (error) {
+      console.error('extension-usage/status error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
+
+  // POST /api/extension-usage/simulate - 월별 사용량 시뮬레이션 (테스트용)
+  app.post('/api/extension-usage/simulate', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        console.warn('[UsageDebug][Server] simulate 요청: 토큰 없음');
+        return res.status(401).json({ message: 'Missing Authorization Bearer token' });
+      }
+      
+      const { targetMonth, targetCount, action } = req.body;
+      if (!targetMonth || !action) {
+        return res.status(400).json({ message: 'targetMonth and action are required' });
+      }
+
+      const decoded = await admin.auth().verifyIdToken(token);
+      const uid = decoded.uid;
+      const db = admin.firestore();
+      
+      console.log('[UsageDebug][Server] simulate 요청 수신 ←', { 
+        uid, 
+        targetMonth, 
+        targetCount, 
+        action,
+        now: new Date().toISOString() 
+      });
 
       // 멤버십 타입 확인
       let membershipType = 'basic';
@@ -3815,24 +3896,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const limit = membershipType === 'basic' ? 20 : Number.MAX_SAFE_INTEGER;
-      const now = new Date();
-      const monthKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYYMM
-      const docId = `${uid}_${monthKey}`;
+      const docId = `${uid}_${targetMonth}`;
       const ref = db.collection('extensionUsage').doc(docId);
-      const snap = await ref.get();
-      const current = snap.exists ? (snap.data()?.count || 0) : 0;
 
+      let result;
+      
+      if (action === 'set') {
+        // 특정 월의 사용량을 설정
+        if (typeof targetCount !== 'number' || targetCount < 0) {
+          return res.status(400).json({ message: 'targetCount must be a non-negative number' });
+        }
+        
+        await ref.set({
+          count: targetCount,
+          month: targetMonth,
+          uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        result = {
+          action: 'set',
+          month: targetMonth,
+          currentCount: targetCount,
+          limit,
+          membershipType
+        };
+        
+      } else if (action === 'get') {
+        // 특정 월의 사용량 조회
+        const snap = await ref.get();
+        const current = snap.exists ? (snap.data()?.count || 0) : 0;
+        
+        result = {
+          action: 'get',
+          month: targetMonth,
+          currentCount: current,
+          limit,
+          membershipType,
+          exists: snap.exists
+        };
+        
+      } else if (action === 'consume') {
+        // 특정 월에서 사용량 소비 시뮬레이션
+        const simulationResult = await db.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          const current = snap.exists ? (snap.data()?.count || 0) : 0;
+          
+          if (membershipType === 'booster') {
+            return { allowed: true, currentCount: current, limit: Number.MAX_SAFE_INTEGER, membershipType };
+          }
+          
+          if (current >= limit) {
+            return { allowed: false, currentCount: current, limit, membershipType };
+          }
+          
+          const next = current + 1;
+          if (snap.exists) {
+            tx.update(ref, { count: next, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+          } else {
+            tx.set(ref, { 
+              count: next, 
+              month: targetMonth, 
+              uid, 
+              createdAt: admin.firestore.FieldValue.serverTimestamp(), 
+              updatedAt: admin.firestore.FieldValue.serverTimestamp() 
+            });
+          }
+          return { allowed: true, currentCount: next, limit, membershipType };
+        });
+        
+        result = {
+          action: 'consume',
+          month: targetMonth,
+          ...simulationResult
+        };
+        
+      } else if (action === 'list') {
+        // 사용자의 모든 월별 사용량 조회
+        const querySnapshot = await db.collection('extensionUsage')
+          .where('uid', '==', uid)
+          .orderBy('month', 'desc')
+          .get();
+        
+        const monthlyUsage = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            month: data.month,
+            count: data.count,
+            createdAt: data.createdAt?.toDate?.() || null,
+            updatedAt: data.updatedAt?.toDate?.() || null
+          };
+        });
+        
+        result = {
+          action: 'list',
+          monthlyUsage,
+          membershipType,
+          limit
+        };
+        
+      } else {
+        return res.status(400).json({ message: 'Invalid action. Use: set, get, consume, or list' });
+      }
+
+      console.log('[UsageDebug][Server] simulate 결과 →', result);
       return res.json({
         success: true,
-        data: {
-          membershipType,
-          month: monthKey,
-          currentCount: current,
-          limit
-        }
+        data: result
       });
+      
     } catch (error) {
-      console.error('extension-usage/status error:', error);
+      console.error('extension-usage/simulate error:', error);
       return res.status(500).json({ success: false, message: 'Internal server error' });
     }
   });

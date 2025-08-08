@@ -19,6 +19,7 @@ import SubscriptionPage from "@/pages/subscription";
 import PaymentSuccessPage from "@/pages/payment-success";
 import SubscriptionCompletePage from "@/pages/subscription-complete";
 import NaverOnboarding from "@/pages/naver-onboarding";
+import ExtensionUsageSimulationPage from "@/pages/extension-usage-simulation";
 
 function Router() {
   return (
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/subscription" component={SubscriptionPage} />
       <Route path="/subscription-complete" component={SubscriptionCompletePage} />
       <Route path="/payment-success" component={PaymentSuccessPage} />
+      <Route path="/extension-usage-simulation" component={ExtensionUsageSimulationPage} />
       <Route component={NotFound} />
     </Switch>
   );
