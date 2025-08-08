@@ -1281,35 +1281,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/nicepay/billing-key", async (req, res) => {
     try {
       console.log("=== 빌키 발급 요청 시작 ===");
-      // 민감한 정보 제거하고 로깅
-      const { uid, cardNo, expYear, expMonth, idNo, cardPw } = req.body;
-      console.log("요청 정보:", { 
-        uid, 
-        cardNo: maskCardNumber(cardNo || ''),
-        expYear: maskSensitiveData(expYear || ''),
-        expMonth: maskSensitiveData(expMonth || ''),
-        idNo: maskSensitiveData(idNo || ''),
-        cardPw: '**'
-      });
+
+      // 인증/인가 강제: Bearer 토큰 필수 + uid는 토큰에서만 취득
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized', message: 'Missing Authorization Bearer token' });
+      }
+      const decoded = await admin.auth().verifyIdToken(token);
+      const uid = decoded.uid;
+
+      // 바디에서는 카드정보만 수신
+      const { cardNo, expYear, expMonth, idNo, cardPw } = req.body || {};
+
+      // 민감 정보는 운영환경에서 로그 금지
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("요청 정보:", {
+          uid,
+          cardNo: maskCardNumber(cardNo || ''),
+          expYear: maskSensitiveData(expYear || ''),
+          expMonth: maskSensitiveData(expMonth || ''),
+          idNo: maskSensitiveData(idNo || ''),
+          cardPw: '**'
+        });
+      }
       
       // 필수 필드 검증
       if (!uid || !cardNo || !expYear || !expMonth || !idNo || !cardPw) {
-        console.error("필수 필드 누락:", { 
-          uid, 
-          cardNo: cardNo ? "있음" : "없음", 
-          expYear: expYear ? "있음" : "없음", 
-          expMonth: expMonth ? "있음" : "없음", 
-          idNo: idNo ? "있음" : "없음", 
-          cardPw: cardPw ? "있음" : "없음" 
-        });
         return res.status(400).json({ 
           error: "Missing required fields", 
-          message: "uid, cardNo, expYear, expMonth, idNo, cardPw are required" 
+          message: "cardNo, expYear, expMonth, idNo, cardPw are required" 
         });
       }
-
-      // 민감한 정보 로깅 제거
-      console.log("빌키 발급 요청 - 사용자:", uid);
 
       const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
@@ -1325,22 +1328,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
       const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
       
-      // 민감한 정보 제거하고 로깅
-      console.log("암호화 정보:", {
-        plainTextLength: plainText.length,
-        encryptionKeyLength: encryptionKey.length,
-        encryptionKeyPreview: encryptionKey.substring(0, 4) + '****'
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("암호화 정보:", {
+          plainTextLength: plainText.length,
+          encryptionKeyLength: encryptionKey.length,
+          encryptionKeyPreview: encryptionKey.substring(0, 4) + '****'
+        });
+      }
 
       // AES-128 암호화 (AES/ECB/PKCS5padding)
       const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
       let encData = cipher.update(plainText, 'utf8', 'hex');
       encData += cipher.final('hex');
 
-      console.log("암호화 완료:", {
-        encDataLength: encData.length,
-        encDataPreview: encData.substring(0, 20) + '...'
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("암호화 완료:", {
+          encDataLength: encData.length,
+          encDataPreview: encData.substring(0, 20) + '...'
+        });
+      }
 
       // ediDate 생성
       const ediDate = new Date().toISOString();
@@ -1358,14 +1364,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signData: signData
       };
 
-      console.log("빌키 발급 API 요청 데이터:", {
-        orderId: billingKeyRequestData.orderId,
-        ediDate: billingKeyRequestData.ediDate,
-        signData: billingKeyRequestData.signData.substring(0, 20) + '...',
-        encDataLength: billingKeyRequestData.encData.length
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("빌키 발급 API 요청 데이터:", {
+          orderId: billingKeyRequestData.orderId,
+          ediDate: billingKeyRequestData.ediDate,
+          signData: billingKeyRequestData.signData.substring(0, 20) + '...',
+          encDataLength: billingKeyRequestData.encData.length
+        });
+      }
 
-      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      const authHeaderBasic = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
       
       console.log("API 호출 시작:", 'https://api.nicepay.co.kr/v1/subscribe/regist');
       
@@ -1373,17 +1381,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${authHeader}`
+          'Authorization': `Basic ${authHeaderBasic}`
         },
         body: JSON.stringify(billingKeyRequestData)
       });
 
       console.log("API 응답 상태:", response.status);
       const result = await response.json();
-      console.log("빌키 발급 API 응답:", result);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("빌키 발급 API 응답:", result);
+      }
 
       if (response.ok && result.resultCode === '0000') {
-        // 빌키 발급 성공
+        // 빌키 발급 성공 → 서버에만 저장, 클라이언트로는 빌키 미노출
         const db = admin.firestore();
         await db.collection("billingKeys").doc(uid).set({
           billingKey: result.bid,
@@ -1400,16 +1410,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("=== 빌키 발급 완료 ===");
         res.json({
           success: true,
-          billingKey: result.bid,
-          message: "빌키가 성공적으로 발급되었습니다.",
-          result: result
+          message: "빌키가 성공적으로 발급되었습니다."
         });
       } else {
         console.error("빌키 발급 실패:", result);
         res.status(400).json({
           success: false,
           error: result.resultMsg || "빌키 발급에 실패했습니다.",
-          result: result
         });
       }
 
@@ -1427,6 +1434,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 빌키 발급 테스트 엔드포인트 (API 방식)
   app.post("/api/nicepay/billing-key/test", async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ error: "Access denied in production" });
+    }
     try {
       console.log("=== 빌키 발급 테스트 시작 ===");
       console.log("요청 본문:", JSON.stringify(req.body, null, 2));
@@ -1556,6 +1566,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 빌키 수동 승인 처리 (테스트용)
   app.post("/api/nicepay/billing-key/:uid/approve", async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ error: "Access denied in production" });
+    }
     try {
       const { uid } = req.params;
       console.log("=== 빌키 수동 승인 시작 ===");
@@ -1660,6 +1673,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 빌키 상태 확인
   app.get("/api/nicepay/billing-key/:uid", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized', message: 'Missing Authorization Bearer token' });
+      }
+      const decoded = await admin.auth().verifyIdToken(token);
+      if (decoded.uid !== req.params.uid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
+      }
       console.log("=== 빌키 상태 확인 시작 ===");
       const { uid } = req.params;
       console.log("요청된 UID:", uid);
@@ -1720,6 +1742,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 빌키 삭제
   app.delete("/api/nicepay/billing-key/:uid", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized', message: 'Missing Authorization Bearer token' });
+      }
+      const decoded = await admin.auth().verifyIdToken(token);
+      if (decoded.uid !== req.params.uid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
+      }
       const { uid } = req.params;
       
       const db = admin.firestore();
@@ -1742,14 +1773,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Basic 인증 헤더 생성
-      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      const basicAuthHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
 
       // 나이스페이 빌키 삭제 API 호출
       const response = await fetch(`https://api.nicepay.co.kr/v1/payments/${billingKeyData.billingKey}/cancel`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${authHeader}`
+          'Authorization': `Basic ${basicAuthHeader}`
         },
         body: JSON.stringify({
           clientId: clientId,
@@ -1792,17 +1823,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/nicepay/payment/billing", async (req, res) => {
     try {
       console.log("=== 빌키 결제 요청 시작 ===");
-      console.log("요청 본문:", JSON.stringify(req.body, null, 2));
-      
-      const { uid, amount, goodsName, orderId } = req.body;
-      
-      if (!uid || !amount || !goodsName || !orderId) {
-        console.error("필수 필드 누락:", { uid, amount, goodsName, orderId });
-        return res.status(400).json({ 
-          error: "Missing required fields", 
-          message: "uid, amount, goodsName, orderId are required" 
-        });
+
+      // 인증/인가 강제: Bearer 토큰 필수 + uid는 토큰에서만 취득
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized', message: 'Missing Authorization Bearer token' });
       }
+      const decoded = await admin.auth().verifyIdToken(token);
+      const uid = decoded.uid;
+
+      // 금액/상품명/주문번호는 서버에서 결정
+      const amount = 8900;
+      const goodsName = "스토어부스터 부스터 플랜";
+      const orderId = `SUB_${Date.now()}_${uid}`;
 
       const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
@@ -1835,12 +1869,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const billingKey = billingKeyData.billingKey;
 
-      console.log("결제 정보:", {
-        orderId,
-        amount,
-        goodsName,
-        billingKey: billingKey.substring(0, 10) + '...'
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("결제 정보:", {
+          orderId,
+          amount,
+          goodsName,
+          billingKey: billingKey.substring(0, 10) + '...'
+        });
+      }
 
       // ediDate 생성
       const ediDate = new Date().toISOString();
@@ -1861,9 +1897,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signData: signData
       };
 
-      console.log("결제 요청 데이터:", JSON.stringify(paymentRequestData, null, 2));
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("결제 요청 데이터:", JSON.stringify(paymentRequestData, null, 2));
+      }
 
-      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      const authHeaderBasic = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
       
       console.log("API 호출 시작:", `https://api.nicepay.co.kr/v1/subscribe/${billingKey}/payments`);
       
@@ -1871,14 +1909,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${authHeader}`
+          'Authorization': `Basic ${authHeaderBasic}`
         },
         body: JSON.stringify(paymentRequestData)
       });
 
       console.log("결제 API 응답 상태:", response.status);
       const result = await response.json();
-      console.log("결제 API 응답:", result);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("결제 API 응답:", result);
+      }
 
       if (response.ok && result.resultCode === '0000') {
         // 결제 성공
@@ -1900,7 +1940,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log("=== 구독 생성 및 자동결제 스케줄 시작 완료 ===");
         } catch (error) {
           console.error("구독 생성 중 오류:", error);
-          // 구독 생성 실패해도 결제는 성공으로 처리
         }
 
         console.log("=== 빌키 결제 완료 ===");
@@ -1909,7 +1948,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderId: orderId,
           tid: result.tid,
           message: "결제가 성공적으로 완료되었습니다. 구독이 시작되었습니다.",
-          result: result
         });
       } else {
         console.error("결제 실패:", result);
@@ -1930,7 +1968,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({
           success: false,
           error: result.resultMsg || "결제에 실패했습니다.",
-          result: result
         });
       }
 
@@ -2825,6 +2862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const originalStatus = subscriptionData.status;
       await subscriptionDoc.ref.update({
         status: 'EXPIRED',
+        plan: 'basic',
         cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
         cancelledBy: uid,
         cancelReason: trimmedReason,
@@ -3850,164 +3888,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(payload);
     } catch (error) {
       console.error('extension-usage/status error:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-  });
-
-  // POST /api/extension-usage/simulate - 월별 사용량 시뮬레이션 (테스트용)
-  app.post('/api/extension-usage/simulate', async (req, res) => {
-    try {
-      const authHeader = req.headers.authorization || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (!token) {
-        console.warn('[UsageDebug][Server] simulate 요청: 토큰 없음');
-        return res.status(401).json({ message: 'Missing Authorization Bearer token' });
-      }
-      
-      const { targetMonth, targetCount, action } = req.body;
-      if (!targetMonth || !action) {
-        return res.status(400).json({ message: 'targetMonth and action are required' });
-      }
-
-      const decoded = await admin.auth().verifyIdToken(token);
-      const uid = decoded.uid;
-      const db = admin.firestore();
-      
-      console.log('[UsageDebug][Server] simulate 요청 수신 ←', { 
-        uid, 
-        targetMonth, 
-        targetCount, 
-        action,
-        now: new Date().toISOString() 
-      });
-
-      // 멤버십 타입 확인
-      let membershipType = 'basic';
-      const subscriptionDoc = await db.collection('subscriptions').doc(uid).get();
-      if (subscriptionDoc.exists) {
-        const subscriptionData = subscriptionDoc.data();
-        if (subscriptionData?.plan === 'BOOSTER') {
-          const endDate = subscriptionData.endDate?.toDate?.() || new Date();
-          const now = new Date();
-          if (endDate > now) {
-            membershipType = 'booster';
-          }
-        }
-      }
-
-      const limit = membershipType === 'basic' ? 20 : Number.MAX_SAFE_INTEGER;
-      const docId = `${uid}_${targetMonth}`;
-      const ref = db.collection('extensionUsage').doc(docId);
-
-      let result;
-      
-      if (action === 'set') {
-        // 특정 월의 사용량을 설정
-        if (typeof targetCount !== 'number' || targetCount < 0) {
-          return res.status(400).json({ message: 'targetCount must be a non-negative number' });
-        }
-        
-        await ref.set({
-          count: targetCount,
-          month: targetMonth,
-          uid,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        
-        result = {
-          action: 'set',
-          month: targetMonth,
-          currentCount: targetCount,
-          limit,
-          membershipType
-        };
-        
-      } else if (action === 'get') {
-        // 특정 월의 사용량 조회
-        const snap = await ref.get();
-        const current = snap.exists ? (snap.data()?.count || 0) : 0;
-        
-        result = {
-          action: 'get',
-          month: targetMonth,
-          currentCount: current,
-          limit,
-          membershipType,
-          exists: snap.exists
-        };
-        
-      } else if (action === 'consume') {
-        // 특정 월에서 사용량 소비 시뮬레이션
-        const simulationResult = await db.runTransaction(async (tx) => {
-          const snap = await tx.get(ref);
-          const current = snap.exists ? (snap.data()?.count || 0) : 0;
-          
-          if (membershipType === 'booster') {
-            return { allowed: true, currentCount: current, limit: Number.MAX_SAFE_INTEGER, membershipType };
-          }
-          
-          if (current >= limit) {
-            return { allowed: false, currentCount: current, limit, membershipType };
-          }
-          
-          const next = current + 1;
-          if (snap.exists) {
-            tx.update(ref, { count: next, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-          } else {
-            tx.set(ref, { 
-              count: next, 
-              month: targetMonth, 
-              uid, 
-              createdAt: admin.firestore.FieldValue.serverTimestamp(), 
-              updatedAt: admin.firestore.FieldValue.serverTimestamp() 
-            });
-          }
-          return { allowed: true, currentCount: next, limit, membershipType };
-        });
-        
-        result = {
-          action: 'consume',
-          month: targetMonth,
-          ...simulationResult
-        };
-        
-      } else if (action === 'list') {
-        // 사용자의 모든 월별 사용량 조회
-        const querySnapshot = await db.collection('extensionUsage')
-          .where('uid', '==', uid)
-          .orderBy('month', 'desc')
-          .get();
-        
-        const monthlyUsage = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            month: data.month,
-            count: data.count,
-            createdAt: data.createdAt?.toDate?.() || null,
-            updatedAt: data.updatedAt?.toDate?.() || null
-          };
-        });
-        
-        result = {
-          action: 'list',
-          monthlyUsage,
-          membershipType,
-          limit
-        };
-        
-      } else {
-        return res.status(400).json({ message: 'Invalid action. Use: set, get, consume, or list' });
-      }
-
-      console.log('[UsageDebug][Server] simulate 결과 →', result);
-      return res.json({
-        success: true,
-        data: result
-      });
-      
-    } catch (error) {
-      console.error('extension-usage/simulate error:', error);
       return res.status(500).json({ success: false, message: 'Internal server error' });
     }
   });

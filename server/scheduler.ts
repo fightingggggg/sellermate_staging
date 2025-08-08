@@ -201,6 +201,7 @@ export class AutoPaymentScheduler {
         
         batch.update(doc.ref, {
           status: 'EXPIRED',
+          plan: 'basic',
           expiredAt: admin.firestore.FieldValue.serverTimestamp()
         });
       });
@@ -533,6 +534,7 @@ export class AutoPaymentScheduler {
 
     await db.collection('subscriptions').doc(uid).set({
       status: "ACTIVE",
+      plan: "BOOSTER",
       lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
       lastPaymentAmount: 8900,
       lastPaymentOrderId: orderId,
@@ -552,6 +554,7 @@ export class AutoPaymentScheduler {
   private async expireSubscription(db: admin.firestore.Firestore, uid: string, errorMessage: string) {
     await db.collection('subscriptions').doc(uid).set({
       status: "EXPIRED",
+      plan: 'basic',
       lastPaymentAttempt: admin.firestore.FieldValue.serverTimestamp(),
       paymentFailureReason: errorMessage
     }, { merge: true });
