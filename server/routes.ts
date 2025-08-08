@@ -2486,8 +2486,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // subscriptionCancellations 컬렉션에 저장
-      await db.collection("subscriptionCancellations").add(membershipCancelData);
+      // subscriptionCancellations 컬렉션에 저장 (문서 ID = uid)
+      await db.collection("subscriptionCancellations").doc(uid).set(membershipCancelData);
 
       console.log(`멤버십 해지 완료: ${uid}, 만료일: ${subscriptionData.endDate?.toDate?.()?.toISOString()}, 해지 이력 저장됨`);
 
@@ -2969,8 +2969,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      // paymentCancellations 컬렉션에 저장
-      await db.collection("paymentCancellations").add(cancelHistoryData);
+      // paymentCancellations 컬렉션에 저장 (문서 ID = uid)
+      await db.collection("paymentCancellations").doc(uid).set(cancelHistoryData);
 
       console.log(`결제 취소 완료: ${uid}, TID: ${paymentData.tid}, 원래 상태: ${originalStatus}, 취소 이력 저장됨`);
 
