@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { auth } from '@/lib/firebase';
 
 interface BillingKeyRequest {
   uid: string;
@@ -61,25 +60,15 @@ export const useNicePay = () => {
         uid: currentUser.uid
       };
 
+      // 카드 정보가 제공되면 API 방식으로 처리
       if (cardInfo) {
         Object.assign(requestData, cardInfo);
-      }
-
-      const user = auth.currentUser;
-      if (!user) {
-        // 초기화 중인 상태: 오류 노출 없이 종료
-        return null;
-      }
-      const idToken = await user.getIdToken();
-      if (!idToken) {
-        throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인 해주세요.');
       }
 
       const response = await fetch('/api/nicepay/billing-key', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify(requestData),
       });
@@ -90,7 +79,28 @@ export const useNicePay = () => {
         throw new Error(data.error || data.message || '빌키 발급 요청에 실패했습니다.');
       }
 
-      // 서버는 빌키를 응답하지 않음. 성공 여부만 사용
+      // API 방식으로 성공한 경우
+      if (data.success && data.billingKey) {
+        console.log('빌키 발급 성공:', data.billingKey);
+        return data;
+      }
+
+      // 결제창 방식으로 처리해야 하는 경우 (카드 정보가 없는 경우)
+      if (data.success && data.clientId) {
+        // 나이스페이 JS SDK가 로드되어 있는지 확인
+        if (typeof (window as any).AUTHNICE === 'undefined') {
+          // SDK 로드
+          const script = document.createElement('script');
+          script.src = 'https://pay.nicepay.co.kr/v1/js/';
+          script.onload = () => {
+            callNicePayBillingKey(data);
+          };
+          document.head.appendChild(script);
+        } else {
+          callNicePayBillingKey(data);
+        }
+      }
+
       return data;
     } catch (err: any) {
       setError(err.message);
@@ -139,19 +149,7 @@ export const useNicePay = () => {
     setError(null);
 
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        return null;
-      }
-      const idToken = await user.getIdToken();
-      if (!idToken) {
-        throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인 해주세요.');
-      }
-      const response = await fetch(`/api/nicepay/billing-key/${currentUser.uid}`, {
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-        },
-      });
+      const response = await fetch(`/api/nicepay/billing-key/${currentUser.uid}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -178,19 +176,8 @@ export const useNicePay = () => {
     setError(null);
 
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        return false;
-      }
-      const idToken = await user.getIdToken();
-      if (!idToken) {
-        throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인 해주세요.');
-      }
       const response = await fetch(`/api/nicepay/billing-key/${currentUser.uid}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${idToken}`,
-        },
       });
 
       const data = await response.json();
@@ -209,7 +196,7 @@ export const useNicePay = () => {
   };
 
   // 빌키로 결제 요청
-  const requestPayment = async (_paymentInfo: Omit<PaymentRequest, 'uid'>): Promise<any> => {
+  const requestPayment = async (paymentInfo: Omit<PaymentRequest, 'uid'>): Promise<any> => {
     if (!currentUser?.uid) {
       setError('로그인이 필요합니다.');
       return null;
@@ -219,22 +206,15 @@ export const useNicePay = () => {
     setError(null);
 
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        return null;
-      }
-      const idToken = await user.getIdToken();
-      if (!idToken) {
-        throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인 해주세요.');
-      }
-      // 금액/상품명/주문번호는 서버가 결정하므로 바디는 비워도 됨
       const response = await fetch('/api/nicepay/payment/billing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          ...paymentInfo
+        }),
       });
 
       const data = await response.json();

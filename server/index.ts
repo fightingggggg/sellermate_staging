@@ -3,93 +3,13 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { autoPaymentScheduler } from "./scheduler";
 import dotenv from "dotenv";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 dotenv.config();
 
 const app = express();
 // reverse proxy (Cloudtype 등) 뒤에서 실행 시 X-Forwarded-Proto 헤더를 신뢰하도록 설정
 app.set("trust proxy", true);
-
-// 보안 헤더 적용 (콘텐츠 정책은 필요에 따라 별도 설정 가능)
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-}));
-
-// 콘텐츠 보안 정책(CSP) – 서비스에서 사용하는 외부 리소스 허용
-app.use(
-  helmet.contentSecurityPolicy({
-    useDefaults: true,
-    directives: {
-      "default-src": ["'self'"],
-      "script-src": [
-        "'self'",
-        "'unsafe-inline'",
-        "https://www.googletagmanager.com",
-        "https://www.google-analytics.com"
-      ],
-      "script-src-attr": ["'self'", "'unsafe-inline'"],
-      "style-src": [
-        "'self'",
-        "'unsafe-inline'",
-        "https://fonts.googleapis.com"
-      ],
-      "font-src": [
-        "'self'",
-        "https://fonts.gstatic.com"
-      ],
-      "img-src": [
-        "'self'",
-        "data:",
-        "https:",
-        "blob:"
-      ],
-      "connect-src": [
-        "'self'",
-        "https://identitytoolkit.googleapis.com",
-        "https://firestore.googleapis.com",
-        "https://www.google-analytics.com",
-        // 클라우드타입 등 외부 API 호출 도메인 허용 (동적 호스트 허용은 와일드카드 대신 현재 호스트 신뢰)
-        "https://*.cloudtype.app"
-      ],
-      "frame-src": [
-        "'self'"
-      ],
-      "object-src": ["'none'"]
-    },
-  })
-);
-
-// 민감 API 레이트리밋 (IP 기준)
-const sensitiveLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1분
-  max: 30, // 분당 30회
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// JSON 파서
 app.use(express.json());
-
-// 민감 경로에 제한 적용
-app.use([
-  "/api/nicepay",
-  "/api/payment",
-  "/api/refund",
-  "/api/subscription",
-], sensitiveLimiter);
-
-// HTTPS 강제 (프록시 환경에서만 동작, 개발환경은 스킵)
-app.use((req, res, next) => {
-  if (process.env.NODE_ENV === 'production') {
-    const proto = (req.headers['x-forwarded-proto'] || '').toString();
-    if (proto && proto !== 'https') {
-      const host = req.headers.host;
-      return res.redirect(301, `https://${host}${req.url}`);
-    }
-  }
-  next();
-});
+app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
   const start = Date.now();

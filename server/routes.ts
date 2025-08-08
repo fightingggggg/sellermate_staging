@@ -1281,38 +1281,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/nicepay/billing-key", async (req, res) => {
     try {
       console.log("=== 빌키 발급 요청 시작 ===");
-
-      // 인증/인가 강제: Bearer 토큰 필수 + uid는 토큰에서만 취득
-      const authHeader = req.headers.authorization || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (!token) {
-        return res.status(401).json({ error: 'Unauthorized', message: 'Missing Authorization Bearer token' });
-      }
-      const decoded = await admin.auth().verifyIdToken(token);
-      const uid = decoded.uid;
-
-      // 바디에서는 카드정보만 수신
-      const { cardNo, expYear, expMonth, idNo, cardPw } = req.body || {};
-
-      // 민감 정보는 운영환경에서 로그 금지
-      if (process.env.NODE_ENV !== 'production') {
-        console.log("요청 정보:", {
-          uid,
-          cardNo: maskCardNumber(cardNo || ''),
-          expYear: maskSensitiveData(expYear || ''),
-          expMonth: maskSensitiveData(expMonth || ''),
-          idNo: maskSensitiveData(idNo || ''),
-          cardPw: '**'
-        });
-      }
+      // 민감한 정보 제거하고 로깅
+      const { uid, cardNo, expYear, expMonth, idNo, cardPw } = req.body;
+      console.log("요청 정보:", { 
+        uid, 
+        cardNo: maskCardNumber(cardNo || ''),
+        expYear: maskSensitiveData(expYear || ''),
+        expMonth: maskSensitiveData(expMonth || ''),
+        idNo: maskSensitiveData(idNo || ''),
+        cardPw: '**'
+      });
       
       // 필수 필드 검증
       if (!uid || !cardNo || !expYear || !expMonth || !idNo || !cardPw) {
+        console.error("필수 필드 누락:", { 
+          uid, 
+          cardNo: cardNo ? "있음" : "없음", 
+          expYear: expYear ? "있음" : "없음", 
+          expMonth: expMonth ? "있음" : "없음", 
+          idNo: idNo ? "있음" : "없음", 
+          cardPw: cardPw ? "있음" : "없음" 
+        });
         return res.status(400).json({ 
           error: "Missing required fields", 
-          message: "cardNo, expYear, expMonth, idNo, cardPw are required" 
+          message: "uid, cardNo, expYear, expMonth, idNo, cardPw are required" 
         });
       }
+
+      // 민감한 정보 로깅 제거
+      console.log("빌키 발급 요청 - 사용자:", uid);
 
       const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
@@ -1328,25 +1325,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
       const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
       
-      if (process.env.NODE_ENV !== 'production') {
-        console.log("암호화 정보:", {
-          plainTextLength: plainText.length,
-          encryptionKeyLength: encryptionKey.length,
-          encryptionKeyPreview: encryptionKey.substring(0, 4) + '****'
-        });
-      }
+      // 민감한 정보 제거하고 로깅
+      console.log("암호화 정보:", {
+        plainTextLength: plainText.length,
+        encryptionKeyLength: encryptionKey.length,
+        encryptionKeyPreview: encryptionKey.substring(0, 4) + '****'
+      });
 
       // AES-128 암호화 (AES/ECB/PKCS5padding)
       const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
       let encData = cipher.update(plainText, 'utf8', 'hex');
       encData += cipher.final('hex');
 
-      if (process.env.NODE_ENV !== 'production') {
-        console.log("암호화 완료:", {
-          encDataLength: encData.length,
-          encDataPreview: encData.substring(0, 20) + '...'
-        });
-      }
+      console.log("암호화 완료:", {
+        encDataLength: encData.length,
+        encDataPreview: encData.substring(0, 20) + '...'
+      });
 
       // ediDate 생성
       const ediDate = new Date().toISOString();
@@ -1364,16 +1358,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signData: signData
       };
 
-      if (process.env.NODE_ENV !== 'production') {
-        console.log("빌키 발급 API 요청 데이터:", {
-          orderId: billingKeyRequestData.orderId,
-          ediDate: billingKeyRequestData.ediDate,
-          signData: billingKeyRequestData.signData.substring(0, 20) + '...',
-          encDataLength: billingKeyRequestData.encData.length
-        });
-      }
+      console.log("빌키 발급 API 요청 데이터:", {
+        orderId: billingKeyRequestData.orderId,
+        ediDate: billingKeyRequestData.ediDate,
+        signData: billingKeyRequestData.signData.substring(0, 20) + '...',
+        encDataLength: billingKeyRequestData.encData.length
+      });
 
-      const authHeaderBasic = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
       
       console.log("API 호출 시작:", 'https://api.nicepay.co.kr/v1/subscribe/regist');
       
@@ -1381,19 +1373,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${authHeaderBasic}`
+          'Authorization': `Basic ${authHeader}`
         },
         body: JSON.stringify(billingKeyRequestData)
       });
 
       console.log("API 응답 상태:", response.status);
       const result = await response.json();
-      if (process.env.NODE_ENV !== 'production') {
-        console.log("빌키 발급 API 응답:", result);
-      }
+      console.log("빌키 발급 API 응답:", result);
 
       if (response.ok && result.resultCode === '0000') {
-        // 빌키 발급 성공 → 서버에만 저장, 클라이언트로는 빌키 미노출
+        // 빌키 발급 성공
         const db = admin.firestore();
         await db.collection("billingKeys").doc(uid).set({
           billingKey: result.bid,
@@ -1410,13 +1400,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("=== 빌키 발급 완료 ===");
         res.json({
           success: true,
-          message: "빌키가 성공적으로 발급되었습니다."
+          billingKey: result.bid,
+          message: "빌키가 성공적으로 발급되었습니다.",
+          result: result
         });
       } else {
         console.error("빌키 발급 실패:", result);
         res.status(400).json({
           success: false,
           error: result.resultMsg || "빌키 발급에 실패했습니다.",
+          result: result
         });
       }
 
@@ -1434,9 +1427,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 빌키 발급 테스트 엔드포인트 (API 방식)
   app.post("/api/nicepay/billing-key/test", async (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
     try {
       console.log("=== 빌키 발급 테스트 시작 ===");
       console.log("요청 본문:", JSON.stringify(req.body, null, 2));
@@ -1566,9 +1556,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 빌키 수동 승인 처리 (테스트용)
   app.post("/api/nicepay/billing-key/:uid/approve", async (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
     try {
       const { uid } = req.params;
       console.log("=== 빌키 수동 승인 시작 ===");
@@ -1673,15 +1660,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 빌키 상태 확인
   app.get("/api/nicepay/billing-key/:uid", async (req, res) => {
     try {
-      const authHeader = req.headers.authorization || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (!token) {
-        return res.status(401).json({ error: 'Unauthorized', message: 'Missing Authorization Bearer token' });
-      }
-      const decoded = await admin.auth().verifyIdToken(token);
-      if (decoded.uid !== req.params.uid) {
-        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
-      }
       console.log("=== 빌키 상태 확인 시작 ===");
       const { uid } = req.params;
       console.log("요청된 UID:", uid);
@@ -1742,15 +1720,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 빌키 삭제
   app.delete("/api/nicepay/billing-key/:uid", async (req, res) => {
     try {
-      const authHeader = req.headers.authorization || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (!token) {
-        return res.status(401).json({ error: 'Unauthorized', message: 'Missing Authorization Bearer token' });
-      }
-      const decoded = await admin.auth().verifyIdToken(token);
-      if (decoded.uid !== req.params.uid) {
-        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
-      }
       const { uid } = req.params;
       
       const db = admin.firestore();
@@ -1773,19 +1742,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Basic 인증 헤더 생성
-      const basicAuthHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
 
       // 나이스페이 빌키 삭제 API 호출
-      const response = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${billingKeyData.billingKey}/expire`, {
+      const response = await fetch(`https://api.nicepay.co.kr/v1/payments/${billingKeyData.billingKey}/cancel`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${basicAuthHeader}`
+          'Authorization': `Basic ${authHeader}`
         },
         body: JSON.stringify({
           clientId: clientId,
-          orderId: `DELETE_${uid}_${Date.now()}`,
-          ediDate: new Date().toISOString(),
           reason: "사용자 요청"
         })
       });
@@ -1825,20 +1792,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/nicepay/payment/billing", async (req, res) => {
     try {
       console.log("=== 빌키 결제 요청 시작 ===");
-
-      // 인증/인가 강제: Bearer 토큰 필수 + uid는 토큰에서만 취득
-      const authHeader = req.headers.authorization || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (!token) {
-        return res.status(401).json({ error: 'Unauthorized', message: 'Missing Authorization Bearer token' });
+      console.log("요청 본문:", JSON.stringify(req.body, null, 2));
+      
+      const { uid, amount, goodsName, orderId } = req.body;
+      
+      if (!uid || !amount || !goodsName || !orderId) {
+        console.error("필수 필드 누락:", { uid, amount, goodsName, orderId });
+        return res.status(400).json({ 
+          error: "Missing required fields", 
+          message: "uid, amount, goodsName, orderId are required" 
+        });
       }
-      const decoded = await admin.auth().verifyIdToken(token);
-      const uid = decoded.uid;
-
-      // 금액/상품명/주문번호는 서버에서 결정
-      const amount = 8900;
-      const goodsName = "스토어부스터 부스터 플랜";
-      const orderId = `SUB_${Date.now()}_${uid}`;
 
       const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
@@ -1871,14 +1835,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const billingKey = billingKeyData.billingKey;
 
-      if (process.env.NODE_ENV !== 'production') {
-        console.log("결제 정보:", {
-          orderId,
-          amount,
-          goodsName,
-          billingKey: billingKey.substring(0, 10) + '...'
-        });
-      }
+      console.log("결제 정보:", {
+        orderId,
+        amount,
+        goodsName,
+        billingKey: billingKey.substring(0, 10) + '...'
+      });
 
       // ediDate 생성
       const ediDate = new Date().toISOString();
@@ -1899,11 +1861,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signData: signData
       };
 
-      if (process.env.NODE_ENV !== 'production') {
-        console.log("결제 요청 데이터:", JSON.stringify(paymentRequestData, null, 2));
-      }
+      console.log("결제 요청 데이터:", JSON.stringify(paymentRequestData, null, 2));
 
-      const authHeaderBasic = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
       
       console.log("API 호출 시작:", `https://api.nicepay.co.kr/v1/subscribe/${billingKey}/payments`);
       
@@ -1911,16 +1871,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${authHeaderBasic}`
+          'Authorization': `Basic ${authHeader}`
         },
         body: JSON.stringify(paymentRequestData)
       });
 
       console.log("결제 API 응답 상태:", response.status);
       const result = await response.json();
-      if (process.env.NODE_ENV !== 'production') {
-        console.log("결제 API 응답:", result);
-      }
+      console.log("결제 API 응답:", result);
 
       if (response.ok && result.resultCode === '0000') {
         // 결제 성공
@@ -1942,6 +1900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log("=== 구독 생성 및 자동결제 스케줄 시작 완료 ===");
         } catch (error) {
           console.error("구독 생성 중 오류:", error);
+          // 구독 생성 실패해도 결제는 성공으로 처리
         }
 
         console.log("=== 빌키 결제 완료 ===");
@@ -1950,6 +1909,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderId: orderId,
           tid: result.tid,
           message: "결제가 성공적으로 완료되었습니다. 구독이 시작되었습니다.",
+          result: result
         });
       } else {
         console.error("결제 실패:", result);
@@ -1970,6 +1930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({
           success: false,
           error: result.resultMsg || "결제에 실패했습니다.",
+          result: result
         });
       }
 
@@ -2372,14 +2333,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 멤버십 해지 API
   app.post("/api/subscription/cancel", async (req, res) => {
     try {
-      const authHeader = req.headers.authorization || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (!token) return res.status(401).json({ error: 'Unauthorized' });
-      const decoded = await admin.auth().verifyIdToken(token);
-
       const { uid } = req.body;
-      if (!uid || uid !== decoded.uid) {
-        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
+      
+      if (!uid) {
+        return res.status(400).json({ 
+          error: "Missing required fields", 
+          message: "uid is required" 
+        });
       }
 
       console.log(`=== 멤버십 해지 요청: ${uid} ===`);
@@ -2486,14 +2446,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 멤버십 재활성화 API
   app.post("/api/subscription/reactivate", async (req, res) => {
     try {
-      const authHeader = req.headers.authorization || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (!token) return res.status(401).json({ error: 'Unauthorized' });
-      const decoded = await admin.auth().verifyIdToken(token);
-
       const { uid } = req.body;
-      if (!uid || uid !== decoded.uid) {
-        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
+      
+      if (!uid) {
+        return res.status(400).json({ 
+          error: "Missing required fields", 
+          message: "uid is required" 
+        });
       }
 
       console.log(`=== 멤버십 재활성화 요청: ${uid} ===`);
@@ -2707,14 +2666,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 결제 취소 API (7일 이내, 사용량 0인 경우)
   app.post("/api/payment/cancel", async (req, res) => {
     try {
-      const authHeader = req.headers.authorization || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (!token) return res.status(401).json({ error: 'Unauthorized' });
-      const decoded = await admin.auth().verifyIdToken(token);
-
       const { uid, reason } = req.body;
-      if (!uid || uid !== decoded.uid) {
-        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
+      
+      if (!uid) {
+        return res.status(400).json({ 
+          error: "Missing required fields", 
+          message: "uid is required" 
+        });
       }
 
       // 취소 사유 검증 (10자 이상)
@@ -2966,14 +2924,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // POST /api/refund - 일반 환불 처리
   app.post('/api/refund', async (req, res) => {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-    const decoded = await admin.auth().verifyIdToken(token);
-
     const { uid, orderId, refundReason, refundAmount } = req.body;
-    if (!uid || uid !== decoded.uid) {
-      return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
+
+    if (!uid || !orderId || !refundReason) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        message: 'uid, orderId, refundReason are required' 
+      });
     }
 
     const db = admin.firestore();
@@ -3134,14 +3091,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // POST /api/resend-payment-email - 결제 성공 이메일 재발송
   app.post('/api/resend-payment-email', async (req, res) => {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-    const decoded = await admin.auth().verifyIdToken(token);
-
     const { uid, orderId, amount, goodsName } = req.body;
-    if (!uid || uid !== decoded.uid) {
-      return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
+
+    if (!uid || !orderId) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        message: 'uid, orderId are required' 
+      });
     }
 
     const db = admin.firestore();
@@ -3198,14 +3154,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/membership/type - 사용자의 멤버십 타입 확인
   app.get('/api/membership/type/:uid', async (req, res) => {
     try {
-      const authHeader = req.headers.authorization || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (!token) return res.status(401).json({ error: 'Unauthorized' });
-      const decoded = await admin.auth().verifyIdToken(token);
-
       const { uid } = req.params;
-      if (!uid || uid !== decoded.uid) {
-        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
+      
+      if (!uid) {
+        return res.status(400).json({ 
+          error: 'Missing required fields', 
+          message: 'uid is required' 
+        });
       }
 
       const db = admin.firestore();
