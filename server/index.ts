@@ -3,13 +3,31 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { autoPaymentScheduler } from "./scheduler";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 dotenv.config();
 
 const app = express();
 // reverse proxy (Cloudtype 등) 뒤에서 실행 시 X-Forwarded-Proto 헤더를 신뢰하도록 설정
 app.set("trust proxy", true);
-app.use(express.json());
+app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: false }));
+
+// 보안 헤더
+app.use(helmet({
+  contentSecurityPolicy: false, // SPA/Vite 호환. 필요 시 정확히 설정
+  referrerPolicy: { policy: 'no-referrer' },
+  frameguard: { action: 'deny' },
+}));
+
+// 레이트 리밋 (민감 API 위주 경로)
+const sensitiveLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(['/api/nicepay', '/api/auth', '/api/payment', '/api/ext'], sensitiveLimiter);
 
 app.use((req, res, next) => {
   const start = Date.now();

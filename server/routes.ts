@@ -661,8 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tokenRes = await fetch(tokenURL, { method: "GET" });
       console.log("[NAVER-OAUTH] Token res status:", tokenRes.status);
       const tokenJson = await tokenRes.json();
-      console.log("[NAVER-OAUTH] Token JSON:", tokenJson);
-
+      
       if (!tokenJson.access_token) {
         return res.status(500).send("failed to get access token");
       }
@@ -672,8 +671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       console.log("[NAVER-OAUTH] Profile res status:", profileRes.status);
       const profileJson = await profileRes.json();
-      console.log("[NAVER-OAUTH] Profile JSON:", profileJson);
-
+      
       const { id: naverId, email, nickname, name, mobile_e164, mobile, age, birthday, birthyear } = profileJson.response || {};
       const phoneFromProfile = mobile_e164 || mobile || "";
       
@@ -868,15 +866,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body: body.toString(),
       });
       const tokenJson = await tokenRes.json();
-      console.log("[KAKAO-OAUTH] token", tokenJson);
+      
       if (!tokenJson.access_token) return res.status(500).send("no access token");
 
       const profRes = await fetch("https://kapi.kakao.com/v2/user/me", {
         headers: { Authorization: `Bearer ${tokenJson.access_token}` },
       });
       const prof = await profRes.json();
-      console.log("[KAKAO-OAUTH] profile", prof);
-
+      
       const kakaoId = prof.id;
       const kakaoAcc = prof.kakao_account || {};
       const email = kakaoAcc.email || "";
@@ -1107,15 +1104,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     console.log("=== 환경 변수 확인 ===");
-    const envInfo = {
+    res.json({
       NICEPAY_CLIENT_ID: process.env.NICEPAY_CLIENT_ID ? "설정됨" : "설정되지 않음",
       NICEPAY_SECRET_KEY: process.env.NICEPAY_SECRET_KEY ? "설정됨" : "설정되지 않음",
-      BASE_URL: process.env.BASE_URL || "설정되지 않음",
+      BASE_URL: process.env.BASE_URL ? "설정됨" : "설정되지 않음",
       NODE_ENV: process.env.NODE_ENV || "설정되지 않음"
-    };
-    console.log("환경 변수 정보:", envInfo);
+    });
     console.log("=== 환경 변수 확인 완료 ===");
-    res.json(envInfo);
   });
 
   // 빌키 테스트 결제 엔드포인트 (디버그용)
@@ -1908,13 +1903,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("=== 빌키 결제 요청 시작 ===");
       console.log("요청 본문 수신");
       
-      const { uid, amount, goodsName, orderId } = req.body;
+      const { uid, amount, goodsName } = req.body;
       
-      if (!uid || !amount || !goodsName || !orderId) {
-        console.error("필수 필드 누락:", { uid, amount, goodsName, orderId });
+      if (!uid || !amount || !goodsName) {
+        console.error("필수 필드 누락:", { uid, amount, goodsName });
         return res.status(400).json({ 
           error: "Missing required fields", 
-          message: "uid, amount, goodsName, orderId are required" 
+          message: "uid, amount, goodsName are required" 
         });
       }
 
@@ -1942,11 +1937,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof goodsName !== 'string' || goodsName.length < 1 || goodsName.length > 100) {
         return res.status(400).json({ error: 'Invalid goodsName' });
       }
-      if (typeof orderId !== 'string' || orderId.length < 5 || orderId.length > 100) {
-        return res.status(400).json({ error: 'Invalid orderId' });
-      }
 
-      const clientId = process.env.NICEPAY_CLIENT_ID;
+            const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
       
       if (!clientId || !secretKey) {
@@ -1954,10 +1946,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "NicePay credentials not configured" });
       }
 
-      // Firestore에서 빌키 정보 조회
+      // Firestore에서 빌키 정보 조회 (서버에서만 접근)
       const db = admin.firestore();
       const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
-      
       if (!billingKeyDoc.exists) {
         console.error("빌키 정보를 찾을 수 없음:", uid);
         return res.status(404).json({ 
@@ -1965,7 +1956,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "등록된 카드 정보가 없습니다." 
         });
       }
-
       const billingKeyData = billingKeyDoc.data();
       if (!billingKeyData || !billingKeyData.billingKey) {
         console.error("유효한 빌키가 없음:", uid);
@@ -1974,8 +1964,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "유효하지 않은 카드 정보입니다." 
         });
       }
-
       const billingKey = billingKeyData.billingKey;
+
+      // 서버에서 안전한 orderId 생성
+      const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+      const orderId = `SUB_${randomNum}_${uid}`;
 
       console.log("결제 정보 준비 완료");
 
