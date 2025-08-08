@@ -144,7 +144,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 휴대폰 번호를 custom claim으로 설정하는 API
   app.post('/api/auth/set-phone-claim', async (req, res) => {
     try {
+      const authUid = await verifyAuthUid(req, res);
+      if (!authUid) return;
       const { uid, phoneNumber } = req.body;
+      
+      if (authUid !== uid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'uid mismatch' });
+      }
       
       if (!uid || !phoneNumber) {
         return res.status(400).json({ 
@@ -997,8 +1003,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /* -------------------------- 소셜 연결 해제 -------------------------- */
   app.post("/api/auth/naver/unlink", async (req, res) => {
     try {
+      const authUid = await verifyAuthUid(req, res);
+      if (!authUid) return;
       const { uid } = req.body as { uid?: string };
       if (!uid) return res.status(400).json({ error: "uid required" });
+      if (authUid !== uid) return res.status(403).json({ error: 'Forbidden', message: 'uid mismatch' });
       const docSnap = await admin.firestore().doc(`socialTokens/${uid}`).get();
       if (!docSnap.exists) return res.status(404).json({ error: "not found" });
       const data = docSnap.data() as any;
@@ -1019,8 +1028,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/kakao/unlink", async (req, res) => {
     try {
+      const authUid = await verifyAuthUid(req, res);
+      if (!authUid) return;
       const { uid } = req.body as { uid?: string };
       if (!uid) return res.status(400).json({ error: "uid required" });
+      if (authUid !== uid) return res.status(403).json({ error: 'Forbidden', message: 'uid mismatch' });
       const docSnap = await admin.firestore().doc(`socialTokens/${uid}`).get();
       if (!docSnap.exists) return res.status(404).json({ error: "not found" });
       const data = docSnap.data() as any;
@@ -3601,7 +3613,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== 휴대폰 번호 업데이트 API =====
   app.post('/api/auth/update-phone', async (req, res) => {
     try {
+      const authUid = await verifyAuthUid(req, res);
+      if (!authUid) return;
       const { uid, phoneNumber } = req.body;
+      
+      if (authUid !== uid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'uid mismatch' });
+      }
       
       if (!uid || !phoneNumber) {
         return res.status(400).json({ 

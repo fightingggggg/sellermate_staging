@@ -472,6 +472,11 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
     // Firebase Auth 삭제 전에 uid를 저장
     const userUid = currentUser.uid;
     const socialProvider = (userProfile as any)?.provider;
+    // 삭제 전에 ID 토큰을 미리 확보 (삭제 후에는 currentUser가 없어짐)
+    let preDeleteIdToken: string | null = null;
+    try {
+      preDeleteIdToken = await auth.currentUser.getIdToken();
+    } catch {}
 
     try {
       // 이메일/비밀번호 로그인 사용자가 비밀번호를 입력한 경우에만 재인증을 수행합니다.
@@ -532,13 +537,19 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
         if (socialProvider === "naver") {
           await fetch("/api/auth/naver/unlink", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
+            },
             body: JSON.stringify({ uid: userUid }),
           });
         } else if (socialProvider === "kakao") {
           await fetch("/api/auth/kakao/unlink", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
+            },
             body: JSON.stringify({ uid: userUid }),
           });
         }

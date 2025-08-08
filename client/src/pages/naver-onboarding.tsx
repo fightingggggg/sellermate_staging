@@ -432,10 +432,12 @@ export default function NaverOnboarding() {
                     // 휴대폰 번호가 없으면 다시 설정
                     if (!auth.currentUser?.phoneNumber) {
                       try {
+                        const idToken = await auth.currentUser?.getIdToken?.();
                         await fetch('/api/auth/update-phone', {
                           method: 'POST',
                           headers: {
                             'Content-Type': 'application/json',
+                            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
                           },
                           body: JSON.stringify({
                             uid: auth.currentUser!.uid,
@@ -479,10 +481,12 @@ export default function NaverOnboarding() {
               // Firebase Auth에 휴대폰 번호 설정 (식별자 표시를 위해 필수)
               // 소셜 로그인의 경우 linkWithCredential로 연결되었지만, 식별자 표시를 위해 추가 설정 필요
               try {
+                const idToken = await auth.currentUser?.getIdToken?.();
                 await fetch('/api/auth/update-phone', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
+                    ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
                   },
                   body: JSON.stringify({
                     uid: auth.currentUser!.uid,
