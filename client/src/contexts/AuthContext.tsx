@@ -652,11 +652,24 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
           try {
             const token = await user.getIdToken();
             if (token !== lastSentIdTokenRef.current) {
+              // 멤버십 타입 조회 (실패 시 기본 basic)
+              let membershipType: 'basic' | 'booster' = 'basic';
+              try {
+                const resp = await fetch(`/api/membership/type/${user.uid}`);
+                if (resp.ok) {
+                  const data = await resp.json();
+                  membershipType = data?.data?.membershipType === 'booster' ? 'booster' : 'basic';
+                }
+              } catch (e) {
+                console.warn('[AuthContext] 멤버십 조회 실패, basic으로 진행');
+              }
+
               window.postMessage(
                 {
                   type: "WEB_LOGIN_STATUS",
                   email: user.email,
                   idToken: token,
+                  membershipType,
                   ts: Date.now(),
                 },
                 "*",

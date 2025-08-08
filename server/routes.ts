@@ -3731,6 +3731,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/extension-usage/consume - 확장 직접 사용 시 월간 사용량 1회 소비 (Basic 20회 제한)
+  app.post('/api/extension-usage/consume', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        return res.status(401).json({ allowed: false, message: 'Missing Authorization Bearer token' });
+      }
+      const decoded = await admin.auth().verifyIdToken(token);
+      const uid = decoded.uid;
+      const db = admin.firestore();
+
+      // 멤버십 타입 확인 (기존 로직 재사용)
+      let membershipType = 'basic';
+      const subscriptionDoc = await db.collection('subscriptions').doc(uid).get();
+      if (subscriptionDoc.exists) {
+        const subscriptionData = subscriptionDoc.data();
+        if (subscriptionData?.plan === 'BOOSTER') {
+          const endDate = subscriptionData.endDate?.toDate?.() || new Date();
+          const now = new Date();
+          if (endDate > now) {
+            membershipType = 'booster';
+          }
+        }
+      }
+
+      const limit = membershipType === 'basic' ? 20 : Number.MAX_SAFE_INTEGER;
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYYMM
+      const docId = `${uid}_${monthKey}`;
+      const ref = db.collection('extensionUsage').doc(docId);
+
+      const result = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const current = snap.exists ? (snap.data()?.count || 0) : 0;
+        if (current >= limit) {
+          return { allowed: false, currentCount: current, limit, membershipType };
+        }
+        const next = current + 1;
+        if (snap.exists) {
+          tx.update(ref, { count: next, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        } else {
+          tx.set(ref, { count: next, month: monthKey, uid, createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        }
+        return { allowed: true, currentCount: next, limit, membershipType };
+      });
+
+      if (!result.allowed) {
+        return res.status(429).json(result);
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('extension-usage/consume error:', error);
+      return res.status(500).json({ allowed: false, message: 'Internal server error' });
+    }
+  });
+
+  // GET /api/extension-usage/status - 현재 월 사용량/제한 조회 (소비 없이 조회)
+  app.get('/api/extension-usage/status', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) {
+        return res.status(401).json({ message: 'Missing Authorization Bearer token' });
+      }
+      const decoded = await admin.auth().verifyIdToken(token);
+      const uid = decoded.uid;
+      const db = admin.firestore();
+
+      // 멤버십 타입 확인
+      let membershipType = 'basic';
+      const subscriptionDoc = await db.collection('subscriptions').doc(uid).get();
+      if (subscriptionDoc.exists) {
+        const subscriptionData = subscriptionDoc.data();
+        if (subscriptionData?.plan === 'BOOSTER') {
+          const endDate = subscriptionData.endDate?.toDate?.() || new Date();
+          const now = new Date();
+          if (endDate > now) {
+            membershipType = 'booster';
+          }
+        }
+      }
+
+      const limit = membershipType === 'basic' ? 20 : Number.MAX_SAFE_INTEGER;
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYYMM
+      const docId = `${uid}_${monthKey}`;
+      const ref = db.collection('extensionUsage').doc(docId);
+      const snap = await ref.get();
+      const current = snap.exists ? (snap.data()?.count || 0) : 0;
+
+      return res.json({
+        success: true,
+        data: {
+          membershipType,
+          month: monthKey,
+          currentCount: current,
+          limit
+        }
+      });
+    } catch (error) {
+      console.error('extension-usage/status error:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
+
   const port = Number(process.env.PORT) || 5005;
   const httpServer = createServer(app);
 
