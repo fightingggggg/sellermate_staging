@@ -14,33 +14,25 @@ export default function PaymentSuccessPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // URL 파라미터에서 결제 정보 추출
+    // URL 파라미터에서 결제 식별자만 참고 후 즉시 정리
     const urlParams = new URLSearchParams(window.location.search);
     const orderId = urlParams.get('orderId');
     const authResultCode = urlParams.get('authResultCode');
     const authResultMsg = urlParams.get('authResultMsg');
-    const billingKey = urlParams.get('billingKey');
-    const cardName = urlParams.get('cardName');
-    const cardNo = urlParams.get('cardNo');
 
-    if (authResultCode === '0000') {
-      setPaymentInfo({
-        orderId,
-        authResultCode,
-        authResultMsg,
-        billingKey,
-        cardName,
-        cardNo,
-        success: true
-      });
-    } else {
-      setPaymentInfo({
-        orderId,
-        authResultCode,
-        authResultMsg,
-        success: false
-      });
-    }
+    const success = authResultCode === '0000';
+    setPaymentInfo({
+      orderId,
+      authResultCode,
+      authResultMsg,
+      success,
+    });
+
+    // 민감 파라미터 및 전체 쿼리 제거
+    const clean = new URL(window.location.href);
+    ['billingKey','cardName','cardNo','authResultCode','authResultMsg','orderId'].forEach(k=>clean.searchParams.delete(k));
+    window.history.replaceState({}, '', clean.toString());
+
     setLoading(false);
   }, []);
 
@@ -125,14 +117,14 @@ export default function PaymentSuccessPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* 등록된 카드 정보 */}
+            {/* 결제 완료 안내 (민감정보 표시 제거) */}
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center gap-3 mb-3">
                 <CreditCard className="w-5 h-5 text-green-600" />
-                <span className="font-medium text-green-800">등록된 카드</span>
+                <span className="font-medium text-green-800">결제가 완료되었습니다</span>
               </div>
               <p className="text-sm text-green-700">
-                {paymentInfo?.cardName || '카드'} • {paymentInfo?.cardNo ? formatCardNumberWithPrefix(paymentInfo.cardNo.substring(0, 2)) : '****-****-****-****'}
+                카드 정보 등 민감정보는 표시하지 않습니다.
               </p>
             </div>
 

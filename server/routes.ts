@@ -57,6 +57,23 @@ async function verifyAuthUid(req: any, res: any): Promise<string | null> {
   }
 }
 
+// 1) 온보딩 세션 유틸리티 추가
+async function createOnboardingSession(data: Record<string, any>): Promise<string> {
+  const db = admin.firestore();
+  const code = crypto.randomBytes(24).toString('hex');
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5분 유효
+  await db.collection('onboardingSessions').doc(code).set({
+    ...data,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+    used: false,
+  });
+  return code;
+}
+
+
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS 설정 추가
   const corsOptions = {
@@ -789,18 +806,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (phoneVerified) params.skip = "1";
       if (age) params.age = age;
       if (birthDate) params.birthDate = birthDate;
-      // 소셜에서 가져온 전화번호 정보 전달
       if (phoneFromProfile) params.socialPhone = phoneFromProfile;
 
-      // 계정 병합 정보가 있으면 추가
+      // 계정 병합 정보가 있으면 포함
       if (stateData?.merge && stateData?.emailUid && stateData?.email) {
         params.merge = 'true';
         params.emailUid = stateData.emailUid;
         params.email = stateData.email;
       }
 
-      const qs = new URLSearchParams(params).toString();
-      const redirectUrl = `/naver-onboarding?${qs}`;
+      // 쿼리스트링으로 민감정보를 전달하지 않고 서버 세션 코드 발급
+      const sessionCode = await createOnboardingSession({
+        ...params,
+        mergeEmail: params.email,
+      });
+      const redirectUrl = `/naver-onboarding?code=${sessionCode}`;
       return res.redirect(redirectUrl);
     } catch (err) {
       console.error("[NAVER-OAUTH] Callback error:", err);
@@ -982,18 +1002,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (phoneVerified) params.skip = "1";
       if (age) params.age = age;
       if (birthDate) params.birthDate = birthDate;
-      // 소셜에서 가져온 전화번호 정보 전달
       if (phoneNumber) params.socialPhone = phoneNumber;
-      
-      // 계정 병합 정보가 있으면 추가
       if (stateData?.merge && stateData?.emailUid && stateData?.email) {
         params.merge = 'true';
         params.emailUid = stateData.emailUid;
         params.email = stateData.email;
       }
-      
-      const qs = new URLSearchParams(params).toString();
-      res.redirect(`/naver-onboarding?${qs}`);
+
+      // 카카오도 동일하게 세션 코드로 전달
+      const sessionCode = await createOnboardingSession({
+        ...params,
+        mergeEmail: params.email,
+      });
+      res.redirect(`/naver-onboarding?code=${sessionCode}`);
     } catch(err){
       console.error(err);
       res.status(500).send("kakao error");
@@ -2007,7 +2028,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           goodsName: validatedGoodsName,
           status: "SUCCESS",
           tid: result.tid,
-          billingKey: billingKey,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           completedAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -2039,7 +2059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: validatedAmount,
           goodsName: validatedGoodsName,
           status: "FAILED",
-          billingKey: billingKey,
+
           errorMessage: result.resultMsg,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           failedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -3980,6 +4000,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('extension-usage/status error:', error);
       return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
+
+  // 2) 온보딩 세션 조회 엔드포인트 (1회용)
+  app.get('/api/auth/onboarding-session', async (req: import('express').Request, res: import('express').Response) => {
+    try {
+      const code = String((req.query as any).code || '').trim();
+      if (!code) {
+        return res.status(400).json({ error: 'code is required' });
+      }
+      const db = admin.firestore();
+      const ref = db.collection('onboardingSessions').doc(code);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        return res.status(404).json({ error: 'session not found' });
+      }
+      const data = snap.data() as any;
+
+      // 만료/사용 여부 검사
+      const now = new Date();
+      const expiresAt = data?.expiresAt?.toDate?.() || new Date(0);
+      if (data?.used || now > expiresAt) {
+        // 만료/사용된 세션은 제거
+        await ref.delete().catch(() => {});
+        return res.status(410).json({ error: 'session expired' });
+      }
+
+      // 반환 시 민감 정보 과다 노출 방지: URL이 아닌 응답 바디로만 전달
+      const response = {
+        token: data.token || '',
+        email: data.email || '',
+        name: data.name || '',
+        provider: data.provider || '',
+        age: data.age || '',
+        birthDate: data.birthDate || '',
+        socialPhone: data.socialPhone || '',
+        merge: !!data.merge,
+        emailUid: data.emailUid || '',
+        mergeEmail: data.mergeEmail || data.email || '',
+      };
+
+      // 1회용 표시 후 삭제
+      await ref.delete().catch(async () => {
+        // 삭제 실패 시 used 플래그 세팅
+        await ref.update({ used: true }).catch(() => {});
+      });
+
+      return res.json({ success: true, data: response });
+    } catch (e: any) {
+      console.error('[onboarding-session] error', e?.message || e);
+      return res.status(500).json({ error: 'internal error' });
     }
   });
 

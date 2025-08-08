@@ -15,17 +15,21 @@ export default function NaverOnboarding() {
   // useLocation hook for navigation only
   // parse query
   const searchParams = new URLSearchParams(window.location.search);
-  const token = searchParams.get("token") || "";
-  const email = searchParams.get("email") || "";
-  const name = searchParams.get("name") || "";
-  const provider = searchParams.get("provider") || "";
-  const age = searchParams.get("age") || "";
-  const birthDate = searchParams.get("birthDate") || "";
-  const skip = searchParams.get("skip") === "1";
-  const socialPhone = searchParams.get("socialPhone") || ""; // 소셜에서 가져온 전화번호
-  const merge = searchParams.get("merge") === "true";
-  const emailUid = searchParams.get("emailUid") || "";
-  const mergeEmail = searchParams.get("email") || "";
+  const code = searchParams.get("code") || "";
+
+  // 서버 세션에서 수신할 값들
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [token, setToken] = useState("");
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [provider, setProvider] = useState("");
+  const [age, setAge] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [socialPhone, setSocialPhone] = useState("");
+  const [skip, setSkip] = useState(false);
+  const [merge, setMerge] = useState(false);
+  const [emailUid, setEmailUid] = useState("");
+  const [mergeEmail, setMergeEmail] = useState("");
 
   const [step, setStep] = useState<"signin" | "phone" | "done">("signin");
   const [countryCode, setCountryCode] = useState("+82");
@@ -99,9 +103,49 @@ export default function NaverOnboarding() {
     return normalized1 === normalized2;
   };
 
+  // 세션 로드: code가 있으면 서버에서 1회 조회
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!code) {
+          setSessionLoaded(true);
+          setStep("phone");
+          return;
+        }
+        const resp = await fetch(`/api/auth/onboarding-session?code=${encodeURIComponent(code)}`, { credentials: 'include' });
+        const json = await resp.json();
+        if (resp.ok && json?.success) {
+          const d = json.data || {};
+          setToken(d.token || "");
+          setEmail(d.email || "");
+          setName(d.name || "");
+          setProvider(d.provider || "");
+          setAge(d.age || "");
+          setBirthDate(d.birthDate || "");
+          setSocialPhone(d.socialPhone || "");
+          setMerge(!!d.merge);
+          setEmailUid(d.emailUid || "");
+          setMergeEmail(d.mergeEmail || d.email || "");
+          setSkip(d.skip === '1' || d.skip === true);
+        } else {
+          console.warn('[ONBOARDING] invalid or expired session');
+        }
+      } catch (e) {
+        console.error('[ONBOARDING] session fetch error', e);
+      } finally {
+        setSessionLoaded(true);
+        // URL 정리: code 제거
+        const clean = new URL(window.location.href);
+        clean.searchParams.delete('code');
+        window.history.replaceState({}, '', clean.toString());
+      }
+    })();
+  }, [code]);
+
   // 1) skip=1(이미 휴대폰 인증 완료된 계정)인 경우에만 즉시 로그인 후 홈으로 이동합니다.
   useEffect(() => {
     (async () => {
+      if (!sessionLoaded) return;
       if (!token || !skip) {
         // 휴대폰 인증이 필요한 신규 가입자는 로그인 지연
         setStep("phone");
@@ -115,7 +159,7 @@ export default function NaverOnboarding() {
         console.error("[ONBOARDING] auto-login skipped user failed", err);
       }
     })();
-  }, [token, skip]);
+  }, [sessionLoaded, token, skip]);
 
   // effect for countdown
   useEffect(()=>{

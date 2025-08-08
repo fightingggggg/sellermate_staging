@@ -77,6 +77,12 @@ match /subscriptions/{subscriptionId} {
       allow read, write: if request.auth != null;
     }
     
+    // 온보딩 일회용 세션: 읽기만 허용 (서버가 생성/삭제)
+    match /onboardingSessions/{code} {
+      allow get: if true; // 1회용 세션 조회만 사용
+      allow list, create, update, delete: if false;
+    }
+
     // 기타 모든 문서 접근 거부
     match /{document=**} {
       allow read, write: if false;
