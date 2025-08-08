@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { auth } from '@/lib/firebase';
 
 interface BillingKeyRequest {
   uid: string;
@@ -39,6 +40,18 @@ export const useNicePay = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const getIdTokenSafely = async (): Promise<string | null> => {
+    try {
+      const firebaseUser = auth.currentUser as any;
+      if (firebaseUser && typeof firebaseUser.getIdToken === 'function') {
+        return await firebaseUser.getIdToken();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   // 빌키 발급 요청 (API 방식)
   const requestBillingKey = async (cardInfo?: {
     cardNo: string;
@@ -65,10 +78,13 @@ export const useNicePay = () => {
         Object.assign(requestData, cardInfo);
       }
 
+      const idToken = await getIdTokenSafely();
+
       const response = await fetch('/api/nicepay/billing-key', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         body: JSON.stringify(requestData),
       });
@@ -149,7 +165,12 @@ export const useNicePay = () => {
     setError(null);
 
     try {
-      const response = await fetch(`/api/nicepay/billing-key/${currentUser.uid}`);
+      const idToken = await getIdTokenSafely();
+      const response = await fetch(`/api/nicepay/billing-key/${currentUser.uid}`, {
+        headers: {
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -176,8 +197,12 @@ export const useNicePay = () => {
     setError(null);
 
     try {
+      const idToken = await getIdTokenSafely();
       const response = await fetch(`/api/nicepay/billing-key/${currentUser.uid}`, {
         method: 'DELETE',
+        headers: {
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
       });
 
       const data = await response.json();
@@ -206,10 +231,12 @@ export const useNicePay = () => {
     setError(null);
 
     try {
+      const idToken = await getIdTokenSafely();
       const response = await fetch('/api/nicepay/payment/billing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         body: JSON.stringify({
           uid: currentUser.uid,
@@ -243,10 +270,12 @@ export const useNicePay = () => {
     setError(null);
 
     try {
+      const idToken = await getIdTokenSafely();
       const response = await fetch('/api/debug/test-billing-payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         body: JSON.stringify({
           uid: currentUser.uid
@@ -279,7 +308,12 @@ export const useNicePay = () => {
     setError(null);
 
     try {
-      const response = await fetch(`/api/debug/subscription/${currentUser.uid}`);
+      const idToken = await getIdTokenSafely();
+      const response = await fetch(`/api/debug/subscription/${currentUser.uid}`, {
+        headers: {
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -306,10 +340,12 @@ export const useNicePay = () => {
     setError(null);
 
     try {
+      const idToken = await getIdTokenSafely();
       const response = await fetch('/api/debug/run-auto-payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         body: JSON.stringify({
           uid: currentUser.uid
