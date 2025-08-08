@@ -14,22 +14,67 @@ import { Checkbox } from "@/components/ui/checkbox";
 export default function NaverOnboarding() {
   // useLocation hook for navigation only
   // parse query
-  const searchParams = new URLSearchParams(window.location.search);
-  const code = searchParams.get("code") || "";
+  const initialParamsRef = useRef<{
+    token: string;
+    email: string;
+    name: string;
+    provider: string;
+    age: string;
+    birthDate: string;
+    skip: boolean;
+    socialPhone: string;
+    merge: boolean;
+    emailUid: string;
+    mergeEmail: string;
+  } | null>(null);
 
-  // 서버 세션에서 수신할 값들
-  const [sessionLoaded, setSessionLoaded] = useState(false);
-  const [token, setToken] = useState("");
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [provider, setProvider] = useState("");
-  const [age, setAge] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [socialPhone, setSocialPhone] = useState("");
-  const [skip, setSkip] = useState(false);
-  const [merge, setMerge] = useState(false);
-  const [emailUid, setEmailUid] = useState("");
-  const [mergeEmail, setMergeEmail] = useState("");
+  if (!initialParamsRef.current) {
+    const hashParams = new URLSearchParams(
+      window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash
+    );
+    const searchParams = new URLSearchParams(window.location.search);
+    const get = (k: string) => hashParams.get(k) ?? searchParams.get(k) ?? "";
+
+    const tokenParsed = get("token");
+    const emailParsed = get("email");
+    const nameParsed = get("name");
+    const providerParsed = get("provider");
+    const ageParsed = get("age");
+    const birthDateParsed = get("birthDate");
+    const skipParsed = (hashParams.get("skip") ?? searchParams.get("skip")) === "1";
+    const socialPhoneParsed = get("socialPhone");
+    const mergeParsed = (hashParams.get("merge") ?? searchParams.get("merge")) === "true";
+    const emailUidParsed = get("emailUid");
+    const mergeEmailParsed = get("email");
+
+    initialParamsRef.current = {
+      token: tokenParsed,
+      email: emailParsed,
+      name: nameParsed,
+      provider: providerParsed,
+      age: ageParsed,
+      birthDate: birthDateParsed,
+      skip: skipParsed,
+      socialPhone: socialPhoneParsed,
+      merge: mergeParsed,
+      emailUid: emailUidParsed,
+      mergeEmail: mergeEmailParsed,
+    };
+  }
+
+  const {
+    token,
+    email,
+    name,
+    provider,
+    age,
+    birthDate,
+    skip,
+    socialPhone,
+    merge,
+    emailUid,
+    mergeEmail,
+  } = initialParamsRef.current!;
 
   const [step, setStep] = useState<"signin" | "phone" | "done">("signin");
   const [countryCode, setCountryCode] = useState("+82");
@@ -103,49 +148,20 @@ export default function NaverOnboarding() {
     return normalized1 === normalized2;
   };
 
-  // 세션 로드: code가 있으면 서버에서 1회 조회
+  // 민감 파라미터는 즉시 URL에서 제거하여 유출 최소화
   useEffect(() => {
-    (async () => {
-      try {
-        if (!code) {
-          setSessionLoaded(true);
-          setStep("phone");
-          return;
-        }
-        const resp = await fetch(`/api/auth/onboarding-session?code=${encodeURIComponent(code)}`, { credentials: 'include' });
-        const json = await resp.json();
-        if (resp.ok && json?.success) {
-          const d = json.data || {};
-          setToken(d.token || "");
-          setEmail(d.email || "");
-          setName(d.name || "");
-          setProvider(d.provider || "");
-          setAge(d.age || "");
-          setBirthDate(d.birthDate || "");
-          setSocialPhone(d.socialPhone || "");
-          setMerge(!!d.merge);
-          setEmailUid(d.emailUid || "");
-          setMergeEmail(d.mergeEmail || d.email || "");
-          setSkip(d.skip === '1' || d.skip === true);
-        } else {
-          console.warn('[ONBOARDING] invalid or expired session');
-        }
-      } catch (e) {
-        console.error('[ONBOARDING] session fetch error', e);
-      } finally {
-        setSessionLoaded(true);
-        // URL 정리: code 제거
-        const clean = new URL(window.location.href);
-        clean.searchParams.delete('code');
-        window.history.replaceState({}, '', clean.toString());
-      }
-    })();
-  }, [code]);
+    const url = new URL(window.location.href);
+    if (url.hash) {
+      history.replaceState({}, document.title, url.pathname);
+    } else if (url.search) {
+      url.search = "";
+      history.replaceState({}, document.title, url.toString());
+    }
+  }, []);
 
   // 1) skip=1(이미 휴대폰 인증 완료된 계정)인 경우에만 즉시 로그인 후 홈으로 이동합니다.
   useEffect(() => {
     (async () => {
-      if (!sessionLoaded) return;
       if (!token || !skip) {
         // 휴대폰 인증이 필요한 신규 가입자는 로그인 지연
         setStep("phone");
@@ -159,7 +175,7 @@ export default function NaverOnboarding() {
         console.error("[ONBOARDING] auto-login skipped user failed", err);
       }
     })();
-  }, [sessionLoaded, token, skip]);
+  }, [token, skip]);
 
   // effect for countdown
   useEffect(()=>{
