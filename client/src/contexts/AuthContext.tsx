@@ -697,7 +697,6 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
                 {
                   type: "WEB_LOGIN_STATUS",
                   email: user.email,
-                  idToken: token,
                   membershipType,
                   ts: Date.now(),
                 },

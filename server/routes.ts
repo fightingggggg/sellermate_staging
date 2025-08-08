@@ -3364,6 +3364,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/merge-account', async (req, res) => {
     try {
       const { emailAccountUid, socialProvider, socialUid, email, password, phoneNumber, birthDate, socialName, socialEmail } = req.body;
+
+      // 인증 및 권한 확인: 요청자의 uid는 반드시 socialUid와 같아야 함
+      const authUid = await verifyAuthUid(req, res);
+      if (!authUid) return;
+      if (authUid !== socialUid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'Authenticated user does not match socialUid' });
+      }
       
       if (!emailAccountUid || !socialProvider || !socialUid || !email) {
         return res.status(400).json({ 
@@ -3383,6 +3390,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ error: 'Email account not found' });
         }
         throw error;
+      }
+
+      // 이메일 계정 식별 정보(email)와 전달된 email이 일치하는지 검증 (소유권 검증 강화)
+      const emailFromRecord = (emailUser.email || '').toLowerCase();
+      const emailFromReq = (email || '').toLowerCase();
+      if (!emailFromRecord || emailFromRecord !== emailFromReq) {
+        return res.status(403).json({ error: 'Forbidden', message: 'Email does not match emailAccountUid' });
       }
 
       // 2. 소셜 계정 정보 가져오기
