@@ -358,11 +358,14 @@ export default function ProfilePage() {
       }
 
       // 결제수단 삭제 API 호출
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const token = await auth.currentUser?.getIdToken?.();
+        if (token) headers.Authorization = `Bearer ${token}`;
+      } catch {}
       const response = await fetch(`/api/billing-key/${possibleUid}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
       });
 
       const result = await response.json();
@@ -417,11 +420,15 @@ export default function ProfilePage() {
       }
 
       // 결제 취소 API 호출
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const token = await auth.currentUser?.getIdToken?.();
+        if (token) headers.Authorization = `Bearer ${token}`;
+      } catch {}
+
       const response = await fetch('/api/payment/cancel', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ uid: possibleUid, reason: trimmed }),
       });
 
@@ -1576,10 +1583,9 @@ export default function ProfilePage() {
                                ⚠️ 결제 취소 시 전체 금액이 환불되며, 즉시 베이직 플랜으로 변경됩니다.
                              </span>
                              <br/><br/>
-                             <div className="text-sm text-gray-600 space-y-1">
-                               <p>결제일로부터 7일 이내 미사용일 경우에만 환불이 가능합니다.
-                               환불은 영업일 기준 1-2일 내에 처리됩니다</p>
-                             </div>
+                             <span className="text-sm text-gray-600 block">
+                               결제일로부터 7일 이내 미사용일 경우에만 환불이 가능합니다. 환불은 영업일 기준 1-2일 내에 처리됩니다
+                             </span>
                            </DialogDescription>
                          </DialogHeader>
                          <div className="space-y-2 mt-2">

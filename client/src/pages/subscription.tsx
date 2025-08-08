@@ -242,29 +242,11 @@ export default function SubscriptionPage() {
       if (result?.success) {
         // 구독 정보를 Firestore에 저장
         try {
-          const subscriptionData = {
-            uid: currentUser?.uid,
-            plan: 'BOOSTER',
-            status: 'ACTIVE',
-            startDate: serverTimestamp(),
-            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후
-            lastPaymentAmount: amount,
-            lastPaymentOrderId: orderId,
-            paymentMethod: selectedPaymentMethod,
-            paymentHistory: [{
-              amount: amount,
-              date: serverTimestamp(),
-              orderId: orderId,
-              status: 'SUCCESS',
-              plan: 'BOOSTER'
-            }],
-            createdAt: serverTimestamp()
-          };
-
-          await addDoc(collection(db, 'subscriptions'), subscriptionData);
+          // 서버가 결제 성공 시 구독 문서를 uid로 생성/업데이트합니다.
+          // 중복 생성 방지를 위해 클라이언트에서는 생성하지 않습니다.
+          console.log('구독 정보는 서버에서 생성/업데이트됩니다.');
         } catch (error) {
-          console.error('구독 정보 저장 실패:', error);
-          // 구독 정보 저장 실패해도 결제는 성공했으므로 계속 진행
+          console.error('구독 정보 확인 중 경고:', error);
         }
 
         setPaymentStatus('success');
@@ -346,29 +328,11 @@ export default function SubscriptionPage() {
       if (result?.success) {
         // 구독 정보를 Firestore에 저장
         try {
-          const subscriptionData = {
-            uid: currentUser?.uid,
-            plan: 'BOOSTER',
-            status: 'ACTIVE',
-            startDate: serverTimestamp(),
-            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후
-            lastPaymentAmount: amount,
-            lastPaymentOrderId: orderId,
-            paymentMethod: selectedPaymentMethod,
-            paymentHistory: [{
-              amount: amount,
-              date: serverTimestamp(),
-              orderId: orderId,
-              status: 'SUCCESS',
-              plan: 'BOOSTER'
-            }],
-            createdAt: serverTimestamp()
-          };
-
-          await addDoc(collection(db, 'subscriptions'), subscriptionData);
+          // 서버가 결제 성공 시 구독 문서를 uid로 생성/업데이트합니다.
+          // 중복 생성을 막기 위해 클라이언트에서는 생성하지 않습니다.
+          console.log('구독 정보는 서버에서 생성/업데이트됩니다.');
         } catch (error) {
-          console.error('구독 정보 저장 실패:', error);
-          // 구독 정보 저장 실패해도 결제는 성공했으므로 계속 진행
+          console.error('구독 정보 확인 중 경고:', error);
         }
 
         setPaymentStatus('success');
