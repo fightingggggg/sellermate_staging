@@ -1055,6 +1055,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /* -------------------- socialTokens 서버 삭제 API -------------------- */
+  app.post("/api/auth/social-tokens/delete", async (req, res) => {
+    try {
+      const authUid = await verifyAuthUid(req, res);
+      if (!authUid) return;
+      const { uid } = req.body as { uid?: string };
+      if (!uid) return res.status(400).json({ error: "uid required" });
+      if (uid !== authUid) return res.status(403).json({ error: "Forbidden", message: "uid mismatch" });
+
+      const docRef = admin.firestore().doc(`socialTokens/${uid}`);
+      const snap = await docRef.get();
+      if (snap.exists) {
+        await docRef.delete();
+      }
+      return res.json({ success: true });
+    } catch (e: any) {
+      console.error("[SOCIAL-TOKENS:DELETE] error", e);
+      return res.status(500).json({ error: "failed", detail: e?.message });
+    }
+  });
+
   /* -------------------------- 나이스페이 빌키발급 -------------------------- */
   
   // 웹훅 테스트용 엔드포인트

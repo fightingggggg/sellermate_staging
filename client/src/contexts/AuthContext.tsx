@@ -510,6 +510,47 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
         // Firestore 삭제 실패는 무시하고 계속 진행
       }
 
+      // 2. 소셜 계정 연결 해제 (Firebase Auth 삭제 전에 수행)
+      try {
+        if (socialProvider === "naver") {
+          await fetch("/api/auth/naver/unlink", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
+            },
+            body: JSON.stringify({ uid: userUid }),
+          });
+        } else if (socialProvider === "kakao") {
+          await fetch("/api/auth/kakao/unlink", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
+            },
+            body: JSON.stringify({ uid: userUid }),
+          });
+        }
+      } catch (unlinkErr) {
+        console.warn("[SOCIAL-UNLINK] warning", unlinkErr);
+      }
+
+      // 2-1. socialTokens 문서 삭제 (클라이언트 권한 이슈 방지: 서버 API로 삭제)
+      try {
+        const idTokenForServer = preDeleteIdToken || (await auth.currentUser?.getIdToken?.());
+        await fetch('/api/auth/social-tokens/delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(idTokenForServer ? { Authorization: `Bearer ${idTokenForServer}` } : {}),
+          },
+          body: JSON.stringify({ uid: userUid }),
+        });
+        console.log('[SERVER-DELETE] Requested socialTokens delete for uid:', userUid);
+      } catch (socialTokensErr) {
+        console.warn('[SERVER-DELETE] socialTokens server delete failed (ignored):', socialTokensErr);
+      }
+
       // 2. Firebase Auth에서 사용자 삭제
       try {
         await deleteUser(auth.currentUser);
@@ -532,30 +573,7 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
         throw authError;
       }
 
-      // 3. 소셜 계정 연결 해제 (Firebase Auth 삭제 성공 후)
-      try {
-        if (socialProvider === "naver") {
-          await fetch("/api/auth/naver/unlink", {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
-            },
-            body: JSON.stringify({ uid: userUid }),
-          });
-        } else if (socialProvider === "kakao") {
-          await fetch("/api/auth/kakao/unlink", {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
-            },
-            body: JSON.stringify({ uid: userUid }),
-          });
-        }
-      } catch (unlinkErr) {
-        console.warn("[SOCIAL-UNLINK] warning", unlinkErr);
-      }
+      // (언링크 및 socialTokens 삭제는 Auth 삭제 전에 완료됨)
 
       setCurrentUser(null);
       setUserProfile(null);
