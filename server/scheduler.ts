@@ -28,6 +28,8 @@ interface SubscriptionData {
   plan: string;
   createdAt?: any;
   lastPaymentDate?: any;
+  lastPaymentAmount?: number;
+  lastPaymentOrderId?: string;
   paymentHistory?: any[];
 }
 
@@ -63,7 +65,7 @@ export class AutoPaymentScheduler {
     console.log('자동 결제 스케줄러 시작됨');
 
     // 매일 오전 12시 05분(한국시간)에 모든 만료된 구독을 배치로 처리
-    cron.schedule('50 3 * * *', async () => {
+    cron.schedule('30 2 * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -532,6 +534,8 @@ export class AutoPaymentScheduler {
     await db.collection('subscriptions').doc(uid).set({
       status: "ACTIVE",
       lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
+      lastPaymentAmount: 8900,
+      lastPaymentOrderId: orderId,
       endDate: admin.firestore.Timestamp.fromDate(newEndDate),
       paymentHistory: admin.firestore.FieldValue.arrayUnion({
         orderId: orderId,
