@@ -47,6 +47,22 @@ export class UsageService {
     return `users/${safeEmail}/usage`;
   }
 
+  private static getUsageMonthlyCollectionPath(userEmail: string): string {
+    const safeEmail = userEmail
+      .replace(/\./g, '_dot_')
+      .replace(/@/g, '_at_')
+      .replace(/-/g, '_dash_')
+      .replace(/\+/g, '_plus_');
+    return `users/${safeEmail}/usageMonthly`;
+  }
+
+  private static getCurrentMonthString(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }
+
   // 사용자의 멤버십 타입 확인
   private static async getUserMembershipType(userEmail: string): Promise<'basic' | 'booster'> {
     try {
@@ -126,6 +142,29 @@ export class UsageService {
     }
   }
 
+  // 월간 사용량 가져오기
+  static async getMonthlyKeywordUsage(userEmail: string): Promise<{ month: string; keywordAnalysis: number; lastUpdated: Timestamp }>{
+    const month = this.getCurrentMonthString();
+    const colPath = this.getUsageMonthlyCollectionPath(userEmail);
+    const docRef = doc(db, colPath, month);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data() as any;
+      return {
+        month,
+        keywordAnalysis: data.keywordAnalysis || 0,
+        lastUpdated: data.lastUpdated || (serverTimestamp() as Timestamp)
+      };
+    }
+    const defaultData = {
+      month,
+      keywordAnalysis: 0,
+      lastUpdated: serverTimestamp() as Timestamp
+    };
+    await setDoc(docRef, defaultData);
+    return defaultData;
+  }
+
   // 키워드 분석 사용량 확인
   static async checkKeywordAnalysisLimit(userEmail: string): Promise<UsageLimit> {
     const usage = await this.getDailyUsage(userEmail);
@@ -152,6 +191,25 @@ export class UsageService {
     const currentCount = usage.productOptimization ?? 0;
     const canUse = currentCount < maxCount;
     
+    return {
+      canUse,
+      currentCount,
+      maxCount,
+      remainingCount: Math.max(0, maxCount - currentCount)
+    };
+  }
+
+  // 월간 키워드 분석 사용량 제한 체크 (basic: 20, booster: 무제한)
+  static async checkMonthlyKeywordAnalysisLimit(userEmail: string): Promise<UsageLimit> {
+    const membershipType = await this.getUserMembershipType(userEmail);
+    // booster는 무제한
+    if (membershipType === 'booster') {
+      return { canUse: true, currentCount: 0, maxCount: Number.MAX_SAFE_INTEGER, remainingCount: Number.MAX_SAFE_INTEGER };
+    }
+    const usage = await this.getMonthlyKeywordUsage(userEmail);
+    const maxCount = 20;
+    const currentCount = usage.keywordAnalysis ?? 0;
+    const canUse = currentCount < maxCount;
     return {
       canUse,
       currentCount,
@@ -208,6 +266,17 @@ export class UsageService {
     }
   }
 
+  // 월간 키워드 분석 사용량 증가
+  static async incrementMonthlyKeywordAnalysis(userEmail: string): Promise<void> {
+    const colPath = this.getUsageMonthlyCollectionPath(userEmail);
+    const month = this.getCurrentMonthString();
+    const ref = doc(db, colPath, month);
+    await setDoc(ref, { keywordAnalysis: increment(1), lastUpdated: serverTimestamp() }, { merge: true });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('usage-updated'));
+    }
+  }
+
   // 사용량 제한 확인 및 증가 (한 번에 처리)
   static async checkAndIncrementUsage(userEmail: string, type: UsageType): Promise<UsageLimit> {
     let limit: UsageLimit;
@@ -224,6 +293,15 @@ export class UsageService {
       }
     }
     
+    return limit;
+  }
+
+  // 월간 사용량 확인 및 증가
+  static async checkAndIncrementMonthlyKeywordAnalysis(userEmail: string): Promise<UsageLimit> {
+    const limit = await this.checkMonthlyKeywordAnalysisLimit(userEmail);
+    if (limit.canUse) {
+      await this.incrementMonthlyKeywordAnalysis(userEmail);
+    }
     return limit;
   }
 } 

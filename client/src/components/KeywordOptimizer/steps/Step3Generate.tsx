@@ -311,6 +311,19 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
     latestQueryRef.current = productName.trim();
     latestPageIndexRef.current = pageNum;
+
+    // ✅ 확장 분석 전 월간(베이직 20회) 제한 체크 추가
+    try {
+      if (currentUser?.email) {
+        const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(currentUser.email);
+        if (!monthly.canUse) {
+          alert(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
+          optimizationInProgressRef.current = false;
+          return;
+        }
+      }
+    } catch {}
+
     setIsOptimizing(true);
     trackEvent("ProductOptimizer", "optimize", "ProductName");
 

@@ -2666,12 +2666,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 결제 취소 API (7일 이내, 사용량 0인 경우)
   app.post("/api/payment/cancel", async (req, res) => {
     try {
-      const { uid } = req.body;
+      const { uid, reason } = req.body;
       
       if (!uid) {
         return res.status(400).json({ 
           error: "Missing required fields", 
           message: "uid is required" 
+        });
+      }
+
+      // 취소 사유 검증 (10자 이상)
+      const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+      if (trimmedReason.length < 10) {
+        return res.status(400).json({
+          error: "Invalid reason",
+          message: "취소 사유는 10자 이상 입력해주세요."
         });
       }
 
@@ -2698,15 +2707,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // 2. 결제일로부터 7일 이내인지 확인
-      const createdAt = subscriptionData.createdAt?.toDate() || new Date();
+      // 2. 최근 결제일(정기결제 포함) 기준 7일 이내인지 확인
+      const latestPaymentDate = subscriptionData.lastPaymentDate?.toDate?.() 
+        || subscriptionData.createdAt?.toDate?.() 
+        || new Date();
       const now = new Date();
-      const daysSincePayment = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+      const daysSincePayment = Math.floor((now.getTime() - latestPaymentDate.getTime()) / (1000 * 60 * 60 * 24));
       
       if (daysSincePayment > 7) {
         return res.status(400).json({ 
           error: "Payment too old", 
-          message: "결제일로부터 7일이 지나서 취소할 수 없습니다." 
+          message: "최근 결제일로부터 7일이 지나서 취소할 수 없습니다." 
         });
       }
 
@@ -2772,7 +2783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .digest('hex');
 
       const cancelRequest = {
-        reason: "사용자 요청 - 7일 이내 미사용",
+        reason: trimmedReason,
         orderId: orderId,
         ediDate: ediDate,
         signData: signData,
@@ -2816,7 +2827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'EXPIRED',
         cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
         cancelledBy: uid,
-        cancelReason: "7일 이내 미사용으로 인한 전체 취소",
+        cancelReason: trimmedReason,
         expiredAt: admin.firestore.FieldValue.serverTimestamp(), // 즉시 만료 처리
         originalStatus: originalStatus // 원래 상태 보존
       });
@@ -2825,7 +2836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await paymentDoc.ref.update({
         status: "CANCELLED",
         cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
-        cancelReason: "7일 이내 미사용으로 인한 전체 취소"
+        cancelReason: trimmedReason
       });
 
       // 8. 결제 취소 이력 별도 저장
@@ -2836,7 +2847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cancelledTid: cancelResult.cancelledTid || null,
         amount: paymentData.amount,
         refundAmount: paymentData.amount,
-        cancelReason: "7일 이내 미사용으로 인한 전체 취소",
+        cancelReason: trimmedReason,
         cancelType: "FULL_REFUND", // 전체 환불
         subscriptionId: subscriptionDoc.id,
         paymentId: paymentDoc.id,

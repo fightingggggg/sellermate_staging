@@ -202,6 +202,8 @@ export default function KeywordCompetitionAnalysisPage() {
             try {
               await UsageService.incrementKeywordAnalysis(currentUser.email!);
               console.log('[Usage] Keyword analysis usage incremented after successful analysis');
+              // ✅ 월간 카운트도 증가
+              await UsageService.incrementMonthlyKeywordAnalysis(currentUser.email!);
             } catch (error) {
               console.error('[Usage] Failed to increment usage:', error);
             }
@@ -243,6 +245,13 @@ export default function KeywordCompetitionAnalysisPage() {
                 setIsAnalyzing(false);
                 return;
               }
+              // ✅ 월간 제한도 확인
+              const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(emailToUse);
+              if (!monthly.canUse) {
+                setKeywordAnalysisLimitMessage(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
+                setIsAnalyzing(false);
+                return;
+              }
             } catch (err) {
               console.error('[Usage] Failed to check usage limit (extension data):', err);
               // 오류 시 계속 진행 (보수적)
@@ -278,6 +287,8 @@ export default function KeywordCompetitionAnalysisPage() {
               try {
                 await UsageService.incrementKeywordAnalysis(emailToUse);
                 console.log('[Usage] Keyword analysis usage incremented after extension analysis');
+                // ✅ 월간 카운트도 증가
+                await UsageService.incrementMonthlyKeywordAnalysis(emailToUse);
               } catch (error) {
                 console.error('[Usage] Failed to increment usage:', error);
               }
@@ -620,6 +631,13 @@ export default function KeywordCompetitionAnalysisPage() {
         return;
       }
       setKeywordAnalysisLimitMessage(null);
+
+      // ✅ 월간(베이직 20회) 제한 확인 추가
+      const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(currentUser.email!);
+      if (!monthly.canUse) {
+        setKeywordAnalysisLimitMessage(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
+        return;
+      }
     } catch (error) {
       console.error('[LOG] [USAGE] Failed to check usage limit:', error);
       // 사용량 확인 실패 시에도 분석 진행
@@ -762,6 +780,13 @@ export default function KeywordCompetitionAnalysisPage() {
             return;
           }
           setKeywordAnalysisLimitMessage(null);
+
+          // ✅ 월간(베이직 20회) 제한 확인 추가
+          const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(currentUser.email!);
+          if (!monthly.canUse) {
+            setKeywordAnalysisLimitMessage(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
+            return;
+          }
         } catch (error) {
           console.error('[LOG] [USAGE] Failed to check usage limit (자동 분석):', error);
           // 사용량 확인 실패 시에도 분석 진행

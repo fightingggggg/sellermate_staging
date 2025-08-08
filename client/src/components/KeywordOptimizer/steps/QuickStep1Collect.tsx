@@ -378,6 +378,13 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         return;
       }
       setUsageLimitMessage(null);
+      // ✅ 확장 분석 전 월간(베이직 20회) 제한 체크 추가
+      const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(currentUser.email!);
+      if (!monthly.canUse) {
+        alert(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
+        optimizationInProgressRef.current = false;
+        return;
+      }
     } catch (error) {
       console.error('[Usage] Failed to check usage limit:', error);
       // 사용량 확인 실패 시에도 분석 진행

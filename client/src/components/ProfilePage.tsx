@@ -22,6 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -84,6 +85,7 @@ export default function ProfilePage() {
   const [isDeletingBillingKey, setIsDeletingBillingKey] = useState(false);
   const [cancelPaymentOpen, setCancelPaymentOpen] = useState(false);
   const [isCancellingPayment, setIsCancellingPayment] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [billingKeyChangeOpen, setBillingKeyChangeOpen] = useState(false);
   const [billingKeyRegisterOpen, setBillingKeyRegisterOpen] = useState(false);
   const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false);
@@ -390,6 +392,16 @@ export default function ProfilePage() {
 
   // 결제 취소 처리 (7일 이내, 사용량 0인 경우)
   const handleCancelPayment = async () => {
+    // 사유 검증
+    const trimmed = cancelReason.trim();
+    if (trimmed.length < 10) {
+      toast({
+        title: "취소 사유가 짧습니다",
+        description: "취소 사유는 10자 이상 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsCancellingPayment(true);
     try {
       // uid 가져오기
@@ -410,7 +422,7 @@ export default function ProfilePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ uid: possibleUid }),
+        body: JSON.stringify({ uid: possibleUid, reason: trimmed }),
       });
 
       const result = await response.json();
@@ -618,9 +630,9 @@ export default function ProfilePage() {
 
   let cancelPaymentButton = null;
   if (subscriptionInfo) {
-    const createdAt = subscriptionInfo.createdAt?.toDate?.() || new Date();
+    const latestPaymentDate = subscriptionInfo.lastPaymentDate?.toDate?.() || subscriptionInfo.createdAt?.toDate?.() || new Date();
     const now = new Date();
-    const daysSincePayment = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    const daysSincePayment = Math.floor((now.getTime() - latestPaymentDate.getTime()) / (1000 * 60 * 60 * 24));
     const totalUsage = (usageInfo?.keywordAnalysis?.current || 0) + (usageInfo?.productOptimization?.current || 0);
     const canCancel = daysSincePayment <= 7 && totalUsage === 0 && subscriptionInfo.status !== 'EXPIRED';
     
@@ -1205,7 +1217,9 @@ export default function ProfilePage() {
                              </div>
                             <p className="text-sm text-gray-600 mb-3">
                               현재 등록된 결제 수단으로 자동 결제됩니다.
-                           
+                            </p>
+                            <p className="text-xs text-gray-500 mb-3">
+                              카카오뱅크, 토스뱅크 카드는 매입사인 KB국민, 신한카드로 표기됩니다
                             </p>
                             <div className="flex flex-wrap gap-2 mt-auto">
                               <Button 
@@ -1551,7 +1565,7 @@ export default function ProfilePage() {
                      </Dialog>
 
                      {/* 결제 취소 확인 다이얼로그 */}
-                     <Dialog open={cancelPaymentOpen} onOpenChange={setCancelPaymentOpen}>
+                     <Dialog open={cancelPaymentOpen} onOpenChange={(open)=>{ setCancelPaymentOpen(open); if(!open) setCancelReason(""); }}>
                        <DialogContent className="border-none shadow-md">
                          <DialogHeader>
                            <DialogTitle>결제 취소 확인</DialogTitle>
@@ -1568,6 +1582,16 @@ export default function ProfilePage() {
                              </div>
                            </DialogDescription>
                          </DialogHeader>
+                         <div className="space-y-2 mt-2">
+                           <label className="text-sm font-medium text-gray-700">취소 사유 (10자 이상)</label>
+                           <Textarea
+                             value={cancelReason}
+                             onChange={(e) => setCancelReason(e.target.value)}
+                                                           placeholder="취소 사유를 입력해주세요 (10자 이상)"
+                             className="min-h-[100px]"
+                           />
+                                                       <div className="text-xs text-gray-500 text-right">{cancelReason.trim().length} / 10</div>
+                         </div>
                          <DialogFooter className="gap-2 sm:gap-0">
                            <Button 
                              type="button" 
@@ -1580,7 +1604,7 @@ export default function ProfilePage() {
                              type="button" 
                              variant="destructive"
                              className="bg-red-500 hover:bg-red-600"
-                             disabled={isCancellingPayment}
+                                                           disabled={isCancellingPayment || cancelReason.trim().length < 10}
                              onClick={handleCancelPayment}
                            >
                              {isCancellingPayment ? (
