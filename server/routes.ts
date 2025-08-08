@@ -1776,7 +1776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const basicAuthHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
 
       // 나이스페이 빌키 삭제 API 호출
-      const response = await fetch(`https://api.nicepay.co.kr/v1/payments/${billingKeyData.billingKey}/cancel`, {
+      const response = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${billingKeyData.billingKey}/expire`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1784,6 +1784,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         body: JSON.stringify({
           clientId: clientId,
+          orderId: `DELETE_${uid}_${Date.now()}`,
+          ediDate: new Date().toISOString(),
           reason: "사용자 요청"
         })
       });
@@ -2370,13 +2372,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 멤버십 해지 API
   app.post("/api/subscription/cancel", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) return res.status(401).json({ error: 'Unauthorized' });
+      const decoded = await admin.auth().verifyIdToken(token);
+
       const { uid } = req.body;
-      
-      if (!uid) {
-        return res.status(400).json({ 
-          error: "Missing required fields", 
-          message: "uid is required" 
-        });
+      if (!uid || uid !== decoded.uid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
       }
 
       console.log(`=== 멤버십 해지 요청: ${uid} ===`);
@@ -2483,13 +2486,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 멤버십 재활성화 API
   app.post("/api/subscription/reactivate", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) return res.status(401).json({ error: 'Unauthorized' });
+      const decoded = await admin.auth().verifyIdToken(token);
+
       const { uid } = req.body;
-      
-      if (!uid) {
-        return res.status(400).json({ 
-          error: "Missing required fields", 
-          message: "uid is required" 
-        });
+      if (!uid || uid !== decoded.uid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
       }
 
       console.log(`=== 멤버십 재활성화 요청: ${uid} ===`);
@@ -2703,13 +2707,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 결제 취소 API (7일 이내, 사용량 0인 경우)
   app.post("/api/payment/cancel", async (req, res) => {
     try {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) return res.status(401).json({ error: 'Unauthorized' });
+      const decoded = await admin.auth().verifyIdToken(token);
+
       const { uid, reason } = req.body;
-      
-      if (!uid) {
-        return res.status(400).json({ 
-          error: "Missing required fields", 
-          message: "uid is required" 
-        });
+      if (!uid || uid !== decoded.uid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
       }
 
       // 취소 사유 검증 (10자 이상)
@@ -2961,13 +2966,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // POST /api/refund - 일반 환불 처리
   app.post('/api/refund', async (req, res) => {
-    const { uid, orderId, refundReason, refundAmount } = req.body;
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    const decoded = await admin.auth().verifyIdToken(token);
 
-    if (!uid || !orderId || !refundReason) {
-      return res.status(400).json({ 
-        error: 'Missing required fields', 
-        message: 'uid, orderId, refundReason are required' 
-      });
+    const { uid, orderId, refundReason, refundAmount } = req.body;
+    if (!uid || uid !== decoded.uid) {
+      return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
     }
 
     const db = admin.firestore();
@@ -3128,13 +3134,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // POST /api/resend-payment-email - 결제 성공 이메일 재발송
   app.post('/api/resend-payment-email', async (req, res) => {
-    const { uid, orderId, amount, goodsName } = req.body;
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    const decoded = await admin.auth().verifyIdToken(token);
 
-    if (!uid || !orderId) {
-      return res.status(400).json({ 
-        error: 'Missing required fields', 
-        message: 'uid, orderId are required' 
-      });
+    const { uid, orderId, amount, goodsName } = req.body;
+    if (!uid || uid !== decoded.uid) {
+      return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
     }
 
     const db = admin.firestore();
@@ -3191,13 +3198,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/membership/type - 사용자의 멤버십 타입 확인
   app.get('/api/membership/type/:uid', async (req, res) => {
     try {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (!token) return res.status(401).json({ error: 'Unauthorized' });
+      const decoded = await admin.auth().verifyIdToken(token);
+
       const { uid } = req.params;
-      
-      if (!uid) {
-        return res.status(400).json({ 
-          error: 'Missing required fields', 
-          message: 'uid is required' 
-        });
+      if (!uid || uid !== decoded.uid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
       }
 
       const db = admin.firestore();

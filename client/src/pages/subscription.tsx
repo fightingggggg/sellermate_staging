@@ -324,12 +324,19 @@ export default function SubscriptionPage() {
       return;
     }
 
-    // 일반 카드 선택 시 등록된 카드가 없으면 모달 표시
-    if (selectedPaymentMethod === 'card' && !billingKeyStatus?.hasBillingKey) {
+    // 최신 결제수단 상태 확인 후 결정 (초기 로딩/새로고침 직후 대비)
+    let status = billingKeyStatus;
+    if (!status) {
+      status = await getBillingKeyStatus();
+      setBillingKeyStatus(status);
+    }
+
+    // 일반 카드 선택 시 등록된 카드가 없으면 모달 표시, 있으면 바로 결제 진행
+    if (selectedPaymentMethod === 'card' && !status?.hasBillingKey) {
       setShowBillingKeyModal(true);
       return;
     }
-
+    
     setPaymentStatus('processing');
 
     try {

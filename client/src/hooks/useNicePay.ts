@@ -65,7 +65,12 @@ export const useNicePay = () => {
         Object.assign(requestData, cardInfo);
       }
 
-      const idToken = await auth.currentUser?.getIdToken();
+      const user = auth.currentUser;
+      if (!user) {
+        // 초기화 중인 상태: 오류 노출 없이 종료
+        return null;
+      }
+      const idToken = await user.getIdToken();
       if (!idToken) {
         throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인 해주세요.');
       }
@@ -134,7 +139,11 @@ export const useNicePay = () => {
     setError(null);
 
     try {
-      const idToken = await auth.currentUser?.getIdToken();
+      const user = auth.currentUser;
+      if (!user) {
+        return null;
+      }
+      const idToken = await user.getIdToken();
       if (!idToken) {
         throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인 해주세요.');
       }
@@ -169,7 +178,11 @@ export const useNicePay = () => {
     setError(null);
 
     try {
-      const idToken = await auth.currentUser?.getIdToken();
+      const user = auth.currentUser;
+      if (!user) {
+        return false;
+      }
+      const idToken = await user.getIdToken();
       if (!idToken) {
         throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인 해주세요.');
       }
@@ -206,7 +219,11 @@ export const useNicePay = () => {
     setError(null);
 
     try {
-      const idToken = await auth.currentUser?.getIdToken();
+      const user = auth.currentUser;
+      if (!user) {
+        return null;
+      }
+      const idToken = await user.getIdToken();
       if (!idToken) {
         throw new Error('인증 토큰을 가져올 수 없습니다. 다시 로그인 해주세요.');
       }

@@ -3,13 +3,49 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { autoPaymentScheduler } from "./scheduler";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 dotenv.config();
 
 const app = express();
 // reverse proxy (Cloudtype 등) 뒤에서 실행 시 X-Forwarded-Proto 헤더를 신뢰하도록 설정
 app.set("trust proxy", true);
+
+// 보안 헤더 적용 (콘텐츠 정책은 필요에 따라 별도 설정 가능)
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+}));
+
+// 민감 API 레이트리밋 (IP 기준)
+const sensitiveLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1분
+  max: 30, // 분당 30회
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// JSON 파서
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// 민감 경로에 제한 적용
+app.use([
+  "/api/nicepay",
+  "/api/payment",
+  "/api/refund",
+  "/api/subscription",
+], sensitiveLimiter);
+
+// HTTPS 강제 (프록시 환경에서만 동작, 개발환경은 스킵)
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'production') {
+    const proto = (req.headers['x-forwarded-proto'] || '').toString();
+    if (proto && proto !== 'https') {
+      const host = req.headers.host;
+      return res.redirect(301, `https://${host}${req.url}`);
+    }
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
