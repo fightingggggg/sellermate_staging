@@ -44,8 +44,38 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+
+      // 민감 경로는 응답 본문을 로깅하지 않음
+      const isSensitivePath = path.startsWith('/api/nicepay') || path.startsWith('/api/auth');
+
+      // 간단한 마스킹 함수
+      const sanitizeObject = (obj: any): any => {
+        const sensitiveKeys = new Set([
+          'email', 'buyerEmail', 'authorization', 'Authorization', 'token', 'idToken',
+          'cardNo', 'cardPw', 'pwd_2digit', 'birth', 'idNo', 'billingKey', 'authToken',
+        ]);
+        if (obj == null || typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) return obj.map(sanitizeObject);
+        const sanitized: Record<string, any> = {};
+        for (const [k, v] of Object.entries(obj)) {
+          if (sensitiveKeys.has(k)) {
+            sanitized[k] = '[REDACTED]';
+          } else if (v && typeof v === 'object') {
+            sanitized[k] = sanitizeObject(v);
+          } else {
+            sanitized[k] = v;
+          }
+        }
+        return sanitized;
+      };
+
+      if (!isSensitivePath && capturedJsonResponse) {
+        try {
+          const safeBody = sanitizeObject(capturedJsonResponse);
+          logLine += ` :: ${JSON.stringify(safeBody)}`;
+        } catch {
+          // ignore sanitize errors
+        }
       }
 
       if (logLine.length > 80) {

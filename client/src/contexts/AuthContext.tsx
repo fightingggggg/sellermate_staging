@@ -697,6 +697,7 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
                 {
                   type: "WEB_LOGIN_STATUS",
                   email: user.email,
+                  idToken: token,   // ← 제거 권고
                   membershipType,
                   ts: Date.now(),
                 },

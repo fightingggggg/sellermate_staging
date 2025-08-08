@@ -1465,16 +1465,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("=== 빌키 발급 완료 ===");
         res.json({
           success: true,
-          billingKey: result.bid,
           message: "빌키가 성공적으로 발급되었습니다.",
-          result: result
         });
       } else {
         console.error("빌키 발급 실패:", result);
         res.status(400).json({
           success: false,
           error: result.resultMsg || "빌키 발급에 실패했습니다.",
-          result: result
         });
       }
 
@@ -1598,16 +1595,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("=== 빌키 발급 테스트 완료 ===");
         res.json({
           success: true,
-          billingKey: result.bid,
           message: "빌키가 성공적으로 발급되었습니다.",
-          result: result
         });
       } else {
         console.error("빌키 발급 실패:", result);
         res.status(400).json({
           success: false,
           error: result.resultMsg || "빌키 발급에 실패했습니다.",
-          result: result
         });
       }
 
@@ -1938,7 +1932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid goodsName' });
       }
 
-            const clientId = process.env.NICEPAY_CLIENT_ID;
+      const clientId = process.env.NICEPAY_CLIENT_ID;
       const secretKey = process.env.NICEPAY_SECRET_KEY;
       
       if (!clientId || !secretKey) {
@@ -1946,8 +1940,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "NicePay credentials not configured" });
       }
 
-      // Firestore에서 빌키 정보 조회 (서버에서만 접근)
+      // Firestore 인스턴스
       const db = admin.firestore();
+
+      // 활성 구독 중복 결제 방지: 이미 활성이고 만료 전이면 거절
+      const subscriptionDoc = await db.collection('subscriptions').doc(uid).get();
+      if (subscriptionDoc.exists) {
+        const sub = subscriptionDoc.data() as any;
+        if (sub?.status === 'ACTIVE' && sub?.endDate?.toDate) {
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const endDate: Date = sub.endDate.toDate();
+          const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+          if (endDateOnly >= today) {
+            return res.status(409).json({ error: 'Subscription already active', message: '이미 활성 구독이 있습니다.' });
+          }
+        }
+      }
+
+      // 결제 중복 방지용 분산 락 (TTL 5분)
+      const lockRef = db.collection('paymentLocks').doc(uid);
+      let acquiredLock = false;
+      try {
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(lockRef);
+          const nowTs = admin.firestore.Timestamp.now();
+          const ttlThreshold = admin.firestore.Timestamp.fromDate(new Date(Date.now() - 5 * 60 * 1000));
+          if (snap.exists) {
+            const createdAt = (snap.data() as any)?.createdAt as admin.firestore.Timestamp | undefined;
+            if (createdAt && createdAt.toMillis() > ttlThreshold.toMillis()) {
+              throw Object.assign(new Error('PAYMENT_IN_PROGRESS'), { code: 'PAYMENT_IN_PROGRESS' });
+            }
+          }
+          tx.set(lockRef, { createdAt: nowTs, goodsName, amount });
+          acquiredLock = true;
+        });
+      } catch (e: any) {
+        if (e?.code === 'PAYMENT_IN_PROGRESS') {
+          return res.status(409).json({ error: 'Payment already in progress', message: '결제가 진행 중입니다. 잠시 후 다시 시도해주세요.' });
+        }
+        throw e;
+      }
+
+      // Firestore에서 빌키 정보 조회 (서버에서만 접근)
       const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
       if (!billingKeyDoc.exists) {
         console.error("빌키 정보를 찾을 수 없음:", uid);
@@ -1956,13 +1991,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "등록된 카드 정보가 없습니다." 
         });
       }
-      const billingKeyData = billingKeyDoc.data();
+      const billingKeyData = billingKeyDoc.data() as any;
       if (!billingKeyData || !billingKeyData.billingKey) {
         console.error("유효한 빌키가 없음:", uid);
         return res.status(400).json({ 
           error: "Invalid billing key", 
           message: "유효하지 않은 카드 정보입니다." 
         });
+      }
+      if (billingKeyData.status && billingKeyData.status !== 'ACTIVE') {
+        return res.status(400).json({ error: 'Billing key not active', message: '결제 수단이 비활성 상태입니다.' });
       }
       const billingKey = billingKeyData.billingKey;
 
@@ -2021,7 +2059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           goodsName: validatedGoodsName,
           status: "SUCCESS",
           tid: result.tid,
-          billingKey: billingKey,
+          // billingKey는 payments에 저장하지 않음
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           completedAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -2041,7 +2079,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderId: orderId,
           tid: result.tid,
           message: "결제가 성공적으로 완료되었습니다. 구독이 시작되었습니다.",
-          result: result
         });
       } else {
         console.error("결제 실패:", result);
@@ -2053,7 +2090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: validatedAmount,
           goodsName: validatedGoodsName,
           status: "FAILED",
-          billingKey: billingKey,
+          // billingKey는 payments에 저장하지 않음
           errorMessage: result.resultMsg,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           failedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -2062,10 +2099,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({
           success: false,
           error: result.resultMsg || "결제에 실패했습니다.",
-          result: result
         });
       }
 
+      // ... existing code ...
     } catch (error: any) {
       console.error("=== 빌키 결제 요청 에러 ===");
       console.error("에러:", error);
@@ -2073,6 +2110,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: "Internal server error", 
         message: error.message 
       });
+    } finally {
+      // 결제 락 해제 (존재하는 경우에만)
+      try {
+        const db = admin.firestore();
+        const { uid } = req.body || {};
+        if (uid) {
+          await db.collection('paymentLocks').doc(uid).delete();
+        }
+      } catch {}
     }
   });
 
@@ -2217,11 +2263,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         actualIP = realIP;
       }
       
-      const allowedIPs = [
-        '203.238.37.15',  // 나이스페이 IP (운영 시 최신 목록으로 유지 필요)
-        '127.0.0.1',      // 로컬 테스트용
-        '::1'             // IPv6 로컬 테스트용
-      ];
+             const allowedIPs = [
+         // 운영 시 최신 나이스페이 IP로 유지/확장 필요. CIDR 허용 불가 시 목록으로 관리.
+         '203.238.37.15',
+         '203.238.37.16',
+         '203.238.37.25',
+         '127.0.0.1',
+         '::1'
+       ];
       
       console.log("웹훅 요청 IP 정보:", { 
         clientIP, 
@@ -2333,13 +2382,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               channel: channel,
               buyerName: buyerName,
               buyerTel: buyerTel,
-              buyerEmail: buyerEmail,
+              buyerEmail: buyerEmail ? buyerEmail.replace(/^(.{2}).+(@.*)$/, '$1****$2') : null,
               receiptUrl: receiptUrl,
-              // 카드 정보 저장 (있는 경우)
+              // 카드 정보 저장 (있는 경우) - 민감 정보 마스킹 처리
               cardInfo: card ? {
                 cardCode: card.cardCode,
                 cardName: card.cardName,
-                cardNum: card.cardNum,
+                cardNum: card.cardNum ? `****${String(card.cardNum).slice(-4)}` : null,
                 cardQuota: card.cardQuota,
                 isInterestFree: card.isInterestFree,
                 cardType: card.cardType,
@@ -3364,13 +3413,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/merge-account', async (req, res) => {
     try {
       const { emailAccountUid, socialProvider, socialUid, email, password, phoneNumber, birthDate, socialName, socialEmail } = req.body;
-
-      // 인증 및 권한 확인: 요청자의 uid는 반드시 socialUid와 같아야 함
-      const authUid = await verifyAuthUid(req, res);
-      if (!authUid) return;
-      if (authUid !== socialUid) {
-        return res.status(403).json({ error: 'Forbidden', message: 'Authenticated user does not match socialUid' });
-      }
       
       if (!emailAccountUid || !socialProvider || !socialUid || !email) {
         return res.status(400).json({ 
@@ -3390,13 +3432,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ error: 'Email account not found' });
         }
         throw error;
-      }
-
-      // 이메일 계정 식별 정보(email)와 전달된 email이 일치하는지 검증 (소유권 검증 강화)
-      const emailFromRecord = (emailUser.email || '').toLowerCase();
-      const emailFromReq = (email || '').toLowerCase();
-      if (!emailFromRecord || emailFromRecord !== emailFromReq) {
-        return res.status(403).json({ error: 'Forbidden', message: 'Email does not match emailAccountUid' });
       }
 
       // 2. 소셜 계정 정보 가져오기

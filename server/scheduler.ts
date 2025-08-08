@@ -107,6 +107,26 @@ export class AutoPaymentScheduler {
     const db = admin.firestore();
     
     try {
+      // 분산 락 (스케줄 전역 락) - 15분 TTL
+      const lockRef = db.collection('schedulerLocks').doc('autoPaymentDaily');
+      const acquired = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(lockRef);
+        const nowTs = admin.firestore.Timestamp.now();
+        const ttlThreshold = admin.firestore.Timestamp.fromDate(new Date(Date.now() - 15 * 60 * 1000));
+        if (snap.exists) {
+          const createdAt = (snap.data() as any)?.createdAt as admin.firestore.Timestamp | undefined;
+          if (createdAt && createdAt.toMillis() > ttlThreshold.toMillis()) {
+            return false; // 다른 인스턴스가 실행 중
+          }
+        }
+        tx.set(lockRef, { createdAt: nowTs });
+        return true;
+      });
+      if (!acquired) {
+        console.log('다른 인스턴스가 스케줄을 실행 중입니다. 이번 실행은 건너뜁니다.');
+        return;
+      }
+
       let totalProcessed = 0;
       let hasMore = true;
       
@@ -134,16 +154,32 @@ export class AutoPaymentScheduler {
         
         for (const chunk of chunks) {
           const chunkPromises = chunk.map(doc => {
-            const subscription = doc.data() as SubscriptionData;
             const uid = doc.id;
             
-            // 이미 처리 중인 경우 스킵
+            // 이미 처리 중인 경우 스킵 (프로세스 내)
             if (this.processingQueue.has(uid)) {
               console.log(`이미 처리 중인 구독 스킵: ${uid}`);
               return Promise.resolve();
             }
 
-            return this.processSubscriptionPaymentWithRetry(uid);
+            // 사용자 단위 분산 락 (5분 TTL)
+            const userLockRef = db.collection('schedulerLocks').doc(`user_${uid}`);
+            return db.runTransaction(async (tx) => {
+              const snap = await tx.get(userLockRef);
+              const nowTs = admin.firestore.Timestamp.now();
+              const ttlThreshold = admin.firestore.Timestamp.fromDate(new Date(Date.now() - 5 * 60 * 1000));
+              if (snap.exists) {
+                const createdAt = (snap.data() as any)?.createdAt as admin.firestore.Timestamp | undefined;
+                if (createdAt && createdAt.toMillis() > ttlThreshold.toMillis()) {
+                  console.log(`다른 작업이 사용자를 처리 중: ${uid}`);
+                  return;
+                }
+              }
+              tx.set(userLockRef, { createdAt: nowTs });
+            }).then(() => this.processSubscriptionPaymentWithRetry(uid))
+              .finally(async () => {
+                try { await db.collection('schedulerLocks').doc(`user_${uid}`).delete(); } catch {}
+              });
           });
 
           // 청크별로 처리 (동시성 제한)
@@ -161,13 +197,13 @@ export class AutoPaymentScheduler {
         // 더 처리할 구독이 있는지 확인 (배치 크기보다 적으면 모두 처리된 것)
         hasMore = expiredSubscriptions.length === this.BATCH_SIZE;
       }
+
+      // 전역 락 해제
+      try { await db.collection('schedulerLocks').doc('autoPaymentDaily').delete(); } catch {}
       
       console.log(`총 처리 완료: ${totalProcessed}개 구독`);
     } catch (error: any) {
       console.error('만료된 구독 조회 중 오류:', error);
-      if (error.code === 9) {
-        console.log('Firestore 인덱스 오류가 발생했습니다. 인덱스 생성을 기다리는 중...');
-      }
     }
   }
 
@@ -532,22 +568,57 @@ export class AutoPaymentScheduler {
     const newEndDate = new Date();
     newEndDate.setDate(newEndDate.getDate() + 30); // 30일 연장
 
-    await db.collection('subscriptions').doc(uid).set({
-      status: "ACTIVE",
-      plan: "BOOSTER",
-      lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
-      lastPaymentAmount: 8900,
-      lastPaymentOrderId: orderId,
-      endDate: admin.firestore.Timestamp.fromDate(newEndDate),
-      paymentHistory: admin.firestore.FieldValue.arrayUnion({
-        orderId: orderId,
-        amount: 8900,
-        date: admin.firestore.Timestamp.fromDate(new Date()),
-        status: "SUCCESS"
-      })
-    }, { merge: true });
+    // 트랜잭션으로 중복 업데이트 방지
+    await db.runTransaction(async (tx) => {
+      const subRef = db.collection('subscriptions').doc(uid);
+      const subSnap = await tx.get(subRef);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (subSnap.exists) {
+        const sub = subSnap.data() as any;
+        const lastOrderId = sub?.lastPaymentOrderId;
+        if (lastOrderId === orderId) {
+          // 이미 같은 주문으로 연장됨
+          return;
+        }
+        const currentEnd: Date | null = sub?.endDate?.toDate?.() || null;
+        // 이미 미래로 연장되어 있으면 누적 덮어쓰기
+        const base = currentEnd && currentEnd > today ? currentEnd : today;
+        const computedEnd = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+        computedEnd.setDate(computedEnd.getDate() + 30);
+        tx.set(subRef, {
+          status: "ACTIVE",
+          plan: "BOOSTER",
+          lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
+          lastPaymentAmount: 8900,
+          lastPaymentOrderId: orderId,
+          endDate: admin.firestore.Timestamp.fromDate(computedEnd),
+          paymentHistory: admin.firestore.FieldValue.arrayUnion({
+            orderId: orderId,
+            amount: 8900,
+            date: admin.firestore.Timestamp.fromDate(new Date()),
+            status: "SUCCESS"
+          })
+        }, { merge: true });
+      } else {
+        tx.set(subRef, {
+          status: "ACTIVE",
+          plan: "BOOSTER",
+          lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
+          lastPaymentAmount: 8900,
+          lastPaymentOrderId: orderId,
+          endDate: admin.firestore.Timestamp.fromDate(newEndDate),
+          paymentHistory: [{
+            orderId: orderId,
+            amount: 8900,
+            date: admin.firestore.Timestamp.fromDate(new Date()),
+            status: "SUCCESS"
+          }]
+        }, { merge: true });
+      }
+    });
 
-    console.log(`구독 연장 완료: ${uid}, 새로운 만료일: ${newEndDate.toISOString()}`);
+    console.log(`구독 연장 완료: ${uid}`);
   }
 
   // 구독 만료 처리

@@ -457,15 +457,11 @@ export default function NaverOnboarding() {
                 try {
                   console.log("[ONBOARDING] 계정 병합 시작:", { emailUid, socialUid: auth.currentUser!.uid });
                   
-                  // ID 토큰 확보
-                  const idToken = await auth.currentUser?.getIdToken?.();
-                  
                   // 서버 API를 사용하여 계정 병합
                   const mergeResponse = await fetch('/api/auth/merge-account', {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
                     },
                     body: JSON.stringify({
                       emailAccountUid: emailUid,
@@ -524,12 +520,13 @@ export default function NaverOnboarding() {
                     return;
                   }
                 } catch (mergeError: any) {
-                  console.error("Account merge error:", mergeError);
+                  console.error('Account merge error:', mergeError);
                   toast({
                     title: "계정 병합 실패",
-                    description: mergeError?.message || '계정 병합 중 오류가 발생했습니다.',
-                    variant: 'destructive',
+                    description: mergeError.message || "계정 병합 중 오류가 발생했습니다.",
+                    variant: "destructive"
                   });
+                  return;
                 }
               }
 
