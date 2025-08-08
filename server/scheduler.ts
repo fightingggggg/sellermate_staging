@@ -65,7 +65,7 @@ export class AutoPaymentScheduler {
     console.log('자동 결제 스케줄러 시작됨');
 
     // 매일 오전 12시 05분(한국시간)에 모든 만료된 구독을 배치로 처리
-    cron.schedule('30 2 * * *', async () => {
+    cron.schedule('43 2 * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
