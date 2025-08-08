@@ -1415,14 +1415,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (response.ok && result.resultCode === '0000') {
         // 빌키 발급 성공
         const db = admin.firestore();
+        // 서버 보호용 빌키만 저장
         await db.collection("billingKeys").doc(uid).set({
           billingKey: result.bid,
           orderId: orderId,
           status: "ACTIVE",
           tid: result.tid,
-          cardCode: result.cardCode,
+          authDate: result.authDate,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 클라이언트 표시용 카드 정보는 별도 컬렉션에 저장
+        await db.collection("billingCards").doc(uid).set({
           cardName: result.cardName,
-          cardNo: maskCardNumber(cardNo).split(" ").slice(0, 3).join(" "),
+          cardNo: maskCardNumber(cardNo),
+          cardNoPrefix: cardNo.substring(0, 2),
           authDate: result.authDate,
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -1708,50 +1715,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Firestore 연결 완료");
       
       const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
-      console.log("Firestore 조회 완료, 문서 존재 여부:", billingKeyDoc.exists);
+      console.log("billingKeys 존재 여부:", billingKeyDoc.exists);
       
       if (!billingKeyDoc.exists) {
-        console.log("빌키 문서가 존재하지 않음");
         const response = { 
           hasBillingKey: false,
           status: "NOT_FOUND" 
         };
-        console.log("응답 데이터:", JSON.stringify(response, null, 2));
-        console.log("=== 빌키 상태 확인 완료 ===");
         return res.json(response);
       }
 
       const billingKeyData = billingKeyDoc.data();
-      console.log("빌키 데이터 존재");
+
+      // 카드 표시용 정보는 billingCards에서 조회
+      const billingCardDoc = await db.collection("billingCards").doc(uid).get();
+      const cardData = billingCardDoc.exists ? billingCardDoc.data() : null;
+
+      // 타임스탬프 로깅 및 정규화
+      const createdAtRaw = (cardData as any)?.createdAt || (billingKeyData as any)?.createdAt;
+      let createdAtISO: string | null = null;
+      try {
+        if (createdAtRaw?.toDate) {
+          createdAtISO = createdAtRaw.toDate().toISOString();
+        } else if (createdAtRaw && typeof createdAtRaw._seconds === 'number') {
+          createdAtISO = new Date(createdAtRaw._seconds * 1000).toISOString();
+        } else if (createdAtRaw instanceof Date) {
+          createdAtISO = (createdAtRaw as Date).toISOString();
+        } else if (typeof createdAtRaw === 'string') {
+          const d = new Date(createdAtRaw);
+          createdAtISO = isNaN(d.getTime()) ? null : d.toISOString();
+        }
+      } catch (e) {
+        console.warn("[billing-key:status] createdAt 정규화 중 오류:", e);
+      }
+
+      console.log("[billing-key:status] 카드/빌키 타임스탬프", {
+        hasCardDoc: !!cardData,
+        cardCreatedAtType: typeof (cardData as any)?.createdAt,
+        cardCreatedAtRaw: (() => { try { return JSON.stringify((cardData as any)?.createdAt); } catch { return String((cardData as any)?.createdAt); } })(),
+        keyCreatedAtType: typeof (billingKeyData as any)?.createdAt,
+        keyCreatedAtRaw: (() => { try { return JSON.stringify((billingKeyData as any)?.createdAt); } catch { return String((billingKeyData as any)?.createdAt); } })(),
+        createdAtISO,
+      });
       
       const response = {
         hasBillingKey: true,
         status: billingKeyData?.status || "UNKNOWN",
-        cardInfo: {
-          cardName: billingKeyData?.cardName,
-          cardNo: billingKeyData?.cardNo,
-          cardNoPrefix: billingKeyData?.cardNoPrefix,
-          expiry: billingKeyData?.expiry
-        },
-        createdAt: billingKeyData?.createdAt
+        cardInfo: cardData ? {
+          cardName: (cardData as any).cardName,
+          cardNo: (cardData as any).cardNo,
+          cardNoPrefix: (cardData as any).cardNoPrefix,
+          expiry: (cardData as any).expiry
+        } : null,
+        createdAt: createdAtISO,
+        authDate: (cardData as any)?.authDate || (billingKeyData as any)?.authDate
       };
       
-      console.log("응답 데이터 구성 완료");
-      console.log("=== 빌키 상태 확인 완료 ===");
-      
-      res.json(response);
+      return res.json(response);
 
     } catch (error: any) {
       console.error("=== 빌키 상태 확인 에러 ===");
-      console.error("에러 타입:", error.constructor.name);
-      console.error("에러 메시지:", error.message);
-      console.error("에러 스택:", error.stack);
-      console.error("=== 빌키 상태 확인 에러 끝 ===");
-      
       res.status(500).json({ 
         error: "Internal server error", 
-        message: error.message,
-        stack: error.stack
+        message: error.message
       });
     }
   });
@@ -1816,11 +1842,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Firestore에서 빌키 정보 삭제
       await billingKeyDoc.ref.delete();
 
-      // 사용자 정보 업데이트
-      await db.collection("usersInfo").doc(uid).update({
-        hasBillingKey: false,
-        billingKeyDeletedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      // billingCards 삭제
+      await db.collection("billingCards").doc(uid).delete().catch(() => {});
+
+      // 5. 사용자 정보 업데이트 (선택사항)
+      try {
+        await db.collection("usersInfo").doc(uid).update({
+          hasBillingKey: false,
+          billingKeyDeletedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (error) {
+        console.log("사용자 정보 업데이트 실패 (무시됨):", error);
+      }
 
       res.json({ 
         success: true, 
@@ -1859,7 +1892,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: 'Forbidden', message: 'UID mismatch' });
       }
 
-      // 추가 형식 검증 (서버 생성이 아닌 클라이언트 전달이라 최소한의 유효성)
+      // 화이트리스트 검증: 상품명/금액
+      const PRICE_WHITELIST: Record<string, number> = {
+        '부스터 플랜 구독': 8900,
+      };
+      const expectedAmount = PRICE_WHITELIST[goodsName];
+      if (!expectedAmount || expectedAmount !== amount) {
+        console.error('[PAY] 금액/상품 불일치:', { goodsName, amount, expectedAmount });
+        return res.status(400).json({ error: 'Invalid product or amount' });
+      }
+
+      // 추가 형식 검증
       if (typeof amount !== 'number' || amount <= 0 || amount > 10000000) {
         return res.status(400).json({ error: 'Invalid amount' });
       }
@@ -1911,11 +1954,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .update(orderId + billingKey + ediDate + secretKey)
         .digest('hex');
 
-      // 결제 요청 데이터
+      // 서버 검증된 값으로 결제 요청 데이터 구성
+      const validatedAmount = expectedAmount; // 서버 화이트리스트 금액
+      const validatedGoodsName = goodsName;  // 화이트리스트에 존재하는 상품명
       const paymentRequestData = {
         orderId: orderId,
-        amount: amount,
-        goodsName: goodsName,
+        amount: validatedAmount,
+        goodsName: validatedGoodsName,
         cardQuota: 0,
         useShopInterest: false,
         ediDate: ediDate,
@@ -1942,12 +1987,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("결제 API 응답 본문 수신");
 
       if (response.ok && result.resultCode === '0000') {
-        // 결제 성공
+        // 결제 성공 (서버 검증 금액/상품명으로 저장)
         await db.collection("payments").doc(orderId).set({
           uid: uid,
           orderId: orderId,
-          amount: amount,
-          goodsName: goodsName,
+          amount: validatedAmount,
+          goodsName: validatedGoodsName,
           status: "SUCCESS",
           tid: result.tid,
           billingKey: billingKey,
@@ -1955,9 +2000,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // 구독 생성 및 자동결제 스케줄 시작
+        // 구독 생성 및 자동결제 스케줄 시작 (검증 금액 반영)
         try {
-          await autoPaymentScheduler.createSubscriptionAndStartSchedule(uid, orderId, amount);
+          await autoPaymentScheduler.createSubscriptionAndStartSchedule(uid, orderId, validatedAmount);
           console.log("=== 구독 생성 및 자동결제 스케줄 시작 완료 ===");
         } catch (error) {
           console.error("구독 생성 중 오류:", error);
@@ -1975,12 +2020,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         console.error("결제 실패:", result);
         
-        // 결제 실패 기록
+        // 결제 실패 기록 (검증 금액 반영)
         await db.collection("payments").doc(orderId).set({
           uid: uid,
           orderId: orderId,
-          amount: amount,
-          goodsName: goodsName,
+          amount: validatedAmount,
+          goodsName: validatedGoodsName,
           status: "FAILED",
           billingKey: billingKey,
           errorMessage: result.resultMsg,
@@ -2678,6 +2723,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 4. Firestore에서 빌키 정보 삭제
       await billingKeyDoc.ref.delete();
+
+      // billingCards 삭제
+      await db.collection("billingCards").doc(uid).delete().catch(() => {});
 
       // 5. 사용자 정보 업데이트 (선택사항)
       try {

@@ -14,6 +14,7 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, query, where, orderBy
 import { calculateAge, maskCardNumber, formatCardNumberWithPrefix } from "@/lib/utils";
 import LoginPage from "@/components/LoginPage";
 import { useToast } from "@/hooks/use-toast";
+import { auth } from "@/lib/firebase";
 
 export default function SubscriptionPage() {
   const { currentUser } = useAuth();
@@ -39,6 +40,7 @@ export default function SubscriptionPage() {
 
 
   useEffect(() => {
+    if (!currentUser?.uid) return;
     checkBillingKeyStatus();
     fetchBillingKeyInfo();
     checkUserAge();
@@ -57,7 +59,7 @@ export default function SubscriptionPage() {
       newUrl.searchParams.delete('mergeComplete');
       window.history.replaceState({}, '', newUrl.toString());
     }
-  }, []);
+  }, [currentUser?.uid]);
 
   const checkBillingKeyStatus = async () => {
     const status = await getBillingKeyStatus();
@@ -108,21 +110,24 @@ export default function SubscriptionPage() {
       console.log('사용자 UID가 없어서 결제 수단 정보를 가져올 수 없습니다.');
       return;
     }
-    
     try {
-      const billingKeyDoc = await getDoc(doc(db, 'billingKeys', currentUser.uid));
-      
-      if (billingKeyDoc.exists()) {
-        const billingKeyData = billingKeyDoc.data();
-        console.log('결제 수단 정보 로드됨:', billingKeyData);
-        setBillingKeyInfo({
-          id: billingKeyDoc.id,
-          ...billingKeyData
-        });
-      } else {
-        console.log('등록된 결제 수단이 없음');
-        setBillingKeyInfo(null);
+      const idToken = await (auth.currentUser?.getIdToken?.() ?? Promise.resolve(null));
+      if (!idToken) {
+        // 토큰이 아직 준비되지 않았으면 스킵
+        return;
       }
+      const resp = await fetch(`/api/nicepay/billing-key/${currentUser.uid}`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data?.hasBillingKey) {
+        setBillingKeyInfo(null);
+        return;
+      }
+      setBillingKeyInfo({
+        id: currentUser.uid,
+        ...data,
+      });
     } catch (error) {
       console.error('결제 수단 정보 가져오기 실패:', error);
       setBillingKeyInfo(null);
@@ -464,20 +469,18 @@ export default function SubscriptionPage() {
                       <CreditCard className="w-4 h-4 text-blue-600" />
                     </div>
                     <span className="text-sm font-medium text-gray-700">
-                      {billingKeyInfo ? (
-                        <div>
-                          <div>등록된 카드</div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {billingKeyInfo.cardName && billingKeyInfo.cardNo && (
+                      {billingKeyInfo?.cardInfo?.cardName && billingKeyInfo?.cardInfo?.cardNo ? (
+                          <div>
+                            <div>등록된 카드</div>
+                            <div className="text-xs text-gray-500 mt-1">
                               <div>
-                                {billingKeyInfo.cardName.replace(/[\[\]]/g, '')} {billingKeyInfo.cardNo}
+                                {billingKeyInfo.cardInfo.cardName.replace(/[\[\]]/g, '')} {billingKeyInfo.cardInfo.cardNo}
                               </div>
-                            )}
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        '일반 카드'
-                      )}
+                        ) : (
+                          '일반 카드'
+                        )}
                     </span>
                   </button>
                 </div>

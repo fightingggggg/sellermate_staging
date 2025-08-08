@@ -558,19 +558,16 @@ export default function ProfilePage() {
     
     setBillingKeyLoading(true);
     try {
-      const billingKeyDoc = await getDoc(doc(db, 'billingKeys', possibleUid));
-      
-      if (billingKeyDoc.exists()) {
-        const billingKeyData = billingKeyDoc.data();
-        console.log('결제 수단 정보 로드됨:', billingKeyData);
-        setBillingKeyInfo({
-          id: billingKeyDoc.id,
-          ...billingKeyData
-        });
-      } else {
-        console.log('등록된 결제 수단이 없음');
+      const token = await auth.currentUser?.getIdToken?.();
+      const resp = await fetch(`/api/nicepay/billing-key/${possibleUid}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data?.hasBillingKey) {
         setBillingKeyInfo(null);
+        return;
       }
+      setBillingKeyInfo({ id: possibleUid, ...data });
     } catch (error) {
       console.error('결제 수단 정보 가져오기 실패:', error);
       setBillingKeyInfo(null);
@@ -667,6 +664,30 @@ export default function ProfilePage() {
         </div>
       );
     }
+  }
+
+  // createdAt 포맷터 (YYYY.MM.DD)
+  function formatCreatedAt(input: any): string {
+    const toDate = (val: any): Date | null => {
+      if (!val) return null;
+      if (typeof val?.toDate === 'function') {
+        try { return val.toDate(); } catch { /* ignore */ }
+      }
+      if (typeof val === 'string') {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      if (val instanceof Date) return val;
+      return null;
+    };
+
+    const date = toDate(input);
+    if (!date) return '정보 없음';
+
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}.${m}.${d}`;
   }
 
   return (
@@ -957,10 +978,10 @@ export default function ProfilePage() {
                                      <Badge className="bg-blue-100 text-blue-800">베이직</Badge>
                                    </div>
                                    <div className="text-sm text-gray-600 mb-3 space-y-1 flex-1">
-                                     <p>• 키워드 분석 10회/일</p>
-                                     <p>• 상품 최적화 10회/일</p>
-                                     <p>• 최근 내역 10개 저장</p>
-                                     <p>• 확장 프로그램 무제한 사용</p>
+                                     <p>• 키워드 분석 5회/일</p>
+                                     <p>• 상품 최적화 3회/일</p>
+                                     <p>• 최근 내역 3개 저장</p>
+                                     <p>• 확장 프로그램 20회/월</p>
                                    </div>
                                    <div className="flex gap-2 mt-auto">
                                      <Button 
@@ -1001,10 +1022,10 @@ export default function ProfilePage() {
                                        <Badge className="bg-orange-100 text-orange-800">해지됨</Badge>
                                      </div>
                                      <div className="text-sm text-gray-600 mb-3 space-y-1 flex-1">
-                                       <p>• 키워드 분석 10회/일</p>
-                                       <p>• 상품 최적화 10회/일</p>
-                                       <p>• 최근 내역 10개 저장</p>
-                                       <p>• 확장 프로그램 무제한 사용</p>
+                                       <p>• 키워드 분석 5회/일</p>
+                                       <p>• 상품 최적화 3회/일</p>
+                                       <p>• 최근 내역 3개 저장</p>
+                                       <p>• 확장 프로그램 20회/월</p>
                                      </div>
                                      <div className="text-sm text-gray-600 mb-3">
                                        <p className="text-orange-600 font-medium">
@@ -1045,9 +1066,9 @@ export default function ProfilePage() {
                                        <Badge className="bg-orange-100 text-orange-800">해지됨</Badge>
                                      </div>
                                      <div className="text-sm text-gray-600 mb-3 space-y-1 flex-1">
-                                       <p>• 키워드 분석 50회/일</p>
-                                       <p>• 상품 최적화 30회/일</p>
-                                       <p>• 최근 내역 50개 저장</p>
+                                       <p>• 키워드 분석 30회/일</p>
+                                       <p>• 상품 최적화 20회/일</p>
+                                       <p>• 최근 내역 30개 저장</p>
                                        <p>• 확장 프로그램 무제한 사용</p>
                                        <p>• 신규 기능 우선 이용</p>
                                      </div>
@@ -1107,9 +1128,9 @@ export default function ProfilePage() {
                                    <div className="text-sm text-gray-600 mb-3">
                                      <p>다음 결제일: {subscriptionInfo.endDate?.toDate?.()?.toLocaleDateString() || '정보 없음'}</p>
                                      <p>결제 금액: {subscriptionInfo.lastPaymentAmount ? `${subscriptionInfo.lastPaymentAmount.toLocaleString()}원/월` : '8,900원/월'}</p>
-                                     <p>결제 방법: {billingKeyInfo?.cardName && billingKeyInfo?.cardNo ? 
-                                       `${billingKeyInfo.cardName.replace(/[\[\]]/g, '')} ${billingKeyInfo.cardNo}` : 
-                                       billingKeyInfo?.cardName || '정보 없음'}</p>
+                                     <p>결제 방법: {billingKeyInfo?.cardInfo?.cardName && billingKeyInfo?.cardInfo?.cardNo ? 
+                                       `${billingKeyInfo.cardInfo.cardName.replace(/[\[\]]/g, '')} ${billingKeyInfo.cardInfo.cardNo}` : 
+                                       billingKeyInfo?.cardInfo?.cardName || '정보 없음'}</p>
                                    </div>
                                    <div className="flex flex-wrap gap-2 mt-auto">
                                      <Button 
@@ -1153,10 +1174,10 @@ export default function ProfilePage() {
                               <Badge className="bg-blue-100 text-blue-800">무료</Badge>
                             </div>
                                                          <div className="text-sm text-gray-600 mb-3 space-y-1 flex-1">
-                               <p>• 키워드 분석 10회/일</p>
-                               <p>• 상품 최적화 10회/일</p>
-                               <p>• 최근 내역 10개 저장</p>
-                               <p>• 확장 프로그램 무제한 사용</p>
+                               <p>• 키워드 분석 5회/일</p>
+                               <p>• 상품 최적화 3회/일</p>
+                               <p>• 최근 내역 3개 저장</p>
+                               <p>• 확장 프로그램 20회/월</p>
                              </div>
                                                          <div className="flex flex-wrap gap-2 mt-auto">
                                <Button 
@@ -1214,13 +1235,15 @@ export default function ProfilePage() {
                                <Badge className="bg-blue-100 text-blue-800">등록됨</Badge>
                              </div>
                              <div className="text-sm text-gray-600 mb-3 space-y-1 flex-1">
-                               {billingKeyInfo.cardName && billingKeyInfo.cardNo && (
-                                 <p>• 카드: {billingKeyInfo.cardName.replace(/[\[\]]/g, '')} {billingKeyInfo.cardNo}</p>
-                               )}
+                               {billingKeyInfo?.cardInfo?.cardName && billingKeyInfo?.cardInfo?.cardNo && (
+                                  <p>• 카드: {billingKeyInfo.cardInfo.cardName.replace(/[\[\]]/g, '')} {billingKeyInfo.cardInfo.cardNo}</p>
+                                )}
                                {billingKeyInfo.expiry && <p>• 유효기간: {billingKeyInfo.expiry}</p>}
-                               {billingKeyInfo.createdAt && (
-                                 <p>• 등록일: {billingKeyInfo.createdAt.toDate?.()?.toLocaleDateString() || '정보 없음'}</p>
-                               )}
+                                                               {typeof billingKeyInfo.createdAt === 'string' && billingKeyInfo.createdAt ? (
+                                  <p>• 등록일: {formatCreatedAt(billingKeyInfo.createdAt)}</p>
+                                ) : (
+                                  <p>• 등록일: 정보 없음</p>
+                                )}
                              </div>
                             <p className="text-sm text-gray-600 mb-3">
                               현재 등록된 결제 수단으로 자동 결제됩니다.

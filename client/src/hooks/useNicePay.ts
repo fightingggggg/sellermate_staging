@@ -166,9 +166,13 @@ export const useNicePay = () => {
 
     try {
       const idToken = await getIdTokenSafely();
+      if (!idToken) {
+        // 토큰이 아직 준비되지 않은 경우 호출 스킵
+        return null;
+      }
       const response = await fetch(`/api/nicepay/billing-key/${currentUser.uid}`, {
         headers: {
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          Authorization: `Bearer ${idToken}`,
         },
       });
       const data = await response.json();
