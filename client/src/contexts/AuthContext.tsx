@@ -655,7 +655,11 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
               // 멤버십 타입 조회 (실패 시 기본 basic)
               let membershipType: 'basic' | 'booster' = 'basic';
               try {
-                const resp = await fetch(`/api/membership/type/${user.uid}`);
+                const resp = await fetch(`/api/membership/type/${user.uid}`, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                });
                 if (resp.ok) {
                   const data = await resp.json();
                   membershipType = data?.data?.membershipType === 'booster' ? 'booster' : 'basic';
