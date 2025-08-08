@@ -19,6 +19,7 @@ import { useUsage } from "@/contexts/UsageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
 import { sampleKeywordInput, sampleKeywordRaw, sampleAnalysisData, sampleStatsData } from "@/sample/sampleData";
+import { CHROME_EXTENSION_ID } from "@/lib/constants";
 
 interface KeywordItem {
   key: string;
@@ -202,8 +203,6 @@ export default function KeywordCompetitionAnalysisPage() {
             try {
               await UsageService.incrementKeywordAnalysis(currentUser.email!);
               console.log('[Usage] Keyword analysis usage incremented after successful analysis');
-              // ✅ 월간 카운트도 증가
-              await UsageService.incrementMonthlyKeywordAnalysis(currentUser.email!);
             } catch (error) {
               console.error('[Usage] Failed to increment usage:', error);
             }
@@ -245,13 +244,6 @@ export default function KeywordCompetitionAnalysisPage() {
                 setIsAnalyzing(false);
                 return;
               }
-              // ✅ 월간 제한도 확인
-              const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(emailToUse);
-              if (!monthly.canUse) {
-                setKeywordAnalysisLimitMessage(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
-                setIsAnalyzing(false);
-                return;
-              }
             } catch (err) {
               console.error('[Usage] Failed to check usage limit (extension data):', err);
               // 오류 시 계속 진행 (보수적)
@@ -287,8 +279,6 @@ export default function KeywordCompetitionAnalysisPage() {
               try {
                 await UsageService.incrementKeywordAnalysis(emailToUse);
                 console.log('[Usage] Keyword analysis usage incremented after extension analysis');
-                // ✅ 월간 카운트도 증가
-                await UsageService.incrementMonthlyKeywordAnalysis(emailToUse);
               } catch (error) {
                 console.error('[Usage] Failed to increment usage:', error);
               }
@@ -541,48 +531,28 @@ export default function KeywordCompetitionAnalysisPage() {
       window.addEventListener("message", messageHandler);
       window.postMessage({ type: "CHECK_EXTENSION" }, "*");
 
-      const EXTENSION_IDS = [
-        "eekjgnjcpmcfeikolboahljpboadaojm", // dev
-        "plgdaggkagiakemkoclkpkbdiocllbbi"  // prod
-      ];
       if (typeof (window as any).chrome !== "undefined" && (window as any).chrome.runtime && (window as any).chrome.runtime.sendMessage) {
         try {
-          let tried = 0;
-          const trySend = (idx: number) => {
-            if (resolved || idx >= EXTENSION_IDS.length) return;
-            (window as any).chrome.runtime.sendMessage(
-              EXTENSION_IDS[idx],
-              { type: "CHECK_EXTENSION_INSTALLED" },
-              (response: any) => {
-                if (resolved) return;
+          (window as any).chrome.runtime.sendMessage(
+            CHROME_EXTENSION_ID,
+            { type: "CHECK_EXTENSION_INSTALLED" },
+            (response: any) => {
+              if (!resolved) {
                 if ((window as any).chrome.runtime.lastError) {
-                  tried++;
-                  if (tried >= EXTENSION_IDS.length) {
-                    resolved = true;
-                    window.removeEventListener("message", messageHandler);
-                    resolve(false);
-                  } else {
-                    trySend(idx + 1);
-                  }
+                  resolved = true;
+                  window.removeEventListener("message", messageHandler);
+                  resolve(false);
                 } else if (response && response.installed) {
                   resolved = true;
                   window.removeEventListener("message", messageHandler);
                   resolve(true);
-                } else {
-                  tried++;
-                  if (tried >= EXTENSION_IDS.length) {
-                    resolved = true;
-                    window.removeEventListener("message", messageHandler);
-                    resolve(false);
-                  } else {
-                    trySend(idx + 1);
-                  }
                 }
               }
-            );
-          };
-          trySend(0);
-        } catch (error) {}
+            }
+          );
+        } catch {
+          /* ignore */
+        }
       }
 
       setTimeout(() => {
@@ -650,13 +620,6 @@ export default function KeywordCompetitionAnalysisPage() {
         return;
       }
       setKeywordAnalysisLimitMessage(null);
-
-      // ✅ 월간(베이직 20회) 제한 확인 추가
-      const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(currentUser.email!);
-      if (!monthly.canUse) {
-        setKeywordAnalysisLimitMessage(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
-        return;
-      }
     } catch (error) {
       console.error('[LOG] [USAGE] Failed to check usage limit:', error);
       // 사용량 확인 실패 시에도 분석 진행
@@ -799,13 +762,6 @@ export default function KeywordCompetitionAnalysisPage() {
             return;
           }
           setKeywordAnalysisLimitMessage(null);
-
-          // ✅ 월간(베이직 20회) 제한 확인 추가
-          const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(currentUser.email!);
-          if (!monthly.canUse) {
-            setKeywordAnalysisLimitMessage(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
-            return;
-          }
         } catch (error) {
           console.error('[LOG] [USAGE] Failed to check usage limit (자동 분석):', error);
           // 사용량 확인 실패 시에도 분석 진행

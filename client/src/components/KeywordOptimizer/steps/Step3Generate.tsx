@@ -15,6 +15,7 @@ import { UsageService } from "@/lib/usageService";
 import RobotVerificationDialog from "@/components/ui/robot-verification-dialog";
 import { Link } from "wouter";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { CHROME_EXTENSION_ID } from "@/lib/constants";
 
 // react-wordcloud (CSR only)
 const ReactWordcloud = dynamic(() => import("react-wordcloud"), { ssr: false });
@@ -198,9 +199,10 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
   const checkExtensionInstalled = (): Promise<boolean> => {
     return new Promise((resolve) => {
       let resolved = false;
-
+      
       const messageHandler = (event: MessageEvent) => {
         if (event.data.type === "EXTENSION_STATUS" && !resolved) {
+          console.log('[Step3] 확장프로그램 설치 확인됨 (postMessage):', event.data.installed);
           resolved = true;
           window.removeEventListener("message", messageHandler);
           resolve(event.data.installed === true);
@@ -208,54 +210,42 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       };
 
       window.addEventListener("message", messageHandler);
+      console.log('[Step3] 확장프로그램 설치 확인 요청 전송 (postMessage)');
       window.postMessage({ type: "CHECK_EXTENSION" }, "*");
 
-      const EXTENSION_IDS = [
-        "eekjgnjcpmcfeikolboahljpboadaojm", // dev
-        "plgdaggkagiakemkoclkpkbdiocllbbi"  // prod
-      ];
+      
       if (typeof (window as any).chrome !== 'undefined' && (window as any).chrome.runtime && (window as any).chrome.runtime.sendMessage) {
+        console.log('[Step3] Chrome Extension API를 통한 확인 시도');
+        
         try {
-          let tried = 0;
-          const trySend = (idx: number) => {
-            if (resolved || idx >= EXTENSION_IDS.length) return;
-            (window as any).chrome.runtime.sendMessage(
-              EXTENSION_IDS[idx],
-              { type: "CHECK_EXTENSION_INSTALLED" },
-              (response: any) => {
-                if (resolved) return;
+          (window as any).chrome.runtime.sendMessage(
+            CHROME_EXTENSION_ID,
+            { type: "CHECK_EXTENSION_INSTALLED" },
+            (response: any) => {
+              if (!resolved) {
                 if ((window as any).chrome.runtime.lastError) {
-                  tried++;
-                  if (tried >= EXTENSION_IDS.length) {
-                    resolved = true;
-                    window.removeEventListener("message", messageHandler);
-                    resolve(false);
-                  } else {
-                    trySend(idx + 1);
-                  }
+                  console.log('[Step3] 확장프로그램 설치되지 않음 (Chrome API 오류):', (window as any).chrome.runtime.lastError.message);
+                  resolved = true;
+                  window.removeEventListener("message", messageHandler);
+                  resolve(false);
                 } else if (response && response.installed) {
+                  console.log('[Step3] 확장프로그램 설치 확인됨 (Chrome API):', response);
                   resolved = true;
                   window.removeEventListener("message", messageHandler);
                   resolve(true);
-                } else {
-                  tried++;
-                  if (tried >= EXTENSION_IDS.length) {
-                    resolved = true;
-                    window.removeEventListener("message", messageHandler);
-                    resolve(false);
-                  } else {
-                    trySend(idx + 1);
-                  }
                 }
               }
-            );
-          };
-          trySend(0);
-        } catch {}
+            }
+          );
+        } catch (error) {
+          console.log('[Step3] Chrome Extension API 오류:', error);
+        }
       }
 
       setTimeout(() => {
         if (!resolved) {
+          console.log('[Step3] 확장프로그램 설치되지 않음 (타임아웃)');
+          resolved = true;
           window.removeEventListener("message", messageHandler);
           resolve(false);
         }
@@ -321,19 +311,6 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
     latestQueryRef.current = productName.trim();
     latestPageIndexRef.current = pageNum;
-
-    // ✅ 확장 분석 전 월간(베이직 20회) 제한 체크 추가
-    try {
-      if (currentUser?.email) {
-        const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(currentUser.email);
-        if (!monthly.canUse) {
-          alert(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
-          optimizationInProgressRef.current = false;
-          return;
-        }
-      }
-    } catch {}
-
     setIsOptimizing(true);
     trackEvent("ProductOptimizer", "optimize", "ProductName");
 

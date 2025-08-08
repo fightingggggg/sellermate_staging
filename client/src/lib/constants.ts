@@ -1,0 +1,1 @@
+export const CHROME_EXTENSION_ID = "plgdaggkagiakemkoclkpkbdiocllbbi"; 

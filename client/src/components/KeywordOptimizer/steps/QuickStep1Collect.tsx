@@ -35,6 +35,7 @@ import RobotVerificationDialog from "@/components/ui/robot-verification-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
 import { sampleKeywordInput, sampleKeywordRaw, sampleAnalysisData, sampleQuickAIResult, sampleCategoriesDetailed } from "@/sample/sampleData";
+import { CHROME_EXTENSION_ID } from "@/lib/constants";
 
 interface Step1CollectProps {
   onDone: () => void;
@@ -268,59 +269,40 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
       window.postMessage({ type: "CHECK_EXTENSION" }, "*");
 
       // 방법 2: Chrome Extension API를 통한 직접 확인
-      const EXTENSION_IDS = [
-        "eekjgnjcpmcfeikolboahljpboadaojm", // dev
-        "plgdaggkagiakemkoclkpkbdiocllbbi"  // prod
-      ];
       
       if (typeof (window as any).chrome !== 'undefined' && (window as any).chrome.runtime && (window as any).chrome.runtime.sendMessage) {
         console.log('[Web] Chrome Extension API를 통한 확인 시도');
         
         try {
-          let tried = 0;
-          const trySend = (idx: number) => {
-            if (resolved || idx >= EXTENSION_IDS.length) return;
-            (window as any).chrome.runtime.sendMessage(
-              EXTENSION_IDS[idx],
-              { type: "CHECK_EXTENSION_INSTALLED" },
-              (response: any) => {
-                if (resolved) return;
+          (window as any).chrome.runtime.sendMessage(
+            CHROME_EXTENSION_ID,
+            { type: "CHECK_EXTENSION_INSTALLED" },
+            (response: any) => {
+              if (!resolved) {
                 if ((window as any).chrome.runtime.lastError) {
                   console.log('[Web] 확장프로그램 설치되지 않음 (Chrome API 오류):', (window as any).chrome.runtime.lastError.message);
-                  tried++;
-                  if (tried >= EXTENSION_IDS.length) {
-                    resolved = true;
-                    window.removeEventListener("message", messageHandler);
-                    resolve(false);
-                  } else {
-                    trySend(idx + 1);
-                  }
+                  resolved = true;
+                  window.removeEventListener("message", messageHandler);
+                  resolve(false);
                 } else if (response && response.installed) {
                   console.log('[Web] 확장프로그램 설치 확인됨 (Chrome API):', response);
                   resolved = true;
                   window.removeEventListener("message", messageHandler);
                   resolve(true);
-                } else {
-                  tried++;
-                  if (tried >= EXTENSION_IDS.length) {
-                    resolved = true;
-                    window.removeEventListener("message", messageHandler);
-                    resolve(false);
-                  } else {
-                    trySend(idx + 1);
-                  }
                 }
               }
-            );
-          };
-          trySend(0);
+            }
+          );
         } catch (error) {
           console.log('[Web] Chrome Extension API 오류:', error);
         }
       }
 
+      // 타임아웃: 500ms 후에도 응답이 없으면 설치되지 않은 것으로 판단
       setTimeout(() => {
         if (!resolved) {
+          console.log('[Web] 확장프로그램 설치되지 않음 (타임아웃)');
+          resolved = true;
           window.removeEventListener("message", messageHandler);
           resolve(false);
         }
@@ -396,13 +378,6 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         return;
       }
       setUsageLimitMessage(null);
-      // ✅ 확장 분석 전 월간(베이직 20회) 제한 체크 추가
-      const monthly = await UsageService.checkMonthlyKeywordAnalysisLimit(currentUser.email!);
-      if (!monthly.canUse) {
-        alert(`베이직 플랜의 월간 분석 한도(20회)를 초과했습니다. (${monthly.currentCount}/${monthly.maxCount})`);
-        optimizationInProgressRef.current = false;
-        return;
-      }
     } catch (error) {
       console.error('[Usage] Failed to check usage limit:', error);
       // 사용량 확인 실패 시에도 분석 진행
