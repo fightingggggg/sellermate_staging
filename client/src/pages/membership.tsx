@@ -44,18 +44,21 @@ export default function MembershipPage() {
         return;
       }
 
-      try {
-        const response = await fetch(`/api/membership/type/${currentUser.uid}`);
-        if (response.ok) {
-          const data = await response.json();
-          setMembershipStatus({
-            type: data.data.membershipType,
-            subscriptionInfo: data.data.subscriptionInfo
-          });
-        } else {
-          setMembershipStatus({ type: 'basic' });
-        }
-      } catch (error) {
+              try {
+          const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken?.();
+          const headers: Record<string, string> = {};
+          if (token) headers.Authorization = `Bearer ${token}`;
+          const response = await fetch(`/api/membership/type/${currentUser.uid}`, { headers });
+          if (response.ok) {
+            const data = await response.json();
+            setMembershipStatus({
+              type: data.data.membershipType,
+              subscriptionInfo: data.data.subscriptionInfo
+            });
+          } else {
+            setMembershipStatus({ type: 'basic' });
+          }
+        } catch (error) {
         console.error('멤버십 상태 확인 실패:', error);
         setMembershipStatus({ type: 'basic' });
       } finally {

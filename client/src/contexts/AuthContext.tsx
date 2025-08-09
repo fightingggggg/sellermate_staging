@@ -510,7 +510,29 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
         // Firestore 삭제 실패는 무시하고 계속 진행
       }
 
-      // 2. 소셜 계정 연결 해제 (Firebase Auth 삭제 전에 수행)
+      // 2. Firebase Auth에서 사용자 삭제
+      try {
+        await deleteUser(auth.currentUser);
+        console.log("[AUTH-DELETE] Successfully deleted Firebase Auth user for uid:", userUid);
+      } catch (authError) {
+        console.error("[AUTH-DELETE] Error deleting Firebase Auth user:", authError);
+        
+        // Firebase Auth 삭제 실패 시 Firestore 사용자 정보 복원
+        if (userInfoDeleted && originalUserData) {
+          try {
+            console.log("[FIRESTORE-RESTORE] Attempting to restore userInfo for uid:", userUid);
+            await setDoc(doc(db, "usersInfo", userUid), originalUserData);
+            console.log("[FIRESTORE-RESTORE] Successfully restored userInfo for uid:", userUid);
+          } catch (restoreError) {
+            console.error("[FIRESTORE-RESTORE] Error restoring userInfo:", restoreError);
+          }
+        }
+        
+        // Firebase Auth 오류를 다시 throw하여 상위에서 처리
+        throw authError;
+      }
+
+      // 3. 소셜 계정 연결 해제 (Firebase Auth 삭제 후 수행)
       try {
         if (socialProvider === "naver") {
           await fetch("/api/auth/naver/unlink", {
@@ -535,9 +557,9 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
         console.warn("[SOCIAL-UNLINK] warning", unlinkErr);
       }
 
-      // 2-1. socialTokens 문서 삭제 (클라이언트 권한 이슈 방지: 서버 API로 삭제)
+      // 4. socialTokens 문서 삭제 (클라이언트 권한 이슈 방지: 서버 API로 삭제)
       try {
-        const idTokenForServer = preDeleteIdToken || (await auth.currentUser?.getIdToken?.());
+        const idTokenForServer = preDeleteIdToken;
         await fetch('/api/auth/social-tokens/delete', {
           method: 'POST',
           headers: {
@@ -551,29 +573,7 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
         console.warn('[SERVER-DELETE] socialTokens server delete failed (ignored):', socialTokensErr);
       }
 
-      // 2. Firebase Auth에서 사용자 삭제
-      try {
-        await deleteUser(auth.currentUser);
-        console.log("[AUTH-DELETE] Successfully deleted Firebase Auth user for uid:", userUid);
-      } catch (authError) {
-        console.error("[AUTH-DELETE] Error deleting Firebase Auth user:", authError);
-        
-        // Firebase Auth 삭제 실패 시 Firestore 사용자 정보 복원
-        if (userInfoDeleted && originalUserData) {
-          try {
-            console.log("[FIRESTORE-RESTORE] Attempting to restore userInfo for uid:", userUid);
-            await setDoc(doc(db, "usersInfo", userUid), originalUserData);
-            console.log("[FIRESTORE-RESTORE] Successfully restored userInfo for uid:", userUid);
-          } catch (restoreError) {
-            console.error("[FIRESTORE-RESTORE] Error restoring userInfo:", restoreError);
-          }
-        }
-        
-        // Firebase Auth 오류를 다시 throw하여 상위에서 처리
-        throw authError;
-      }
-
-      // (언링크 및 socialTokens 삭제는 Auth 삭제 전에 완료됨)
+      // (소셜 언링크 및 socialTokens 삭제는 Auth 삭제 이후에 수행됨)
 
       setCurrentUser(null);
       setUserProfile(null);
@@ -684,7 +684,10 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
               // 멤버십 타입 조회 (실패 시 기본 basic)
               let membershipType: 'basic' | 'booster' = 'basic';
               try {
-                const resp = await fetch(`/api/membership/type/${user.uid}`);
+                const tokenForMembership = await user.getIdToken();
+                const resp = await fetch(`/api/membership/type/${user.uid}`, {
+                  headers: { Authorization: `Bearer ${tokenForMembership}` }
+                });
                 if (resp.ok) {
                   const data = await resp.json();
                   membershipType = data?.data?.membershipType === 'booster' ? 'booster' : 'basic';

@@ -10,6 +10,7 @@ if (!admin.apps.length) {
 }
 // fetch: Node 18+ 전역 지원 (node-fetch 불필요)
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 
 // 카드 번호 마스킹 함수
 function maskCardNumber(cardNo: string): string {
@@ -76,6 +77,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
   
   app.use(cors(corsOptions));
+
+  // 결제/웹훅 경로별 강화 레이트 리밋
+  // 결제 청구: 5분당 10회 (IP 기준). 요청 본문에 uid가 포함되므로 서버 내부에서 중복 락도 이미 존재
+  const paymentLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+  // 웹훅: 1분당 60회 (IP 기준). 나이스페이 콜백 트래픽 보호
+  const webhookLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+
+  // 경로에만 한정하여 적용 (기존 전역 리밋과 병행 가능)
+  app.use('/api/nicepay/payment/billing', paymentLimiter);
+  app.use('/api/nicepay/webhook', webhookLimiter);
 
   // API Endpoint to check server status
   app.get('/api/status', (req, res) => {
@@ -2506,6 +2527,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // 인증 및 권한 확인
+      const authUid = await verifyAuthUid(req, res);
+      if (!authUid) return;
+      if (uid !== authUid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'uid mismatch' });
+      }
+
       console.log(`=== 멤버십 해지 요청: ${uid} ===`);
       
       const db = admin.firestore();
@@ -2617,6 +2645,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "Missing required fields", 
           message: "uid is required" 
         });
+      }
+
+      // 인증 및 권한 확인
+      const authUid = await verifyAuthUid(req, res);
+      if (!authUid) return;
+      if (uid !== authUid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'uid mismatch' });
       }
 
       console.log(`=== 멤버십 재활성화 요청: ${uid} ===`);
@@ -3346,6 +3381,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: 'Missing required fields', 
           message: 'uid is required' 
         });
+      }
+
+      // 인증 및 권한 확인
+      const authUid = await verifyAuthUid(req, res);
+      if (!authUid) return;
+      if (uid !== authUid) {
+        return res.status(403).json({ error: 'Forbidden', message: 'uid mismatch' });
       }
 
       const db = admin.firestore();

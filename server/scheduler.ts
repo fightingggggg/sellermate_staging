@@ -50,6 +50,30 @@ export class AutoPaymentScheduler {
   private readonly CONCURRENT_LIMIT = 10; // 동시 처리 제한 (API 호출 제한 고려)
   private readonly MAX_PROCESSING_TIME = 300000; // 5분 최대 처리 시간
 
+  // KST(UTC+9) 고정 오프셋
+  private static readonly KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+  // KST 기준 오늘 자정(00:00 KST)을 UTC 시간으로 반환
+  private getKstStartOfTodayUtc(): Date {
+    const nowUtcMs = Date.now();
+    const kstNow = new Date(nowUtcMs + AutoPaymentScheduler.KST_OFFSET_MS);
+    const y = kstNow.getUTCFullYear();
+    const m = kstNow.getUTCMonth();
+    const d = kstNow.getUTCDate();
+    const kstMidnightUtcMs = Date.UTC(y, m, d) - AutoPaymentScheduler.KST_OFFSET_MS;
+    return new Date(kstMidnightUtcMs);
+  }
+
+  // 전달된 시점이 속한 KST 날짜의 자정(00:00 KST)을 UTC 시간으로 반환
+  private getKstStartOfDayUtc(dateUtc: Date): Date {
+    const kstDate = new Date(dateUtc.getTime() + AutoPaymentScheduler.KST_OFFSET_MS);
+    const y = kstDate.getUTCFullYear();
+    const m = kstDate.getUTCMonth();
+    const d = kstDate.getUTCDate();
+    const kstMidnightUtcMs = Date.UTC(y, m, d) - AutoPaymentScheduler.KST_OFFSET_MS;
+    return new Date(kstMidnightUtcMs);
+  }
+
   constructor() {
     console.log('자동 결제 스케줄러 초기화 완료');
   }
@@ -64,8 +88,9 @@ export class AutoPaymentScheduler {
     this.isRunning = true;
     console.log('자동 결제 스케줄러 시작됨');
 
-    // 매일 오전 7시(한국시간)에 모든 만료된 구독을 배치로 처리 (UTC 22시)
-    cron.schedule('0 22 * * *', async () => {
+    // 매일 오전 7시(한국시간)에 모든 만료된 구독을 배치로 처리
+    // 타임존을 Asia/Seoul로 고정해 서버 로컬 타임존과 무관하게 동일 동작
+    cron.schedule('0 7 * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -77,10 +102,10 @@ export class AutoPaymentScheduler {
       }
       
       console.log('=== 자동 결제 스케줄러 실행 완료 ===');
-    });
+    }, { timezone: 'Asia/Seoul' });
 
-    // 추가 스케줄러: 오전 9시에 재시도 (실패한 구독 처리) (UTC 00시)
-    cron.schedule('0 0 * * *', async () => {
+    // 추가 스케줄러: 오전 9시에 재시도 (실패한 구독 처리)
+    cron.schedule('0 9 * * *', async () => {
       console.log('=== 자동 결제 재시도 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -91,7 +116,7 @@ export class AutoPaymentScheduler {
       }
       
       console.log('=== 자동 결제 재시도 스케줄러 실행 완료 ===');
-    });
+    }, { timezone: 'Asia/Seoul' });
   }
 
   // 스케줄러 중지
@@ -133,11 +158,10 @@ export class AutoPaymentScheduler {
       // 모든 만료된 구독을 처리할 때까지 반복
       while (hasMore) {
         // 만료된 구독 찾기 (배치 크기 제한) - ACTIVE 상태만 처리 (CANCELLED는 제외)
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // 오늘 날짜만 (시간 제외)
+        const todayKstStartUtc = this.getKstStartOfTodayUtc();
         const subscriptionsQuery = await db.collection('subscriptions')
           .where('status', '==', 'ACTIVE')
-          .where('endDate', '<=', today)
+          .where('endDate', '<=', todayKstStartUtc)
           .limit(this.BATCH_SIZE)
           .get();
 
@@ -212,12 +236,11 @@ export class AutoPaymentScheduler {
     const db = admin.firestore();
     
     try {
-      // 해지되었지만 아직 만료되지 않은 구독 찾기
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // 오늘 날짜만 (시간 제외)
+      // 해지되었지만 아직 만료되지 않은 구독 찾기 (KST 자정 기준)
+      const todayKstStartUtc = this.getKstStartOfTodayUtc();
       const cancelledSubscriptionsQuery = await db.collection('subscriptions')
         .where('status', '==', 'CANCELLED')
-        .where('endDate', '<=', today)
+        .where('endDate', '<=', todayKstStartUtc)
         .limit(this.BATCH_SIZE)
         .get();
 
@@ -365,18 +388,17 @@ export class AutoPaymentScheduler {
         return { success: false, orderId: '', errorMessage: 'Subscription not active' };
       }
 
-      // 만료 여부 확인 (날짜만 비교)
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // 오늘 날짜만 (시간 제외)
-      const endDate = subscription.endDate?.toDate() || new Date();
-      const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()); // 만료일 날짜만 (시간 제외)
+      // 만료 여부 확인 (KST 날짜 기준 비교)
+      const todayKstStartUtc = this.getKstStartOfTodayUtc();
+      const endDateRaw: Date = subscription.endDate?.toDate?.() || new Date();
+      const endDateKstStartUtc = this.getKstStartOfDayUtc(endDateRaw);
       
-      if (endDateOnly > today) {
-        console.log(`구독이 아직 만료되지 않음: ${uid}, 만료일: ${endDateOnly.toISOString()}`);
+      if (endDateKstStartUtc > todayKstStartUtc) {
+        console.log(`구독이 아직 만료되지 않음: ${uid}, 만료일(KST 자정): ${endDateKstStartUtc.toISOString()}`);
         return { success: false, orderId: '', errorMessage: 'Subscription not expired' };
       }
 
-      console.log(`만료된 구독 처리 중: ${uid}, 만료일: ${endDate.toISOString()}`);
+      console.log(`만료된 구독 처리 중: ${uid}, 만료일 원시: ${endDateRaw.toISOString()}, 비교 기준(KST 자정): ${endDateKstStartUtc.toISOString()}`);
 
       // 빌키 정보 조회
       const billingKeyDoc = await db.collection('billingKeys').doc(uid).get();
@@ -404,13 +426,8 @@ export class AutoPaymentScheduler {
 
       return paymentResult;
     } catch (error) {
-      console.error(`자동 결제 처리 중 오류 (${uid}):`, error);
-      await this.handlePaymentError(db, uid, error);
-      return { 
-        success: false, 
-        orderId: `AUTO_ERROR_${Date.now()}_${uid}`, 
-        errorMessage: error instanceof Error ? error.message : 'Unknown error' 
-      };
+      console.error('구독 결제 처리 중 오류:', error);
+      return { success: false, orderId: '', errorMessage: (error as any)?.message || 'Unknown error' };
     }
   }
 
@@ -566,14 +583,13 @@ export class AutoPaymentScheduler {
   // 구독 연장
   private async extendSubscription(db: admin.firestore.Firestore, uid: string, orderId: string) {
     const newEndDate = new Date();
-    newEndDate.setDate(newEndDate.getDate() + 30); // 30일 연장
+    newEndDate.setDate(newEndDate.getDate() + 30); // 30일 연장 (참고용, 아래에서 KST 기준으로 재계산)
 
     // 트랜잭션으로 중복 업데이트 방지
     await db.runTransaction(async (tx) => {
       const subRef = db.collection('subscriptions').doc(uid);
       const subSnap = await tx.get(subRef);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayKstStartUtc = this.getKstStartOfTodayUtc();
       if (subSnap.exists) {
         const sub = subSnap.data() as any;
         const lastOrderId = sub?.lastPaymentOrderId;
@@ -582,17 +598,22 @@ export class AutoPaymentScheduler {
           return;
         }
         const currentEnd: Date | null = sub?.endDate?.toDate?.() || null;
-        // 이미 미래로 연장되어 있으면 누적 덮어쓰기
-        const base = currentEnd && currentEnd > today ? currentEnd : today;
-        const computedEnd = new Date(base.getFullYear(), base.getMonth(), base.getDate());
-        computedEnd.setDate(computedEnd.getDate() + 30);
+        // 이미 미래로 연장되어 있으면 누적 덮어쓰기 (KST 자정 기준)
+        const baseUtc = (currentEnd && this.getKstStartOfDayUtc(currentEnd) > todayKstStartUtc)
+          ? currentEnd
+          : todayKstStartUtc;
+
+        // base가 속한 KST 날짜의 자정으로 정규화 후 30일 더한 값을 KST 자정으로 계산
+        const baseKstStartUtc = this.getKstStartOfDayUtc(baseUtc);
+        const computedEndUtc = new Date(baseKstStartUtc.getTime() + 30 * 24 * 60 * 60 * 1000);
+
         tx.set(subRef, {
           status: "ACTIVE",
           plan: "BOOSTER",
           lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
           lastPaymentAmount: 8900,
           lastPaymentOrderId: orderId,
-          endDate: admin.firestore.Timestamp.fromDate(computedEnd),
+          endDate: admin.firestore.Timestamp.fromDate(computedEndUtc),
           paymentHistory: admin.firestore.FieldValue.arrayUnion({
             orderId: orderId,
             amount: 8900,
@@ -603,17 +624,7 @@ export class AutoPaymentScheduler {
       } else {
         tx.set(subRef, {
           status: "ACTIVE",
-          plan: "BOOSTER",
-          lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
-          lastPaymentAmount: 8900,
-          lastPaymentOrderId: orderId,
-          endDate: admin.firestore.Timestamp.fromDate(newEndDate),
-          paymentHistory: [{
-            orderId: orderId,
-            amount: 8900,
-            date: admin.firestore.Timestamp.fromDate(new Date()),
-            status: "SUCCESS"
-          }]
+          plan: "BOOSTER"
         }, { merge: true });
       }
     });

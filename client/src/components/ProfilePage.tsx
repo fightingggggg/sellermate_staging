@@ -86,6 +86,7 @@ export default function ProfilePage() {
   const [cancelPaymentOpen, setCancelPaymentOpen] = useState(false);
   const [isCancellingPayment, setIsCancellingPayment] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelMembershipReason, setCancelMembershipReason] = useState("");
   const [billingKeyChangeOpen, setBillingKeyChangeOpen] = useState(false);
   const [billingKeyRegisterOpen, setBillingKeyRegisterOpen] = useState(false);
   const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false);
@@ -245,6 +246,15 @@ export default function ProfilePage() {
   const handleCancelMembership = async () => {
     setIsCancellingMembership(true);
     try {
+      const trimmed = cancelMembershipReason.trim();
+      if (trimmed.length < 10) {
+        toast({
+          title: "해지 사유가 짧습니다",
+          description: "해지 사유는 10자 이상 입력해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
       // uid 가져오기
       let possibleUid = currentUser?.uid;
       
@@ -258,12 +268,15 @@ export default function ProfilePage() {
       }
 
       // 멤버십 해지 API 호출
+      const cancelHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const token = await auth.currentUser?.getIdToken?.();
+        if (token) cancelHeaders.Authorization = `Bearer ${token}`;
+      } catch {}
       const response = await fetch('/api/subscription/cancel', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ uid: possibleUid }),
+        headers: cancelHeaders,
+        body: JSON.stringify({ uid: possibleUid, reason: trimmed }),
       });
 
       const result = await response.json();
@@ -275,11 +288,26 @@ export default function ProfilePage() {
       // 성공 시 구독 정보 새로고침
       await fetchSubscriptionInfo();
       
+      // 해지 사유 Firestore 기록 (subscriptionCancellations/{uid})
+      try {
+        await setDoc(
+          doc(db, "subscriptionCancellations", possibleUid),
+          {
+            cancelReason: trimmed,
+            cancelledAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (logError) {
+        console.error("해지 사유 기록 실패:", logError);
+      }
+      
       toast({
         title: "멤버십 해지 완료",
         description: "멤버십이 성공적으로 해지되었습니다. 다음 결제일까지는 서비스를 이용하실 수 있습니다.",
       });
       setCancelMembershipOpen(false);
+      setCancelMembershipReason("");
     } catch (error: any) {
       toast({
         title: "멤버십 해지 실패",
@@ -308,11 +336,14 @@ export default function ProfilePage() {
       }
 
       // 멤버십 재활성화 API 호출
+      const reactivateHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const token = await auth.currentUser?.getIdToken?.();
+        if (token) reactivateHeaders.Authorization = `Bearer ${token}`;
+      } catch {}
       const response = await fetch('/api/subscription/reactivate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: reactivateHeaders,
         body: JSON.stringify({ uid: possibleUid }),
       });
 
@@ -1471,45 +1502,55 @@ export default function ProfilePage() {
                     </Dialog>
 
                     {/* 멤버십 해지 확인 다이얼로그 */}
-                    <Dialog open={cancelMembershipOpen} onOpenChange={setCancelMembershipOpen}>
+                    <Dialog open={cancelMembershipOpen} onOpenChange={(open)=>{ setCancelMembershipOpen(open); if(!open) setCancelMembershipReason(""); }}>
                       <DialogContent className="border-none shadow-md">
                         <DialogHeader>
                           <DialogTitle>멤버십 해지 확인</DialogTitle>
                           <DialogDescription>
                             멤버십을 해지하시면 다음 정기 결제일부터 자동 결제가 중단됩니다. 
-                            해지 후에도 현재 결제 주기가 끝나는 날까지는 서비스를 이용하실 수 있습니다.
-                            <br/><br/>
-                            <span className="font-medium text-red-600">
-                              다음 결제일: {subscriptionInfo?.endDate?.toDate?.()?.toLocaleDateString() || '정보 없음'}
-                            </span>
-                          </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter className="gap-2 sm:gap-0">
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            onClick={() => setCancelMembershipOpen(false)}
-                          >
-                            취소
-                          </Button>
-                          <Button 
-                            type="button" 
-                            variant="destructive"
-                            className="bg-red-500 hover:bg-red-600"
-                            disabled={isCancellingMembership}
-                            onClick={handleCancelMembership}
-                          >
-                            {isCancellingMembership ? (
-                              <>
-                                <span className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 처리 중...
-                              </>
-                            ) : (
-                              "멤버십 해지"
-                            )}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                             해지 후에도 현재 결제 주기가 끝나는 날까지는 서비스를 이용하실 수 있습니다.
+                             <br/><br/>
+                             <span className="font-medium text-red-600">
+                               다음 결제일: {subscriptionInfo?.endDate?.toDate?.()?.toLocaleDateString() || '정보 없음'}
+                             </span>
+                           </DialogDescription>
+                         </DialogHeader>
+                         <div className="space-y-2 mt-2">
+                           <label className="text-sm font-medium text-gray-700">해지 사유 (10자 이상)</label>
+                           <Textarea
+                             value={cancelMembershipReason}
+                             onChange={(e) => setCancelMembershipReason(e.target.value)}
+                             placeholder="해지 사유를 입력해주세요 (10자 이상)"
+                             className="min-h-[100px]"
+                           />
+                           <div className="text-xs text-gray-500 text-right">{cancelMembershipReason.trim().length} / 10</div>
+                         </div>
+                         <DialogFooter className="gap-2 sm:gap-0">
+                           <Button 
+                             type="button" 
+                             variant="outline" 
+                             onClick={() => setCancelMembershipOpen(false)}
+                           >
+                             취소
+                           </Button>
+                           <Button 
+                             type="button" 
+                             variant="destructive"
+                             className="bg-red-500 hover:bg-red-600"
+                             disabled={isCancellingMembership || cancelMembershipReason.trim().length < 10}
+                             onClick={handleCancelMembership}
+                           >
+                             {isCancellingMembership ? (
+                               <>
+                                 <span className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 처리 중...
+                               </>
+                             ) : (
+                               "멤버십 해지"
+                             )}
+                           </Button>
+                         </DialogFooter>
+                       </DialogContent>
+                     </Dialog>
 
                                          {/* 멤버십 재활성화 확인 다이얼로그 */}
                      <Dialog open={reactivateMembershipOpen} onOpenChange={setReactivateMembershipOpen}>
