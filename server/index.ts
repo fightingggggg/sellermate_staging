@@ -13,9 +13,62 @@ app.set("trust proxy", true);
 app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: false }));
 
-// 보안 헤더
+// 보안 헤더 (CSP 활성화)
+const isDev = app.get("env") === "development";
+const cspDirectives: Record<string, string[]> = {
+  defaultSrc: ["'self'"],
+  baseUri: ["'self'"],
+  objectSrc: ["'none'"],
+  frameAncestors: ["'none'"],
+  scriptSrc: [
+    "'self'",
+    "'unsafe-inline'", // GA 스니펫 등 인라인 초기화 허용
+    "https://www.googletagmanager.com",
+    "https://www.google-analytics.com",
+    "https://www.googleadservices.com",
+    "https://pagead2.googlesyndication.com",
+    "https://googleads.g.doubleclick.net"
+  ],
+  styleSrc: [
+    "'self'",
+    "'unsafe-inline'",
+    "https://fonts.googleapis.com"
+  ],
+  fontSrc: [
+    "'self'",
+    "https://fonts.gstatic.com",
+    "data:"
+  ],
+  imgSrc: [
+    "'self'",
+    "data:",
+    "https:"
+  ],
+  connectSrc: [
+    "'self'",
+    "https:", // Firebase/GA/NicePay 등 HTTPS 통신 허용
+    "https://www.googletagmanager.com",
+    "https://www.google-analytics.com",
+    "https://region1.google-analytics.com",
+    "https://stats.g.doubleclick.net",
+    "https://www.googleadservices.com",
+    "https://pagead2.googlesyndication.com"
+  ],
+  frameSrc: [
+    "'self'",
+    "https://www.googletagmanager.com"
+  ]
+};
+if (isDev) {
+  cspDirectives.scriptSrc.push("'unsafe-eval'");
+  cspDirectives.connectSrc.push("ws:");
+  cspDirectives.scriptSrc.push("http://localhost:5173", "http://127.0.0.1:5173");
+  cspDirectives.connectSrc.push("http://localhost:5173", "http://127.0.0.1:5173");
+  // 개발에서 GA/GTM iframe 렌더 시 제한 완화
+  cspDirectives.frameSrc.push("https://www.google.com", "https://www.youtube.com");
+}
 app.use(helmet({
-  contentSecurityPolicy: false, // SPA/Vite 호환. 필요 시 정확히 설정
+  contentSecurityPolicy: { directives: cspDirectives },
   referrerPolicy: { policy: 'no-referrer' },
   frameguard: { action: 'deny' },
 }));

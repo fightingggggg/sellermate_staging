@@ -60,17 +60,22 @@ async function verifyAuthUid(req: any, res: any): Promise<string | null> {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS 설정 추가
+  const corsAllowedOrigins: string[] = [
+    'https://storebooster.ai.kr'
+  ];
+  if (process.env.NODE_ENV !== 'production') {
+    corsAllowedOrigins.push(
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000'
+    );
+  }
+  if (process.env.NODE_ENV === 'staging') {
+    corsAllowedOrigins.push('https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app');
+  }
   const corsOptions = {
-    origin: [
-      'https://storebooster.ai.kr',
-      // 개발환경에서만 HTTP 허용
-      ...(process.env.NODE_ENV !== 'production' ? [
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:3000'
-      ] : [])
-    ],
+    origin: corsAllowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
