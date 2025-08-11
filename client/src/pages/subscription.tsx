@@ -237,7 +237,7 @@ export default function SubscriptionPage() {
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD 형식
       const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0'); // 6자리 랜덤 숫자
       const orderId = `SUB_${randomNum}_${currentUser?.uid}`;
-      const amount = 8900;
+      const amount = 9900;
       const result = await requestPayment({
         amount: amount,
         goodsName: "부스터 플랜 구독",
@@ -323,7 +323,7 @@ export default function SubscriptionPage() {
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD 형식
       const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0'); // 6자리 랜덤 숫자
       const orderId = `SUB${randomNum}_${currentUser?.uid}`;
-      const amount = 8900;
+      const amount = 9900;
       const result = await requestPayment({
         amount: amount,
         goodsName: "부스터 플랜 구독",
@@ -381,7 +381,7 @@ export default function SubscriptionPage() {
     );
   }
 
-  const monthlyPrice = 8900;
+  const monthlyPrice = 9900;
   const finalPrice = monthlyPrice;
 
   return (

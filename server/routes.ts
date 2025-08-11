@@ -1936,7 +1936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 화이트리스트 검증: 상품명/금액
       const PRICE_WHITELIST: Record<string, number> = {
-        '부스터 플랜 구독': 8900,
+        '부스터 플랜 구독': 9900,
       };
       const expectedAmount = PRICE_WHITELIST[goodsName];
       if (!expectedAmount || expectedAmount !== amount) {
@@ -3344,7 +3344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 결제 성공 이메일 재발송
       await sendPaymentSuccessEmail(userEmail, {
         orderId: orderId,
-        amount: amount || 8900,
+        amount: amount || 9900,
         goodsName: goodsName || "스토어부스터 부스터 플랜",
         paymentDate: new Date(),
         nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30일 후
@@ -3781,7 +3781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      const { orderId, status = 'paid', amount = 8900 } = req.body;
+      const { orderId, status = 'paid', amount = 9900 } = req.body;
       
       if (!orderId) {
         return res.status(400).json({ error: "orderId is required" });
@@ -3873,7 +3873,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      const { orderId, status = 'paid', amount = 8900, testMode = true } = req.body;
+      const { orderId, status = 'paid', amount = 9900, testMode = true } = req.body;
       
       if (!orderId) {
         return res.status(400).json({ error: "orderId is required" });

@@ -1154,14 +1154,14 @@ export default function ProfilePage() {
                                      <p>• 상품 최적화 20회/일</p>
                                      <p>• 최근 내역 30개 저장</p>
                                      <p>• 확장 프로그램 무제한 사용</p>
-                                     <p>• 신규 기능 우선 이용</p>
-                                   </div>
-                                   <div className="text-sm text-gray-600 mb-3">
-                                     <p>다음 결제일: {subscriptionInfo.endDate?.toDate?.()?.toLocaleDateString() || '정보 없음'}</p>
-                                     <p>결제 금액: {subscriptionInfo.lastPaymentAmount ? `${subscriptionInfo.lastPaymentAmount.toLocaleString()}원/월` : '8,900원/월'}</p>
-                                     <p>결제 방법: {billingKeyInfo?.cardInfo?.cardName && billingKeyInfo?.cardInfo?.cardNo ? 
-                                       `${billingKeyInfo.cardInfo.cardName.replace(/[\[\]]/g, '')} ${billingKeyInfo.cardInfo.cardNo}` : 
-                                       billingKeyInfo?.cardInfo?.cardName || '정보 없음'}</p>
+                                                                          <p>• 신규 기능 우선 이용</p>
+                                    </div>
+                                    <div className="text-sm text-gray-600 mb-3">
+                                      <p>다음 결제일: {subscriptionInfo.endDate?.toDate?.()?.toLocaleDateString() || '정보 없음'}</p>
+                                      <p>결제 금액: {subscriptionInfo.lastPaymentAmount ? `${subscriptionInfo.lastPaymentAmount.toLocaleString()}원/월` : '9,900원/월'}</p>
+                                      <p>결제 방법: {billingKeyInfo?.cardInfo?.cardName && billingKeyInfo?.cardInfo?.cardNo ? 
+                                        `${billingKeyInfo.cardInfo.cardName.replace(/[\[\]]/g, '')} ${billingKeyInfo.cardInfo.cardNo}` : 
+                                        billingKeyInfo?.cardInfo?.cardName || '정보 없음'}</p>
                                    </div>
                                    <div className="flex flex-wrap gap-2 mt-auto">
                                      <Button 

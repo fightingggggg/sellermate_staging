@@ -179,7 +179,7 @@ export default function MembershipPage() {
             <CardHeader className="bg-blue-50 border-b border-blue-100 py-6">
               <div className="flex items-center justify-between w-full">
                 <CardTitle className="text-2xl font-bold text-blue-600">부스터</CardTitle>
-                <span className="text-2xl md:text-3xl font-extrabold text-blue-600 whitespace-nowrap">월 8,900원</span>
+                <span className="text-2xl md:text-3xl font-extrabold text-blue-600 whitespace-nowrap">월 9,900원</span>
               </div>
               <CardDescription className="text-gray-500 mt-1">
               합리적인 가격으로 넉넉한 사용

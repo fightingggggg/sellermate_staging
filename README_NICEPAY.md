@@ -59,7 +59,7 @@ POST /api/nicepay/payment/billing
 ```json
 {
   "uid": "사용자ID",
-  "amount": 8900,
+  "amount": 9900,
   "goodsName": "상품명",
   "orderId": "주문ID"
 }
@@ -98,7 +98,7 @@ const status = await getBillingKeyStatus();
 const { requestPayment } = useNicePay();
 
 const result = await requestPayment({
-  amount: 8900,
+  amount: 9900,
   goodsName: "스토어부스터 부스터 플랜",
   orderId: "SUB_1234567890_uid"
 });

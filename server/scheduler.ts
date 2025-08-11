@@ -473,7 +473,7 @@ export class AutoPaymentScheduler {
     
     const paymentData = {
       orderId: orderId,
-      amount: 8900,
+      amount: 9900,
       goodsName: "스토어부스터 부스터 플랜 (자동결제)",
       cardQuota: 0,
       useShopInterest: false,
@@ -516,7 +516,7 @@ export class AutoPaymentScheduler {
             
             await sendPaymentSuccessEmail(userEmail, {
               orderId: orderId,
-              amount: 8900,
+              amount: 9900,
               goodsName: "스토어부스터 부스터 플랜 (자동결제)",
               paymentDate: new Date(),
               nextBillingDate: nextBillingDate
@@ -537,7 +537,7 @@ export class AutoPaymentScheduler {
           const paymentFailureData = {
             uid: uid,
             orderId: orderId,
-            amount: 8900,
+            amount: 9900,
             goodsName: "스토어부스터 부스터 플랜 (자동결제)",
             status: "FAILED",
             errorMessage: result.resultMsg || '결제 처리 중 오류가 발생했습니다.',
@@ -561,7 +561,7 @@ export class AutoPaymentScheduler {
           if (userEmail) {
             await sendPaymentFailureEmail(userEmail, {
               orderId: orderId,
-              amount: 8900,
+              amount: 9900,
               goodsName: "스토어부스터 부스터 플랜 (자동결제)",
               failureDate: new Date(),
               errorMessage: result.resultMsg || '결제 처리 중 오류가 발생했습니다.'
@@ -611,12 +611,12 @@ export class AutoPaymentScheduler {
           status: "ACTIVE",
           plan: "BOOSTER",
           lastPaymentDate: admin.firestore.FieldValue.serverTimestamp(),
-          lastPaymentAmount: 8900,
+          lastPaymentAmount: 9900,
           lastPaymentOrderId: orderId,
           endDate: admin.firestore.Timestamp.fromDate(computedEndUtc),
           paymentHistory: admin.firestore.FieldValue.arrayUnion({
             orderId: orderId,
-            amount: 8900,
+            amount: 9900,
             date: admin.firestore.Timestamp.fromDate(new Date()),
             status: "SUCCESS"
           })
@@ -650,7 +650,7 @@ export class AutoPaymentScheduler {
       const paymentFailureData = {
         uid: uid,
         orderId: orderId,
-        amount: 8900,
+        amount: 9900,
         goodsName: "스토어부스터 부스터 플랜 (자동결제)",
         status: "FAILED",
         errorMessage: errorMessage,
@@ -692,7 +692,7 @@ export class AutoPaymentScheduler {
     const errorData = {
       uid: uid,
       orderId: orderId,
-      amount: 8900,
+      amount: 9900,
       goodsName: "스토어부스터 부스터 플랜 (자동결제)",
       status: "ERROR",
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
