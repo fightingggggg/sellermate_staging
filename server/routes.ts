@@ -295,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         - 필수 키워드가 2개 이상인 경우 떨어져서 배치
         - 정확히 ${keywordCount}개의 단어만 사용 
         - **입력값의 단어, 띄어쓰기 등 원본 그대로 사용(어떠한 형태도 변경 금지)**
-        - 동일 단어 반복 금지 (단,필수 키워드는 반복 가능)
+        - 동일 단어 반복 금지 (단,필수 키워드는 떨어져서 반복 가능)
         - 상위 키워드 순서가 중요도 순서
 
       ## 상품명 구성 순서
@@ -1101,26 +1101,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   /* -------------------------- 나이스페이 빌키발급 -------------------------- */
   
-  // 웹훅 테스트용 엔드포인트
-  app.post("/api/nicepay/webhook-test", (req, res) => {
-    console.log("Webhook test received:", req.body);
-    res.setHeader('Content-Type', 'text/plain');
-    res.status(200).send("OK");
-  });
-
-  // 더 간단한 웹훅 테스트용 엔드포인트
-  app.post("/webhook-test", (req, res) => {
-    console.log("Simple webhook test received:", req.body);
-    res.setHeader('Content-Type', 'text/plain');
-    res.status(200).send("OK");
-  });
-
-  // GET 요청도 처리하는 테스트 엔드포인트
-  app.get("/webhook-test", (req, res) => {
-    console.log("GET webhook test received");
-    res.setHeader('Content-Type', 'text/plain');
-    res.status(200).send("OK");
-  });
+  // 웹훅 테스트 엔드포인트 (비프로덕션 전용, 단일 경로로 통합)
+  if (process.env.NODE_ENV !== 'production') {
+    app.all("/api/nicepay/webhook-test", (req, res) => {
+      console.log("Webhook test received:", { method: req.method, body: req.body, query: req.query });
+      res.setHeader('Content-Type', 'text/plain');
+      res.status(200).send("OK");
+    });
+  }
 
   // 환경 변수 확인용 엔드포인트 (디버그용 - 개발환경에서만 접근 가능)
   app.get("/api/debug/env", (req, res) => {
@@ -1245,14 +1233,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // 테스트 결제 정보 저장
+      // 테스트 결제 정보 저장 (민감정보 저장 금지: billingKey 제거)
       await db.collection("payments").doc(testOrderId).set({
         uid: uid,
         orderId: testOrderId,
         amount: 500,
         goodsName: "스토어부스터 부스터 플랜 (테스트)",
         status: "PENDING",
-        billingKey: billingKeyData.billingKey,
         isTest: true,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -1864,7 +1851,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Basic 인증 헤더 생성
       const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
 
-      // 나이스페이 빌키 삭제 API 호출
+      // 나이스페이 빌키 삭제 API 호출 (orderId/ediDate/signData 일관 생성)
+      const deleteOrderIdTimestamp = Date.now();
+      const deleteOrderId = `DELETE_${uid}_${deleteOrderIdTimestamp}`;
+      const deleteEdiDate = new Date().toISOString();
+      const deleteSignData = crypto.createHash('sha256')
+        .update(deleteOrderId + String(billingKeyData.billingKey) + deleteEdiDate + secretKey)
+        .digest('hex');
+
       const response = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${billingKeyData.billingKey}/expire`, {
         method: 'POST',
         headers: {
@@ -1872,9 +1866,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'Authorization': `Basic ${authHeader}`
         },
         body: JSON.stringify({
-          orderId: `DELETE_${uid}_${Date.now()}`,
-          ediDate: new Date().toISOString(),
-          signData: crypto.createHash('sha256').update(`DELETE_${uid}_${Date.now()}${billingKeyData.billingKey}${new Date().toISOString()}${secretKey}`).digest('hex'),
+          orderId: deleteOrderId,
+          ediDate: deleteEdiDate,
+          signData: deleteSignData,
           returnCharSet: "utf-8"
         })
       });
