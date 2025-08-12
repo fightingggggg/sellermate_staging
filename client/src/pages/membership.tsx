@@ -221,12 +221,12 @@ export default function MembershipPage() {
                 </li>
                 
  {/* 신규 기능 */}
- {/* <li className="flex items-center space-x-2 text-base text-blue-600 font-bold">
+ <li className="flex items-center space-x-2 text-base text-blue-600 font-bold">
                   <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
                   <span>+ 신규 기능</span>
-                </li> */}
-              
-              <li className="h-5"></li>
+                </li>
+{/*               
+              <li className="h-5"></li> */}
                 {/* 월 총합 강조 */}
                 <li className="flex items-center space-x-2 text-base md:text-lg text-blue-600 font-bold">
                   <CheckCircle className="w-6 h-6 text-blue-600 flex-shrink-0" />

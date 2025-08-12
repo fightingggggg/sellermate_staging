@@ -90,7 +90,7 @@ export class AutoPaymentScheduler {
 
     // 매일 오전 7시(한국시간)에 모든 만료된 구독을 배치로 처리
     // 타임존을 Asia/Seoul로 고정해 서버 로컬 타임존과 무관하게 동일 동작
-    cron.schedule('0 7 * * *', async () => {
+    cron.schedule('10 13 * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -105,7 +105,7 @@ export class AutoPaymentScheduler {
     }, { timezone: 'Asia/Seoul' });
 
     // 추가 스케줄러: 오전 9시에 재시도 (실패한 구독 처리)
-    cron.schedule('0 9 * * *', async () => {
+    cron.schedule('12 13 * * *', async () => {
       console.log('=== 자동 결제 재시도 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       

@@ -1014,6 +1014,11 @@ export default function ProfilePage() {
                                      <p>• 최근 내역 3개 저장</p>
                                      <p>• 확장 프로그램 20회/월</p>
                                    </div>
+                                   {subscriptionInfo?.paymentFailureReason && (
+                                     <div className="text-sm text-gray-600 mb-3">
+                                       <p className="text-blue-600 font-medium">결제가 진행되지 않아 베이직으로 변경되었습니다.</p>
+                                     </div>
+                                   )}
                                    <div className="flex gap-2 mt-auto">
                                      <Button 
                                        variant="outline" 
