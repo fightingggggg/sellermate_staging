@@ -1,11 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
 /* eslint-disable */
 /* stylelint-disable */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Add Pretendard font import */
-@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
 
 :root {
       --background: 0 0% 100%;
@@ -65,18 +63,7 @@
 
 /* 모바일에서 로고 위치 조정 */
 @media (max-width: 768px) {
-  /* 홈화면 로고 - 기본 위치 */
-  .mobile-logo-home {
-    margin-top: 0.0em !important;
-  }
-  
-  /* 멤버십 상단 로고 - 위로 올리기 */
-  .mobile-logo-membership-top {
-    margin-top: -0.3em !important;
-  }
-  
-  /* 멤버십 하단 로고 - 더 위로 올리기 */
-  .mobile-logo-membership-bottom {
-    margin-top: -0.2em !important;
-  }
+  .mobile-logo-home { margin-top: 0; }
+  .mobile-logo-membership-top { margin-top: -0.3em; }
+  .mobile-logo-membership-bottom { margin-top: -0.2em; }
 }

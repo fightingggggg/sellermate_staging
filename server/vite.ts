@@ -5,6 +5,7 @@ import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
+import compression from "compression";
 
 const viteLogger = createLogger();
 
@@ -76,9 +77,32 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // 텍스트 자원 압축 (gzip/br)
+  app.use(compression());
 
-// ✅ robots.txt 및 sitemap.xml 명시적 서빙
+  app.use(
+    express.static(distPath, {
+      etag: true,
+      maxAge: "0",
+      setHeaders: (res, filePath) => {
+        const isIndexHtml = filePath.endsWith("index.html");
+        const isAsset = /(\.js|\.css|\.png|\.jpg|\.jpeg|\.svg|\.gif|\.webp|\.ico|\.woff2)$/.test(
+          filePath,
+        );
+        if (isIndexHtml) {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        } else if (isAsset) {
+          // Vite는 파일명 해시를 붙여 배포 → 장기 캐시
+          res.setHeader(
+            "Cache-Control",
+            "public, max-age=31536000, immutable",
+          );
+        }
+      },
+    }),
+  );
+
+  // ✅ robots.txt 및 sitemap.xml 명시적 서빙
   app.get("/robots.txt", (_req, res) => {
     res.type("text/plain");
     res.sendFile(path.resolve(distPath, "robots.txt"));

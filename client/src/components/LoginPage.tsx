@@ -66,6 +66,8 @@ export default function LoginPage({
   const [kakaoLoginLoading, setKakaoLoginLoading] = useState(false);
   const [naverSignupLoading, setNaverSignupLoading] = useState(false);
   const [kakaoSignupLoading, setKakaoSignupLoading] = useState(false);
+  // 이메일 회원가입용 인증 타이머 (초)
+  const [timer, setTimer] = useState(0);
 
   // 페이지 진입 시(마운트 시) 로딩 상태 초기화 및 에러 메시지 확인
   useEffect(() => {
@@ -93,6 +95,14 @@ export default function LoginPage({
     }
   }, [toast]);
 
+  // 인증 타이머 카운트다운
+  useEffect(() => {
+    if (!codeSent || phoneVerified) return;
+    if (timer <= 0) return;
+    const id = setInterval(() => setTimer((t) => t - 1), 1000);
+    return () => clearInterval(id);
+  }, [codeSent, phoneVerified, timer]);
+
   // 기능 재활성화를 대비해 Kakao 로그인/회원가입 버튼 표시 여부를 토글합니다.
   const ENABLE_KAKAO = true;
 
@@ -106,6 +116,12 @@ export default function LoginPage({
       onLoginSuccess();
     }
   }, [currentUser, isModal, navigate, onLoginSuccess]);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, "0");
+    const sec = (s % 60).toString().padStart(2, "0");
+    return `${m}:${sec}`;
+  };
 
   const handleLogin = async () => {
     if (!email || !password) return;
@@ -222,6 +238,7 @@ export default function LoginPage({
       const result = await signInWithPhoneNumber(auth, phoneNumber, recaptchaRef.current!);
       setConfirmationResult(result);
       setCodeSent(true);
+      setTimer(300);
       setAlertMessage({ message: "인증번호가 전송되었습니다.", type: "success" });
     } catch (err: any) {
       console.error("send sms error", err?.code, err?.message, err);
@@ -505,6 +522,16 @@ export default function LoginPage({
                       )}
                     </Button>
                   )}
+                  {/* 이메일 회원가입 진입 (저강조 텍스트 스타일) */}
+                  <div className="text-center mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowSimpleSignup(true)}
+                      className="text-xs text-gray-500 hover:text-gray-600 underline"
+                    >
+                      이메일로 회원가입
+                    </button>
+                  </div>
                 </div>
               )}
               {showSimpleSignup && (
@@ -591,14 +618,28 @@ export default function LoginPage({
                         placeholder="번호만 입력"
                         value={number}
                         onChange={(e) => setPhoneNumber(e.target.value)}
+                        disabled={phoneVerified}
                       />
                       <Button
                         type="button"
                         variant="outline"
                         onClick={handleSendCode}
-                        disabled={sendingCode || !number || phoneVerified}
+                        disabled={
+                          sendingCode ||
+                          !number ||
+                          phoneVerified ||
+                          (codeSent && timer > 0 && !phoneVerified)
+                        }
                       >
-                        {sendingCode ? "전송중..." : phoneVerified ? "인증완료" : "인증번호 발송"}
+                        {sendingCode
+                          ? "전송중..."
+                          : phoneVerified
+                          ? "인증완료"
+                          : codeSent && timer > 0
+                          ? "인증번호 발송"
+                          : codeSent && timer <= 0
+                          ? "재발송"
+                          : "인증번호 발송"}
                       </Button>
                     </div>
                   </div>
@@ -606,13 +647,20 @@ export default function LoginPage({
                   {codeSent && !phoneVerified && (
                     <div className="space-y-2">
                       <Label htmlFor="smscode">인증번호</Label>
-                      <div className="flex space-x-2">
-                        <Input
-                          id="smscode"
-                          placeholder="6자리 코드"
-                          value={verificationCode}
-                          onChange={(e) => setVerificationCode(e.target.value)}
-                        />
+                      <div className="flex space-x-2 items-center">
+                        <div className="relative flex-1">
+                          <Input
+                            id="smscode"
+                            placeholder="6자리 코드"
+                            value={verificationCode}
+                            onChange={(e) => setVerificationCode(e.target.value)}
+                          />
+                          {timer > 0 && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-red-600 text-xs select-none">
+                              {formatTime(timer)}
+                            </span>
+                          )}
+                        </div>
                         <Button
                           type="button"
                           variant="outline"

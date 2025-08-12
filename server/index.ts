@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { autoPaymentScheduler } from "./scheduler";
@@ -10,6 +11,8 @@ dotenv.config();
 const app = express();
 // reverse proxy(Cloudtype 등) 뒤 1단 프록시만 신뢰하여 X-Forwarded-* 헤더를 안전하게 처리
 app.set("trust proxy", 1);
+// 텍스트 응답 압축 (gzip/deflate)
+app.use(compression());
 app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: false }));
 

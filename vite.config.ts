@@ -28,6 +28,18 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react")) return "vendor-react";
+            if (id.includes("framer-motion")) return "vendor-motion";
+            if (id.includes("firebase")) return "vendor-firebase";
+            if (id.includes("lucide-react")) return "vendor-icons";
+          }
+        },
+      },
+    },
   },
   server: {
     allowedHosts: ['storebooster.ai.kr', 'localhost', '127.0.0.1'], // 프로덕션 도메인 추가

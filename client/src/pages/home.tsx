@@ -3,13 +3,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowRight, BarChart, Search, ShoppingBag, Lock, Wand2, FileText, CheckSquare, LineChart, Star, Download } from "lucide-react";
 import { motion } from "framer-motion";
-import ExampleSection from "../components/ExampleSection";
+import { lazy, Suspense } from "react";
+const ExampleSection = lazy(() => import("../components/ExampleSection"));
 import TextFeaturesSection from "../components/TextFeaturesSection";
 import CtaSection from "../components/CtaSection";
 import FooterSection from "../components/FooterSection";
 import FaqSection from "../components/FaqSection";
 import DashboardLayout from "@/components/DashboardLayout";
-import ReviewSection from "../components/ReviewSection";
+const ReviewSection = lazy(() => import("../components/ReviewSection"));
 
 import { trackEvent, trackTimeSpent } from "@/lib/analytics";
 import { useEffect, useState } from "react";
@@ -119,7 +120,7 @@ export default function Home() {
                 <div className="mb-3 md:mb-4">
                                       <span className="block md:inline">완벽한 솔루션, </span>
                     <span className="block md:inline">
-                      <img src="/logo.png" alt="스토어부스터" className="mobile-logo-home" style={{ height: '1.5em', margin: 0, display: 'inline-block', verticalAlign: 'top', marginTop: '-0.4em' }} />
+                      <img src="/logo.png" alt="스토어부스터" className="mobile-logo-home" style={{ height: '1.5em', margin: 0, display: 'inline-block', verticalAlign: 'top', marginTop: '-0.4em' }} width={240} height={48} decoding="async" />
                     </span>
                 </div>
               </h2>
@@ -187,7 +188,9 @@ export default function Home() {
         viewport={{ once: true }}
         transition={{ duration: 0.5 }}
       >
-        <ExampleSection />
+        <Suspense fallback={null}>
+          <ExampleSection />
+        </Suspense>
       </motion.div>
 
 {/* Feature Section 1 */}
@@ -240,11 +243,17 @@ export default function Home() {
         transition={{ duration: 0.6, delay: 0.4 }}
         viewport={{ once: true }}
       >
-        <img
-          src="/image1.jpg"
-          alt="키워드 분석 화면"
-          className="w-full rounded-2xl shadow-2xl"
-        />
+        <picture>
+          <source srcSet="/image1.avif" type="image/avif" />
+          <source srcSet="/image1.webp" type="image/webp" />
+          <img
+            src="/image1.jpg"
+            alt="키워드 분석 화면"
+            className="w-full rounded-2xl shadow-2xl"
+            fetchPriority="high"
+            decoding="async"
+          />
+        </picture>
       </motion.div>
     </div>
   </div>
@@ -305,11 +314,17 @@ export default function Home() {
         transition={{ duration: 0.6, delay: 0.4 }}
         viewport={{ once: true }}
       >
-        <img
-          src="/image2.jpg"
-          alt="상품 등록 최적화 화면"
-          className="w-full rounded-2xl shadow-2xl"
-        />
+        <picture>
+          <source srcSet="/image2.avif" type="image/avif" />
+          <source srcSet="/image2.webp" type="image/webp" />
+          <img
+            src="/image2.jpg"
+            alt="상품 등록 최적화 화면"
+            className="w-full rounded-2xl shadow-2xl"
+            loading="lazy"
+            decoding="async"
+          />
+        </picture>
       </motion.div>
     </div>
   </div>
@@ -370,11 +385,17 @@ export default function Home() {
         transition={{ duration: 0.6, delay: 0.4 }}
         viewport={{ once: true }}
       >
-        <img
-          src="/image3.jpg"
-          alt="완벽한 상품 최적화 화면"
-          className="w-full rounded-2xl shadow-2xl"
-        />
+        <picture>
+          <source srcSet="/image3.avif" type="image/avif" />
+          <source srcSet="/image3.webp" type="image/webp" />
+          <img
+            src="/image3.jpg"
+            alt="완벽한 상품 최적화 화면"
+            className="w-full rounded-2xl shadow-2xl"
+            loading="lazy"
+            decoding="async"
+          />
+        </picture>
       </motion.div>
     </div>
   </div>
@@ -389,7 +410,9 @@ export default function Home() {
         viewport={{ once: true }}
         transition={{ duration: 0.5 }}
       >
-        <ReviewSection />
+        <Suspense fallback={null}>
+          <ReviewSection />
+        </Suspense>
       </motion.div>
 
      
@@ -400,11 +423,15 @@ export default function Home() {
         viewport={{ once: true }}
         transition={{ duration: 0.5 }}
       >
-      <FaqSection />
+        <Suspense fallback={null}>
+          <FaqSection />
+        </Suspense>
       </motion.section>
       
       {/* <CtaSection /> */}
-      <FooterSection />
+      <Suspense fallback={null}>
+        <FooterSection />
+      </Suspense>
       
       {/* PC 전용 모달 */}
       <PcOnlyModal 

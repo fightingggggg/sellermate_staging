@@ -43,7 +43,7 @@ const ExampleSection = () => {
               </div>
               <div className="mt-6 flex items-center justify-center">
                 <div className="w-40 h-40 rounded-full bg-gray-50 flex items-center justify-center shadow-sm">
-                  <img src={step.image} alt={step.alt} className="w-32 h-32 object-contain" />
+                  <img src={step.image} alt={step.alt} className="w-32 h-32 object-contain" loading="lazy" width={128} height={128} decoding="async" />
                 </div>
               </div>
             </div>

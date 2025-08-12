@@ -44,25 +44,43 @@ export default function MembershipPage() {
         return;
       }
 
-              try {
-          const token = await (await import('@/lib/firebase')).auth.currentUser?.getIdToken?.();
-          const headers: Record<string, string> = {};
-          if (token) headers.Authorization = `Bearer ${token}`;
-          const response = await fetch(`/api/membership/type/${currentUser.uid}`, { headers });
-          if (response.ok) {
-            const data = await response.json();
-            setMembershipStatus({
-              type: data.data.membershipType,
-              subscriptionInfo: data.data.subscriptionInfo
-            });
-          } else {
-            setMembershipStatus({ type: 'basic' });
-          }
-        } catch (error) {
-        console.error('멤버십 상태 확인 실패:', error);
-        setMembershipStatus({ type: 'basic' });
-      } finally {
+      const cacheKey = `membershipType:${currentUser.uid}`;
+      const cachedType = (typeof window !== 'undefined' ? (localStorage.getItem(cacheKey) as 'basic' | 'booster' | null) : null);
+
+      // 캐시가 있으면 즉시 UI 반영 (버튼 빠른 활성/비활성)
+      if (cachedType) {
+        setMembershipStatus({ type: cachedType });
         setLoading(false);
+      } else {
+        // 캐시가 없으면 우선 basic으로 가정하여 UI 지연을 최소화
+        setMembershipStatus({ type: 'basic' });
+        setLoading(false);
+      }
+
+      try {
+        // 백그라운드에서 토큰 확보 후 서버 검증
+        const { auth } = await import('@/lib/firebase');
+        const token = await auth.currentUser?.getIdToken?.();
+        if (!token) return;
+        const response = await fetch(`/api/membership/type/${currentUser.uid}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const latestType = data.data.membershipType as 'basic' | 'booster';
+          setMembershipStatus({
+            type: latestType,
+            subscriptionInfo: data.data.subscriptionInfo
+          });
+          // 최신 결과 캐시 저장
+          try {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(cacheKey, latestType);
+            }
+          } catch {}
+        }
+      } catch (error) {
+        console.error('멤버십 상태 확인 실패:', error);
       }
     };
 
