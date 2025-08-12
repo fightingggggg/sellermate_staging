@@ -12,6 +12,46 @@ if (!admin.apps.length) {
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 
+// 추가: /api/generate-name 안정성을 위한 간단한 세마포어, 캐시, 중복요청 병합 유틸
+class SimpleSemaphore {
+  private queue: Array<() => void> = [];
+  private permits: number;
+  constructor(maxPermits: number) { this.permits = Math.max(1, maxPermits); }
+  async acquire(): Promise<() => void> {
+    if (this.permits > 0) {
+      this.permits -= 1;
+      return () => this.release();
+    }
+    return new Promise<() => void>((resolve) => {
+      this.queue.push(() => resolve(() => this.release()));
+    });
+  }
+  private release() {
+    const next = this.queue.shift();
+    if (next) {
+      next();
+    } else {
+      this.permits += 1;
+    }
+  }
+}
+
+const MAX_CONCURRENT_GENERATE_NAME = Number(process.env.GENERATE_NAME_CONCURRENCY || 4);
+const generateNameSemaphore = new SimpleSemaphore(MAX_CONCURRENT_GENERATE_NAME);
+
+const inFlightGenerateName = new Map<string, Promise<{ productName: string; reason: string }>>();
+
+type GenCacheEntry = { value: { productName: string; reason: string }; expiresAt: number };
+const generateNameCache = new Map<string, GenCacheEntry>();
+const GENERATE_NAME_CACHE_TTL_MS = Number(process.env.GENERATE_NAME_CACHE_TTL_MS || 60_000);
+
+const generateNameLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: Number(process.env.GENERATE_NAME_RATE_LIMIT || 30),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // 카드 번호 마스킹 함수
 function maskCardNumber(cardNo: string): string {
   if (!cardNo || cardNo.length !== 16) {
@@ -74,13 +114,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   if (process.env.NODE_ENV === 'staging') {
     corsAllowedOrigins.push('https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app');
   }
-  const corsOptions = {
+  const corsOptions: cors.CorsOptions = {
     origin: corsAllowedOrigins,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] as string[],
   };
-  
   app.use(cors(corsOptions));
 
   // 결제/웹훅 경로별 강화 레이트 리밋
@@ -244,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/generate-name { query, keyword, keywordCount, exampleNames }
-  app.post('/api/generate-name', async (req, res) => {
+  app.post('/api/generate-name', generateNameLimiter, async (req, res) => {
     const { query, keyword, keywordCount } = req.body || {};
 
     if (!query || !keyword || !keywordCount || isNaN(Number(keywordCount)) || Number(keywordCount) <= 0) {
@@ -265,25 +303,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     console.log('[generate-name] params', { query, keyword, keywordCountNum });
 
-    // 응답 파싱 함수
-    const parseResponse = (response: string) => {
-      const productNameMatch = response.match(/상품명:\s*(.+?)(?=\s*최적화 이유:|$)/);
-      const reasonMatch = response.match(/최적화 이유:\s*([\s\S]+)$/);
-      
-      return {
-        productName: productNameMatch?.[1]?.trim() || '',
-        reasonDetails: reasonMatch?.[1]?.trim() || ''
-      };
+    // 중복요청 병합 및 캐시 키
+    const reqKey = JSON.stringify({ query, keyword, keywordCountNum });
+
+    // 캐시 확인
+    const cached = generateNameCache.get(reqKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.json(cached.value);
+    }
+
+    // 진행 중 요청 병합
+    const existingPromise = inFlightGenerateName.get(reqKey);
+    if (existingPromise) {
+      try {
+        const merged = await existingPromise;
+        return res.json(merged);
+      } catch (e) {
+        // 진행중 요청 실패 시 계속 진행하여 새 시도
+      }
+    }
+
+    // 타입 안전한 import 및 클라이언트 준비
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey, maxRetries: 2 });
+
+    // 재시도 로직 헬퍼
+    const shouldRetryClaudeError = (error: any): boolean => {
+      const status = error?.status ?? error?.statusCode;
+      const type = error?.error?.error?.type || error?.error?.type;
+      const message: string = error?.message || '';
+      const headers = error?.headers;
+      let xShouldRetry = false;
+      try {
+        if (headers?.get) xShouldRetry = headers.get('x-should-retry') === 'true';
+        else if (typeof headers?.['x-should-retry'] !== 'undefined') xShouldRetry = headers['x-should-retry'] === 'true';
+      } catch {}
+      const overloaded = status === 529 || type === 'overloaded_error' || message.includes('overloaded');
+      const transient = status === 408 || status === 409 || status === 425 || status === 429 || (status >= 500 && status < 600);
+      return xShouldRetry || overloaded || transient;
     };
 
-    try {
-      // 타입 안전한 import
-      const { default: Anthropic } = await import('@anthropic-ai/sdk');
-      const client = new Anthropic({ apiKey, maxRetries: 0 });
-      
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    const callClaudeWithRetry = async (): Promise<{ productName: string; reason: string }> => {
       const prompt = `
       ## 목표
-      네이버 스마트스토어 상위노출 최적화 상품명 1개 생성
+      네이버 스마트스토어 상위노출 최적화 포괄적 상품명 1개 생성
 
       ## 입력값
         - **필수 키워드: ${query}**
@@ -292,19 +357,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ## 상품명 생성 규칙 (매우 중요)
         - **입력값에 제공된 단어만 사용할 것 (새로운 단어 생성 금지)**
         - **${query}는 모두 원본 형태 그대로 반드시 개별 단독 사용 필수**
-        - 필수 키워드가 2개 이상인 경우 떨어져서 배치
+        - 필수 키워드가 2개 이상인 경우 단어 연속 배치 금지
         - 정확히 ${keywordCount}개의 단어만 사용 
         - **입력값의 단어, 띄어쓰기 등 원본 그대로 사용(어떠한 형태도 변경 금지)**
-        - 동일 단어 반복 금지 (단,필수 키워드, 상위 키워드 동일 단어는 떨어져서 반복 가능)
-        - 상위 키워드 순서가 중요도 순서
+        - 동일 단어 반복 금지 (단,필수 키워드와 동일 상위 키워드는 떨어져서 반복 가능)
+        - 상위 키워드 배열 순서가 중요도 순서
 
       ## 상품명 구성 순서
         * 해당 항목이 없는 경우 생략하고 상위 키워드 순서대로 배치 
         1.브랜드/제조사
         2.시리즈
         3.모델명
-        4.다양한 상품유형
-        5.필수 키워드
+        4.필수 키워드
+        4.다양한 상품 유형
         5.색상
         6.소재 
         7.수량/용량 
@@ -316,70 +381,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
         상품명: [상품명]
         최적화 이유: [번호 매겨 근거 자세히 설명]`;
 
-      console.log('[generate-name] calling Claude once (no retry)');
-
-      const response = await client.messages.create({
+      const request = {
         model: 'claude-3-5-haiku-20241022',
         temperature: 0.2,
         top_p: 0.2,
         max_tokens: 500,
-        system: '너는 네이버 스마트스토어 SEO 전문가.',
+        system: '너는 규칙을 준수하는 네이버 스마트스토어 SEO 전문가.',
         messages: [
-          {
-            role: 'user',
-            content: [{ type: 'text', text: prompt }],
-          },
-        ],
-      });
+          { role: 'user', content: [{ type: 'text', text: prompt }] },
+        ] as any,
+      } as const;
 
-      // 타입 안전한 텍스트 추출
-      const firstContent = response.content?.[0];
-      const aiResponse = 
-        firstContent && firstContent.type === 'text' 
-          ? firstContent.text.trim() 
-          : '';
+      const maxAttempts = Number(process.env.GENERATE_NAME_MAX_ATTEMPTS || 5);
+      const baseDelay = Number(process.env.GENERATE_NAME_BASE_DELAY_MS || 300);
+      const maxDelay = Number(process.env.GENERATE_NAME_MAX_DELAY_MS || 4000);
 
-      console.log('[generate-name] Claude API response received');
-          
-      if (!aiResponse) {
-        return res.status(500).json({ error: 'Claude API에서 응답을 받지 못했습니다' });
+      let lastError: any = null;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          if (attempt > 1) {
+            const pow = Math.min(attempt - 1, 6);
+            const jitter = 0.7 + Math.random() * 0.6; // 0.7x ~ 1.3x
+            const delay = Math.min(maxDelay, Math.round(baseDelay * Math.pow(2, pow) * jitter));
+            console.log(`[generate-name] retry backoff ${delay}ms (attempt ${attempt}/${maxAttempts})`);
+            await wait(delay);
+          }
+
+          console.log('[generate-name] calling Claude (attempt', attempt, ')');
+          const response = await client.messages.create(request as any);
+
+          const firstContent = (response as any).content?.[0];
+          const aiResponse = firstContent && firstContent.type === 'text' ? firstContent.text.trim() : '';
+          if (!aiResponse) {
+            throw new Error('Empty response from Claude');
+          }
+
+          const productNameMatch = aiResponse.match(/상품명:\s*(.+?)(?=\s*최적화 이유:|$)/);
+          const reasonMatch = aiResponse.match(/최적화 이유:\s*([\s\S]+)$/);
+          const productName = productNameMatch?.[1]?.trim() || '';
+          const reasonDetails = reasonMatch?.[1]?.trim() || '';
+          if (!productName) {
+            throw new Error('Failed to parse product name');
+          }
+
+          const reason = `(판매 상품에 맞는 브랜드, 용량, 수량, 시리즈 등을 검색하거나 변경해 활용하세요)\n` +
+            `* 네이버 상품명 SEO 규칙 준수 \"브랜드/제조사-시리즈-모델명-상품 유형-색상-소재-패키지 수량-사이즈-성별 나이 표현-속성-판매옵션\" 순서로 조합.\n` +
+            reasonDetails;
+
+          return { productName, reason };
+        } catch (err: any) {
+          lastError = err;
+          if (attempt < maxAttempts && shouldRetryClaudeError(err)) {
+            continue;
+          }
+          break;
+        }
       }
+      throw lastError || new Error('Claude call failed');
+    };
 
-      // 개선된 응답 파싱
-      const { productName, reasonDetails } = parseResponse(aiResponse);
+    // 동시성 제한 내에서 실행 (세마포어)
+    const release = await generateNameSemaphore.acquire();
 
-      if (!productName) {
-        return res.status(500).json({ error: '상품명을 파싱할 수 없습니다' });
+    const taskPromise = (async () => {
+      try {
+        const result = await callClaudeWithRetry();
+        // 캐시 저장
+        generateNameCache.set(reqKey, { value: result, expiresAt: Date.now() + GENERATE_NAME_CACHE_TTL_MS });
+        return result;
+      } finally {
+        release();
       }
+    })();
 
-      const reason = `(판매 상품에 맞는 브랜드, 용량, 수량, 시리즈 등을 검색하거나 변경해 활용하세요)\n` +
-        `* 네이버 상품명 SEO 규칙 준수 \"브랜드/제조사-시리즈-모델명-상품 유형-색상-소재-패키지 수량-사이즈-성별 나이 표현-속성-판매옵션\" 순서로 조합.\n` +
-        reasonDetails;
+    inFlightGenerateName.set(reqKey, taskPromise);
 
-      res.json({ productName, reason });
-
-    } catch (err: unknown) {
+    try {
+      const result = await taskPromise;
+      return res.json(result);
+    } catch (err) {
       console.error('[generate-name] Claude API error detail', err);
-      
-      // err를 any로 타입 단언하여 속성 접근
-      const error = err as any;
-      
-      // 더 구체적인 에러 처리
-      if (error.status === 401) {
+      const error: any = err as any;
+      if (error?.status === 401) {
         return res.status(500).json({ 
           error: 'Claude API 인증 실패', 
           detail: 'API 키가 유효하지 않습니다. 새로운 API 키가 필요합니다.' 
         });
-      } else if (error.status === 429) {
+      } else if (error?.status === 429 || error?.status === 529 || (error?.message || '').includes('overloaded')) {
+        res.set('Retry-After', '2');
         return res.status(529).json({ error: 'Claude API 과부하 상태입니다. 잠시 후 다시 시도해주세요.' });
-      } else if (error.status >= 500 || error.message?.includes('overloaded')) {
+      } else if ((error?.status ?? 0) >= 500) {
+        res.set('Retry-After', '2');
         return res.status(529).json({ error: '서버 오류' });
       }
-      
-      res.status(500).json({ 
+      return res.status(500).json({ 
         error: '상품명 생성 실패', 
         detail: error?.message || '알 수 없는 오류'
       });
+    } finally {
+      inFlightGenerateName.delete(reqKey);
     }
   });
 
@@ -1102,246 +1202,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   /* -------------------------- 나이스페이 빌키발급 -------------------------- */
   
   // 웹훅 테스트 엔드포인트 (비프로덕션 전용, 단일 경로로 통합)
-  if (process.env.NODE_ENV !== 'production') {
-    app.all("/api/nicepay/webhook-test", (req, res) => {
-      console.log("Webhook test received:", { method: req.method, body: req.body, query: req.query });
-      res.setHeader('Content-Type', 'text/plain');
-      res.status(200).send("OK");
-    });
-  }
 
-  // 환경 변수 확인용 엔드포인트 (디버그용 - 개발환경에서만 접근 가능)
-  app.get("/api/debug/env", (req, res) => {
-    // 개발환경에서만 접근 허용
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
-    
-    console.log("=== 환경 변수 확인 ===");
-    res.json({
-      NICEPAY_CLIENT_ID: process.env.NICEPAY_CLIENT_ID ? "설정됨" : "설정되지 않음",
-      NICEPAY_SECRET_KEY: process.env.NICEPAY_SECRET_KEY ? "설정됨" : "설정되지 않음",
-      BASE_URL: process.env.BASE_URL ? "설정됨" : "설정되지 않음",
-      NODE_ENV: process.env.NODE_ENV || "설정되지 않음"
-    });
-    console.log("=== 환경 변수 확인 완료 ===");
-  });
 
-  // 빌키 테스트 결제 엔드포인트 (디버그용)
-  app.post("/api/debug/test-billing-payment", async (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
-    try {
-      console.log("=== 빌키 테스트 결제 시작 ===");
-      const { uid } = req.body;
-      
-      if (!uid) {
-        return res.status(400).json({ error: "uid is required" });
-      }
 
-      const clientId = process.env.NICEPAY_CLIENT_ID;
-      const secretKey = process.env.NICEPAY_SECRET_KEY;
-      
-      if (!clientId || !secretKey) {
-        return res.status(500).json({ error: "NicePay credentials not configured" });
-      }
 
-      // Firestore에서 빌키 정보 조회
-      const db = admin.firestore();
-      const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
-      
-      if (!billingKeyDoc.exists) {
-        return res.status(404).json({ error: "Billing key not found" });
-      }
 
-      const billingKeyData = billingKeyDoc.data();
-      if (!billingKeyData) {
-        return res.status(404).json({ error: "Billing key data not found" });
-      }
-      
-      console.log("빌키 데이터 존재 여부 확인 완료");
-
-      // Basic 인증 헤더 생성
-      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
-
-      // billingKey가 없으면 authToken을 사용
-      const actualBillingKey = billingKeyData.billingKey || billingKeyData.authToken;
-      
-      if (!actualBillingKey) {
-        return res.status(400).json({ 
-          error: "Billing key not available", 
-          message: "Billing key or auth token not found" 
-        });
-      }
-
-      const testOrderId = `TEST_${Date.now()}_${uid}`;
-      const paymentData = {
-        clientId: clientId,
-        method: "BILL",
-        orderId: testOrderId,
-        amount: 500, // 테스트 금액
-        goodsName: "스토어부스터 부스터 플랜 (테스트)",
-        billingKey: actualBillingKey, // authToken이 아닌 billingKey 사용
-        returnUrl: `${process.env.BASE_URL || 'https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app'}/api/nicepay/payment/callback`
-      };
-
-      console.log("=== 테스트 결제 API 호출 시작 ===");
-      console.log("API URL:", `https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`);
-      console.log("요청 헤더 생성 완료");
-      
-      // ediDate 생성 (ISO 8601 형식)
-      const ediDate = new Date().toISOString();
-      
-      // signData 생성 (hex(sha256(orderId + bid + ediDate + SecretKey)))
-      const signData = crypto.createHash('sha256')
-        .update(testOrderId + actualBillingKey + ediDate + secretKey)
-        .digest('hex');
-      
-      // 빌키 결제용 요청 데이터 (필드명 변경)
-      const billingPaymentData = {
-        orderId: testOrderId,
-        amount: 500,
-        goodsName: "스토어부스터 부스터 플랜 (테스트)",
-        cardQuota: 0,
-        useShopInterest: false,
-        ediDate: ediDate,
-        signData: signData
-      };
-      
-      console.log("테스트 결제 요청 데이터 준비 완료");
-
-      // 나이스페이 빌키 결제 API 호출
-      const response = await fetch(`https://api.nicepay.co.kr/v1/subscribe/${actualBillingKey}/payments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${authHeader}`
-        },
-        body: JSON.stringify(billingPaymentData)
-      });
-
-      console.log("API 응답 상태:", response.status);
-      const result = await response.json();
-      console.log("API 응답 본문 수신");
-      console.log("=== 테스트 결제 API 호출 완료 ===");
-
-      if (!response.ok) {
-        return res.status(response.status).json({ 
-          error: "NicePay API error", 
-          detail: result 
-        });
-      }
-
-      // 테스트 결제 정보 저장 (민감정보 저장 금지: billingKey 제거)
-      await db.collection("payments").doc(testOrderId).set({
-        uid: uid,
-        orderId: testOrderId,
-        amount: 500,
-        goodsName: "스토어부스터 부스터 플랜 (테스트)",
-        status: "PENDING",
-        isTest: true,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      console.log("=== 빌키 테스트 결제 완료 ===");
-
-      res.json({
-        success: true,
-        orderId: testOrderId,
-        tid: result.tid,
-        message: "테스트 결제가 요청되었습니다. 콜백을 확인하세요."
-      });
-
-    } catch (error: any) {
-      console.error("=== 빌키 테스트 결제 에러 ===");
-      console.error("에러:", error);
-      res.status(500).json({ 
-        error: "Internal server error", 
-        message: error.message 
-      });
-    }
-  });
-
-  // 구독 정보 확인 엔드포인트 (디버그용)
-  app.get("/api/debug/subscription/:uid", async (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
-    try {
-      const { uid } = req.params;
-      const db = admin.firestore();
-      
-      const subscriptionDoc = await db.collection("subscriptions").doc(uid).get();
-      const billingKeyDoc = await db.collection("billingKeys").doc(uid).get();
-      const paymentsQuery = await db.collection("payments")
-        .where("uid", "==", uid)
-        .orderBy("createdAt", "desc")
-        .limit(5)
-        .get();
-
-      const sortedPayments = paymentsQuery.docs;
-
-      const result = {
-        subscription: subscriptionDoc.exists ? subscriptionDoc.data() : null,
-        billingKey: billingKeyDoc.exists ? billingKeyDoc.data() : null,
-        recentPayments: sortedPayments.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-      };
-
-      res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // 수동 자동 결제 실행 엔드포인트 (디버그용)
-  app.post("/api/debug/run-auto-payment", async (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
-    try {
-      console.log("=== 수동 자동 결제 실행 시작 ===");
-      const { uid } = req.body;
-      
-      if (!uid) {
-        return res.status(400).json({ error: "uid is required" });
-      }
-
-      console.log(`수동 자동 결제 실행: ${uid}`);
-      await autoPaymentScheduler.runManualPayment(uid);
-      
-      console.log("=== 수동 자동 결제 실행 완료 ===");
-      res.json({ 
-        success: true, 
-        message: "자동 결제가 실행되었습니다. 서버 로그를 확인하세요." 
-      });
-
-    } catch (error: any) {
-      console.error("수동 자동 결제 실행 중 오류:", error);
-      res.status(500).json({ 
-        error: "Internal server error", 
-        message: error.message 
-      });
-    }
-  });
-
-  // 스케줄러 상태 확인 엔드포인트 (디버그용)
-  app.get("/api/debug/scheduler-status", (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
-    const status = autoPaymentScheduler.getStatus();
-    res.json({
-      ...status,
-      schedule: "매일 오전 9시 실행",
-      nextRun: "다음날 오전 9시",
-      message: "자동 결제 스케줄러가 실행 중입니다.",
-      timestamp: new Date().toISOString()
-    });
-  });
   
   // 빌키 발급 요청 (나이스페이 공식 문서 준수)
   app.post("/api/nicepay/billing-key", async (req, res) => {
@@ -1482,9 +1347,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         console.error("빌키 발급 실패:", result);
+        const userMessage = (() => {
+          switch (result.resultCode) {
+            case 'F113':
+              return '본인의 신용카드 확인중 오류가 발생하였습니다 올바른 정보를 입력해주세요';
+            case 'F112':
+              return '유효하지않은 카드번호를 입력하셨습니다 (card_bin 없음)';
+            default:
+              return result.resultMsg || '빌키 발급에 실패했습니다.';
+          }
+        })();
         res.status(400).json({
           success: false,
-          error: result.resultMsg || "빌키 발급에 실패했습니다.",
+          error: userMessage,
+          code: result.resultCode,
         });
       }
 
@@ -1612,9 +1488,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         console.error("빌키 발급 실패:", result);
+        const userMessage = (() => {
+          switch (result.resultCode) {
+            case 'F113':
+              return '본인의 신용카드 확인중 오류가 발생하였습니다 올바른 정보를 입력해주세요';
+            case 'F112':
+              return '유효하지않은 카드번호를 입력하셨습니다 (card_bin 없음)';
+            default:
+              return result.resultMsg || '빌키 발급에 실패했습니다.';
+          }
+        })();
         res.status(400).json({
           success: false,
-          error: result.resultMsg || "빌키 발급에 실패했습니다.",
+          error: userMessage,
+          code: result.resultCode,
         });
       }
 
@@ -3757,212 +3644,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 나이스페이먼츠 웹훅 테스트 엔드포인트 (개발환경에서만 접근 가능)
-  app.post("/api/nicepay/webhook-test", (req, res) => {
-    // 개발환경에서만 접근 허용
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
-    
-    console.log("=== 나이스페이먼츠 웹훅 테스트 ===");
-    console.log("요청 본문:", JSON.stringify(req.body, null, 2));
-    console.log("요청 헤더:", req.headers);
-    
-    // 나이스페이먼츠 요구사항에 따른 응답
-    res.setHeader('Content-Type', 'text/html;charset=utf-8');
-    res.status(200).send("OK");
-  });
 
-  // 나이스페이먼츠 웹훅 시뮬레이션 엔드포인트 (개발환경에서만 접근 가능)
-  app.post("/api/nicepay/simulate-webhook", async (req, res) => {
-    // 개발환경에서만 접근 허용
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
-    
-    try {
-      const { orderId, status = 'paid', amount = 9900 } = req.body;
-      
-      if (!orderId) {
-        return res.status(400).json({ error: "orderId is required" });
-      }
-      
-      console.log("=== 나이스페이먼츠 웹훅 시뮬레이션 시작 ===");
-      
-      // 시뮬레이션용 웹훅 데이터 생성
-      const ediDate = new Date().toISOString();
-      const tid = `nictest${Date.now()}`;
-      const secretKey = process.env.NICEPAY_SECRET_KEY;
-      
-      // 나이스페이먼츠 공식 서명 생성
-      const signature = secretKey ? crypto.createHash('sha256')
-        .update(tid + amount + ediDate + secretKey)
-        .digest('hex') : '';
-      
-      const webhookData = {
-        resultCode: status === 'paid' ? '0000' : '9999',
-        resultMsg: status === 'paid' ? '정상 처리되었습니다.' : '처리 실패',
-        tid: tid,
-        orderId: orderId,
-        ediDate: ediDate,
-        signature: signature,
-        status: status,
-        paidAt: status === 'paid' ? ediDate : '0',
-        failedAt: status === 'failed' ? ediDate : '0',
-        cancelledAt: status === 'cancelled' ? ediDate : '0',
-        payMethod: 'card',
-        amount: amount,
-        balanceAmt: amount,
-        goodsName: '스토어부스터 부스터 플랜',
-        useEscrow: false,
-        currency: 'KRW',
-        channel: 'pc',
-        buyerName: '테스트 사용자',
-        buyerTel: '01012345678',
-        buyerEmail: 'test@example.com',
-        issuedCashReceipt: false,
-        card: {
-          cardCode: '06',
-          cardName: '신한',
-          cardNum: '123456******1234',
-          cardQuota: '0',
-          isInterestFree: false,
-          cardType: 'credit',
-          canPartCancel: true,
-          acquCardCode: '06',
-          acquCardName: '신한'
-        }
-      };
-      
-      console.log("시뮬레이션 웹훅 데이터 준비 완료");
-      
-      // 실제 웹훅 엔드포인트로 요청 전송
-      const webhookUrl = `${req.protocol}://${req.get('host')}/api/nicepay/webhook`;
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Forwarded-For': '127.0.0.1' // 로컬 IP로 설정
-        },
-        body: JSON.stringify(webhookData)
-      });
-      
-      console.log("웹훅 시뮬레이션 응답:", response.status, response.statusText);
-      
-      res.json({
-        success: true,
-        message: "웹훅 시뮬레이션 완료",
-        webhookData: webhookData,
-        responseStatus: response.status
-      });
-      
-    } catch (error: any) {
-      console.error("웹훅 시뮬레이션 오류:", error);
-      res.status(500).json({ 
-        error: "웹훅 시뮬레이션 실패", 
-        message: error.message 
-      });
-    }
-  });
 
-  // 나이스페이먼츠 웹훅 시뮬레이션 엔드포인트 (개발환경에서만 접근 가능)
-  app.post("/api/nicepay/simulate-webhook", async (req, res) => {
-    // 개발환경에서만 접근 허용
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
-    
-    try {
-      const { orderId, status = 'paid', amount = 9900, testMode = true } = req.body;
-      
-      if (!orderId) {
-        return res.status(400).json({ error: "orderId is required" });
-      }
-      
-      // 테스트 모드 강제 적용 (실제 데이터 변경 방지)
-      if (!testMode) {
-        return res.status(400).json({ error: "testMode must be true for simulation" });
-      }
-      
-      console.log("=== 나이스페이먼츠 웹훅 시뮬레이션 시작 (테스트 모드) ===");
-      
-      // 시뮬레이션용 웹훅 데이터 생성
-      const ediDate = new Date().toISOString();
-      const tid = `nictest${Date.now()}`;
-      const secretKey = process.env.NICEPAY_SECRET_KEY;
-      
-      // 나이스페이먼츠 공식 서명 생성
-      const signature = secretKey ? crypto.createHash('sha256')
-        .update(tid + amount + ediDate + secretKey)
-        .digest('hex') : '';
-      
-      const webhookData = {
-        resultCode: status === 'paid' ? '0000' : '9999',
-        resultMsg: status === 'paid' ? '정상 처리되었습니다.' : '처리 실패',
-        tid: tid,
-        orderId: orderId,
-        ediDate: ediDate,
-        signature: signature,
-        status: status,
-        paidAt: status === 'paid' ? ediDate : '0',
-        failedAt: status === 'failed' ? ediDate : '0',
-        cancelledAt: status === 'cancelled' ? ediDate : '0',
-        payMethod: 'card',
-        amount: amount,
-        balanceAmt: amount,
-        goodsName: '스토어부스터 부스터 플랜 (테스트)',
-        useEscrow: false,
-        currency: 'KRW',
-        channel: 'pc',
-        buyerName: '테스트 사용자',
-        buyerTel: '01012345678',
-        buyerEmail: 'test@example.com',
-        issuedCashReceipt: false,
-        card: {
-          cardCode: '06',
-          cardName: '신한',
-          cardNum: '123456******1234',
-          cardQuota: '0',
-          isInterestFree: false,
-          cardType: 'credit',
-          canPartCancel: true,
-          acquCardCode: '06',
-          acquCardName: '신한'
-        }
-      };
-      
-      console.log("시뮬레이션 웹훅 데이터 준비 완료 (테스트 모드)");
-      
-      // 실제 웹훅 엔드포인트로 요청 전송 (테스트 모드)
-      const webhookUrl = `${req.protocol}://${req.get('host')}/api/nicepay/webhook`;
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Forwarded-For': '127.0.0.1', // 로컬 IP로 설정
-          'X-Test-Mode': 'true' // 테스트 모드 헤더 추가
-        },
-        body: JSON.stringify(webhookData)
-      });
-      
-      console.log("웹훅 시뮬레이션 응답:", response.status, response.statusText);
-      
-      res.json({
-        success: true,
-        message: "웹훅 시뮬레이션 완료 (테스트 모드)",
-        webhookData: webhookData,
-        responseStatus: response.status,
-        testMode: true
-      });
-      
-    } catch (error: any) {
-      console.error("웹훅 시뮬레이션 오류:", error);
-      res.status(500).json({ 
-        error: "웹훅 시뮬레이션 실패", 
-        message: error.message 
-      });
-    }
-  });
 
   // POST /api/extension-usage/consume - 확장 직접 사용 시 월간 사용량 1회 소비 (Basic 20회 제한)
   app.post('/api/extension-usage/consume', async (req, res) => {

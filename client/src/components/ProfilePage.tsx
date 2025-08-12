@@ -1106,7 +1106,7 @@ export default function ProfilePage() {
                                        <p>• 상품 최적화 20회/일</p>
                                        <p>• 최근 내역 30개 저장</p>
                                        <p>• 확장 프로그램 무제한 사용</p>
-                                       <p>• 신규 기능 우선 이용</p>
+                                       {/* <p>• 신규 기능 우선 이용</p> */}
                                      </div>
                                      <div className="text-sm text-gray-600 mb-3">
                                        <p className="text-orange-600 font-medium">
@@ -1159,7 +1159,7 @@ export default function ProfilePage() {
                                      <p>• 상품 최적화 20회/일</p>
                                      <p>• 최근 내역 30개 저장</p>
                                      <p>• 확장 프로그램 무제한 사용</p>
-                                                                          <p>• 신규 기능 우선 이용</p>
+                                                                          {/* <p>• 신규 기능 우선 이용</p> */}
                                     </div>
                                     <div className="text-sm text-gray-600 mb-3">
                                       <p>다음 결제일: {subscriptionInfo.endDate?.toDate?.()?.toLocaleDateString() || '정보 없음'}</p>

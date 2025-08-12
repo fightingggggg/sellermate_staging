@@ -204,7 +204,7 @@ export default function MembershipPage() {
                 <span className="text-2xl md:text-3xl font-extrabold text-blue-600 whitespace-nowrap">월 9,900원</span>
               </div>
               <CardDescription className="text-gray-500 mt-1">
-              합리적인 가격으로 넉넉한 사용
+              하루 300원으로 상위 노출 광고비를 줄이세요!
               </CardDescription>
             </CardHeader>
             <CardContent className="py-6 flex-1 flex flex-col">
@@ -243,12 +243,12 @@ export default function MembershipPage() {
                 </li>
                 
  {/* 신규 기능 */}
- <li className="flex items-center space-x-2 text-base text-blue-600 font-bold">
+ {/* <li className="flex items-center space-x-2 text-base text-blue-600 font-bold">
                   <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
                   <span>+ 신규 기능</span>
-                </li>
-{/*               
-              <li className="h-5"></li> */}
+                </li> */}
+              
+              <li className="h-5"></li>
                 {/* 월 총합 강조 */}
                 <li className="flex items-center space-x-2 text-base md:text-lg text-blue-600 font-bold">
                   <CheckCircle className="w-6 h-6 text-blue-600 flex-shrink-0" />
@@ -286,15 +286,23 @@ export default function MembershipPage() {
             </li>
             <li className="flex items-start space-x-2">
               <span className="text-gray-400 mt-0.5">•</span>
-              <span>결제 주기는 30일 입니다</span>
+              <span>30일 주기로 자동 결제됩니다</span>
             </li>
             <li className="flex items-start space-x-2">
               <span className="text-gray-400 mt-0.5">•</span>
-              <span>환불은 7일 내 미사용자일 경우에만 가능하며, 전액환불 됩니다</span>
+              <span>환불은 7일 내 미사용자일 경우에만 가능하며, 전액환불 됩니다. 환불 시 즉시 제공 혜택이 중단됩니다. </span>
             </li>
             <li className="flex items-start space-x-2">
               <span className="text-gray-400 mt-0.5">•</span>
-              <span>해지는 언제든 가능합니다. 해지 시 만료일까지 사용가능하며 다음 결제일에 자동 결제가 이루어지지 않습니다</span>
+              <span>구매 후 7일 이후, 혹은 1번이라도 사용했을 경우 환불은 불가합니다.</span>
+            </li>
+            <li className="flex items-start space-x-2">
+              <span className="text-gray-400 mt-0.5">•</span>
+              <span>해지는 내 프로필에서 언제든 가능합니다. 해지 시 만료일까지 사용가능하며 다음 결제일에 자동 결제가 이루어지지 않습니다</span>
+            </li>
+            <li className="flex items-start space-x-2">
+              <span className="text-gray-400 mt-0.5">•</span>
+              <span>이 외의 사항은 이용약관을 따릅니다.</span>
             </li>
           </ul>
         </div>
