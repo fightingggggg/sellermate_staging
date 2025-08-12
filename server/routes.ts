@@ -89,7 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     windowMs: 5 * 60 * 1000,
     limit: 10,
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
   });
   // 웹훅: 1분당 60회 (IP 기준). 나이스페이 콜백 트래픽 보호
   const webhookLimiter = rateLimit({

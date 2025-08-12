@@ -1023,7 +1023,7 @@ export default function ProfilePage() {
                                      <Button 
                                        variant="outline" 
                                        size="sm"
-                                       onClick={() => navigate("/membership")}
+                                       onClick={() => navigate("/subscription")}
                                      >
                                        플랜 변경
                                      </Button>
@@ -1072,7 +1072,7 @@ export default function ProfilePage() {
                                        <Button 
                                          variant="outline" 
                                          size="sm"
-                                         onClick={() => navigate("/membership")}
+                                         onClick={() => navigate("/subscription")}
                                        >
                                          플랜 변경
                                        </Button>
@@ -1117,7 +1117,7 @@ export default function ProfilePage() {
                                        <Button 
                                          variant="outline" 
                                          size="sm"
-                                         onClick={() => navigate("/membership")}
+                                         onClick={() => navigate("/subscription")}
                                        >
                                          플랜 변경
                                        </Button>
@@ -1172,7 +1172,7 @@ export default function ProfilePage() {
                                      <Button 
                                        variant="outline" 
                                        size="sm"
-                                       onClick={() => navigate("/membership")}
+                                       onClick={() => navigate("/subscription")}
                                      >
                                        플랜 변경
                                      </Button>
@@ -1219,7 +1219,7 @@ export default function ProfilePage() {
                                <Button 
                                  variant="outline" 
                                  size="sm"
-                                 onClick={() => navigate("/membership")}
+                                 onClick={() => navigate("/subscription")}
                                >
                                  플랜 변경
                                </Button>

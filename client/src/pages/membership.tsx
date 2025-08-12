@@ -162,7 +162,11 @@ export default function MembershipPage() {
                   <span>총 월 150회 키워드 경쟁률 분석 · 90회 상품 최적화!</span>
                 </li>
               </ul>
-              {currentUser ? (
+              {membershipStatus?.type === 'booster' ? (
+                <div className="w-full py-2 px-4 text-center text-gray-400 font-semibold border border-gray-200 rounded-md bg-gray-50 mt-auto cursor-not-allowed select-none">
+                  기본 플랜
+                </div>
+              ) : currentUser ? (
                 <div className="w-full py-2 px-4 text-center text-blue-600 font-semibold border border-blue-300 rounded-md bg-blue-50 mt-auto">
                   현재 이용 중
                 </div>
@@ -237,8 +241,9 @@ export default function MembershipPage() {
               <Button
                 onClick={handleSubscribeClick}
                 className="w-full py-2 px-4 text-center text-white font-semibold border border-blue-600 rounded-md bg-blue-600 hover:bg-blue-700 mt-auto"
+                disabled={loading || membershipStatus?.type === 'booster'}
               >
-                구독하기
+                {membershipStatus?.type === 'booster' ? '현재 이용 중' : '구독하기'}
               </Button>
             </CardContent>
           </Card>

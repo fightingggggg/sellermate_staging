@@ -8,8 +8,8 @@ import rateLimit from "express-rate-limit";
 dotenv.config();
 
 const app = express();
-// reverse proxy (Cloudtype 등) 뒤에서 실행 시 X-Forwarded-Proto 헤더를 신뢰하도록 설정
-app.set("trust proxy", true);
+// reverse proxy(Cloudtype 등) 뒤 1단 프록시만 신뢰하여 X-Forwarded-* 헤더를 안전하게 처리
+app.set("trust proxy", 1);
 app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: false }));
 
