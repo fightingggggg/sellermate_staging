@@ -90,7 +90,7 @@ export class AutoPaymentScheduler {
 
     // 매일 오전 7시(한국시간)에 모든 만료된 구독을 배치로 처리
     // 타임존을 Asia/Seoul로 고정해 서버 로컬 타임존과 무관하게 동일 동작
-    cron.schedule('47 13 * * *', async () => {
+    cron.schedule('03 14 * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -105,7 +105,7 @@ export class AutoPaymentScheduler {
     }, { timezone: 'Asia/Seoul' });
 
     // 추가 스케줄러: 오전 9시에 재시도 (실패한 구독 처리)
-    cron.schedule('51 13 * * *', async () => {
+    cron.schedule('06 14 * * *', async () => {
       console.log('=== 자동 결제 재시도 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -352,7 +352,7 @@ export class AutoPaymentScheduler {
           await sendPaymentSuccessEmail(userEmail, {
             orderId: orderId,
             amount: amount,
-            goodsName: "스토어부스터 부스터 플랜",
+            goodsName: "부스터 플랜 (자동결제)",
             paymentDate: new Date(),
             nextBillingDate: endDate
           });
@@ -421,8 +421,8 @@ export class AutoPaymentScheduler {
         // 구독 연장
         await this.extendSubscription(db, uid, paymentResult.orderId);
       } else {
-        // 구독 만료 처리
-        await this.expireSubscription(db, uid, paymentResult.errorMessage || 'Payment failed');
+        // 구독 만료 처리 (이미 executePayment에서 실패 로그를 남겼으므로 중복 로그는 생략)
+        await this.expireSubscription(db, uid, paymentResult.errorMessage || 'Payment failed', { skipPaymentLog: true });
       }
 
       return paymentResult;
@@ -475,7 +475,7 @@ export class AutoPaymentScheduler {
     const paymentData = {
       orderId: orderId,
       amount: 9900,
-      goodsName: "스토어부스터 부스터 플랜 (자동결제)",
+      goodsName: "부스터플랜 (자동결제)",
       cardQuota: 0,
       useShopInterest: false,
       ediDate: ediDate,
@@ -515,7 +515,7 @@ export class AutoPaymentScheduler {
             uid: uid,
             orderId: orderId,
             amount: 9900,
-            goodsName: "스토어부스터 부스터 플랜 (자동결제)",
+            goodsName: "부스터플랜 (자동결제)",
             status: "SUCCESS",
             tid: result.tid,
             isAutoPayment: true,
@@ -537,7 +537,7 @@ export class AutoPaymentScheduler {
             await sendPaymentSuccessEmail(userEmail, {
               orderId: orderId,
               amount: 9900,
-              goodsName: "스토어부스터 부스터 플랜 (자동결제)",
+              goodsName: "부스터플랜 (자동결제)",
               paymentDate: new Date(),
               nextBillingDate: nextBillingDate
             });
@@ -558,7 +558,7 @@ export class AutoPaymentScheduler {
             uid: uid,
             orderId: orderId,
             amount: 9900,
-            goodsName: "스토어부스터 부스터 플랜 (자동결제)",
+            goodsName: "부스터플랜 (자동결제)",
             status: "FAILED",
             errorMessage: result.resultMsg || '결제 처리 중 오류가 발생했습니다.',
             isAutoPayment: true,
@@ -582,7 +582,7 @@ export class AutoPaymentScheduler {
             await sendPaymentFailureEmail(userEmail, {
               orderId: orderId,
               amount: 9900,
-              goodsName: "스토어부스터 부스터 플랜 (자동결제)",
+              goodsName: "부스터플랜 (자동결제)",
               failureDate: new Date(),
               errorMessage: result.resultMsg || '결제 처리 중 오류가 발생했습니다.'
             });
@@ -653,7 +653,12 @@ export class AutoPaymentScheduler {
   }
 
   // 구독 만료 처리
-  private async expireSubscription(db: admin.firestore.Firestore, uid: string, errorMessage: string) {
+  private async expireSubscription(
+    db: admin.firestore.Firestore,
+    uid: string,
+    errorMessage: string,
+    options?: { skipPaymentLog?: boolean }
+  ) {
     await db.collection('subscriptions').doc(uid).set({
       status: "EXPIRED",
       plan: 'basic',
@@ -663,27 +668,29 @@ export class AutoPaymentScheduler {
 
     console.log(`구독 만료 처리: ${uid}, 사유: ${errorMessage}`);
     
-    // 결제 실패 정보를 payments 컬렉션에 저장
-    try {
-      const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0'); // 6자리 랜덤 숫자
-      const orderId = `AUTO_${randomNum}_${uid}`;
-      const paymentFailureData = {
-        uid: uid,
-        orderId: orderId,
-        amount: 9900,
-        goodsName: "스토어부스터 부스터 플랜 (자동결제)",
-        status: "FAILED",
-        errorMessage: errorMessage,
-        isAutoPayment: true,
-        failureType: "SUBSCRIPTION_EXPIRED",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        failedAt: admin.firestore.FieldValue.serverTimestamp()
-      };
+    // 결제 실패 정보를 payments 컬렉션에 저장 (옵션에 따라 생략 가능)
+    if (!options?.skipPaymentLog) {
+      try {
+        const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0'); // 6자리 랜덤 숫자
+        const orderId = `AUTO_${randomNum}_${uid}`;
+        const paymentFailureData = {
+          uid: uid,
+          orderId: orderId,
+          amount: 9900,
+          goodsName: "부스터플랜 (자동결제)",
+          status: "FAILED",
+          errorMessage: errorMessage,
+          isAutoPayment: true,
+          failureType: "SUBSCRIPTION_EXPIRED",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          failedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
 
-      await db.collection('payments').doc(orderId).set(paymentFailureData);
-      console.log(`결제 실패 정보 저장 완료: ${orderId}`);
-    } catch (paymentError) {
-      console.error(`결제 실패 정보 저장 실패: ${uid}`, paymentError);
+        await db.collection('payments').doc(orderId).set(paymentFailureData);
+        console.log(`결제 실패 정보 저장 완료: ${orderId}`);
+      } catch (paymentError) {
+        console.error(`결제 실패 정보 저장 실패: ${uid}`, paymentError);
+      }
     }
     
     // 구독 만료 이메일 알림 전송
@@ -713,7 +720,7 @@ export class AutoPaymentScheduler {
       uid: uid,
       orderId: orderId,
       amount: 9900,
-      goodsName: "스토어부스터 부스터 플랜 (자동결제)",
+      goodsName: "부스터플랜 (자동결제)",
       status: "ERROR",
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
       isAutoPayment: true,

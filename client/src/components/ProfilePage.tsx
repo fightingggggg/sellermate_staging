@@ -1774,12 +1774,14 @@ export default function ProfilePage() {
                                            payment.status === 'SUCCESS' ? 'bg-blue-100 text-blue-800' :
                                            payment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                                            payment.status === 'CANCELLED' ? 'bg-red-100 text-red-800' :
+                                           payment.status === 'FAILED' ? 'bg-red-100 text-red-800' :
                                            'bg-gray-100 text-gray-800'
                                          }`}
                                        >
                                          {payment.status === 'SUCCESS' ? '결제' :
                                           payment.status === 'COMPLETED' ? '완료' :
                                           payment.status === 'CANCELLED' ? '취소' :
+                                          payment.status === 'FAILED' ? '실패' :
                                           payment.status}
                                        </Badge>
                                      </div>
