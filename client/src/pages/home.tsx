@@ -3,21 +3,22 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowRight, BarChart, Search, ShoppingBag, Lock, Wand2, FileText, CheckSquare, LineChart, Star, Download } from "lucide-react";
 import { motion } from "framer-motion";
-import { lazy, Suspense } from "react";
-const ExampleSection = lazy(() => import("../components/ExampleSection"));
+import ExampleSection from "../components/ExampleSection";
 import TextFeaturesSection from "../components/TextFeaturesSection";
 import CtaSection from "../components/CtaSection";
 import FooterSection from "../components/FooterSection";
 import FaqSection from "../components/FaqSection";
 import DashboardLayout from "@/components/DashboardLayout";
-const ReviewSection = lazy(() => import("../components/ReviewSection"));
+import ReviewSection from "../components/ReviewSection";
 
 import { trackEvent, trackTimeSpent } from "@/lib/analytics";
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import LoginPage from "@/components/LoginPage";
+// import LoginPage from "@/components/LoginPage";
+const LoginPage = lazy(() => import("@/components/LoginPage"));
+import { Link } from "wouter";
 
 export default function Home() {
   const { currentUser, loading } = useAuth();
@@ -119,9 +120,9 @@ export default function Home() {
                 {/* 모바일: 줄바꿈, PC: 한 줄 */}
                 <div className="mb-3 md:mb-4">
                                       <span className="block md:inline">완벽한 솔루션, </span>
-                    <span className="block md:inline">
-                      <img src="/logo.png" alt="스토어부스터" className="mobile-logo-home" style={{ height: '1.5em', margin: 0, display: 'inline-block', verticalAlign: 'top', marginTop: '-0.4em' }} width={240} height={48} decoding="async" />
-                    </span>
+                  <span className="block md:inline">
+                    <img src="/logo.png" alt="스토어부스터" className="mobile-logo-home inline-block align-top h-[1.5em] mt-2 md:mt-[-0.4em]" />
+                  </span>
                 </div>
               </h2>
               {/* <p className="text-xl mb-8 text-gray-600">
@@ -188,9 +189,7 @@ export default function Home() {
         viewport={{ once: true }}
         transition={{ duration: 0.5 }}
       >
-        <Suspense fallback={null}>
-          <ExampleSection />
-        </Suspense>
+        <ExampleSection />
       </motion.div>
 
 {/* Feature Section 1 */}
@@ -228,9 +227,9 @@ export default function Home() {
             상위노출이 유망한 키워드를 찾아보세요.
           </p>
           <div className="mt-6">
-            <a href="/keyword-competition-analysis" className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow text-sm md:text-base">
+            <Link href="/keyword-competition-analysis" className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow text-sm md:text-base">
               키워드 경쟁률 분석 바로가기 <ArrowRight className="inline-block ml-2 w-4 h-4" />
-            </a>
+            </Link>
           </div>
         </div>
       </motion.div>
@@ -243,17 +242,11 @@ export default function Home() {
         transition={{ duration: 0.6, delay: 0.4 }}
         viewport={{ once: true }}
       >
-        <picture>
-          <source srcSet="/image1.avif" type="image/avif" />
-          <source srcSet="/image1.webp" type="image/webp" />
-          <img
-            src="/image1.jpg"
-            alt="키워드 분석 화면"
-            className="w-full rounded-2xl shadow-2xl"
-            fetchPriority="high"
-            decoding="async"
-          />
-        </picture>
+        <img
+          src="/image1.jpg"
+          alt="키워드 분석 화면"
+          className="w-full rounded-2xl shadow-2xl"
+        />
       </motion.div>
     </div>
   </div>
@@ -299,9 +292,9 @@ export default function Home() {
             노출 순위를 높여보세요
           </p>
           <div className="mt-6">
-            <a href="/product-optimizer/quick" className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow text-sm md:text-base">
+            <Link href="/product-optimizer/quick" className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow text-sm md:text-base">
               빠른 상품명 최적화 바로가기 <ArrowRight className="inline-block ml-2 w-4 h-4" />
-            </a>
+            </Link>
           </div>
         </div>
       </motion.div>
@@ -314,17 +307,11 @@ export default function Home() {
         transition={{ duration: 0.6, delay: 0.4 }}
         viewport={{ once: true }}
       >
-        <picture>
-          <source srcSet="/image2.avif" type="image/avif" />
-          <source srcSet="/image2.webp" type="image/webp" />
-          <img
-            src="/image2.jpg"
-            alt="상품 등록 최적화 화면"
-            className="w-full rounded-2xl shadow-2xl"
-            loading="lazy"
-            decoding="async"
-          />
-        </picture>
+        <img
+          src="/image2.jpg"
+          alt="상품 등록 최적화 화면"
+          className="w-full rounded-2xl shadow-2xl"
+        />
       </motion.div>
     </div>
   </div>
@@ -370,9 +357,9 @@ export default function Home() {
           상위노출 가능성을 한층 높여보세요.
           </p>
           <div className="mt-6">
-            <a href="/product-optimizer/complete" className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow text-sm md:text-base">
+            <Link href="/product-optimizer/complete" className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow text-sm md:text-base">
               완벽한 상품명 최적화 바로가기 <ArrowRight className="inline-block ml-2 w-4 h-4" />
-            </a>
+            </Link>
           </div>
         </div>
       </motion.div>
@@ -385,17 +372,11 @@ export default function Home() {
         transition={{ duration: 0.6, delay: 0.4 }}
         viewport={{ once: true }}
       >
-        <picture>
-          <source srcSet="/image3.avif" type="image/avif" />
-          <source srcSet="/image3.webp" type="image/webp" />
-          <img
-            src="/image3.jpg"
-            alt="완벽한 상품 최적화 화면"
-            className="w-full rounded-2xl shadow-2xl"
-            loading="lazy"
-            decoding="async"
-          />
-        </picture>
+        <img
+          src="/image3.jpg"
+          alt="완벽한 상품 최적화 화면"
+          className="w-full rounded-2xl shadow-2xl"
+        />
       </motion.div>
     </div>
   </div>
@@ -410,9 +391,7 @@ export default function Home() {
         viewport={{ once: true }}
         transition={{ duration: 0.5 }}
       >
-        <Suspense fallback={null}>
-          <ReviewSection />
-        </Suspense>
+        <ReviewSection />
       </motion.div>
 
      
@@ -423,15 +402,11 @@ export default function Home() {
         viewport={{ once: true }}
         transition={{ duration: 0.5 }}
       >
-        <Suspense fallback={null}>
-          <FaqSection />
-        </Suspense>
+      <FaqSection />
       </motion.section>
       
       {/* <CtaSection /> */}
-      <Suspense fallback={null}>
-        <FooterSection />
-      </Suspense>
+      <FooterSection />
       
       {/* PC 전용 모달 */}
       <PcOnlyModal 
@@ -441,12 +416,14 @@ export default function Home() {
       {/* 로그인 모달 */}
       <Dialog open={showLoginModal} onOpenChange={setShowLoginModal}>
         <DialogContent className="max-w-md p-0 border-none bg-transparent shadow-none">
-          <LoginPage isModal={true} onLoginSuccess={() => {
-            setShowLoginModal(false);
-            if (isMobile) {
-              setShowPcOnlyModal(true);
-            }
-          }} />
+          <Suspense fallback={null}>
+            <LoginPage isModal={true} onLoginSuccess={() => {
+              setShowLoginModal(false);
+              if (isMobile) {
+                setShowPcOnlyModal(true);
+              }
+            }} />
+          </Suspense>
         </DialogContent>
       </Dialog>
       </div>

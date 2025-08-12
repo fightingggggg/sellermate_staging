@@ -1,3 +1,4 @@
+/* Add Pretendard font import */
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
 /* eslint-disable */
 /* stylelint-disable */
@@ -63,7 +64,7 @@
 
 /* 모바일에서 로고 위치 조정 */
 @media (max-width: 768px) {
-  .mobile-logo-home { margin-top: 0; }
-  .mobile-logo-membership-top { margin-top: -0.3em; }
-  .mobile-logo-membership-bottom { margin-top: -0.2em; }
+  /* 홈 로고: 페이지별 Tailwind 유틸로 제어 (mt-2 등) */
+  .mobile-logo-membership-top { margin-top: -0.3em !important; }
+  .mobile-logo-membership-bottom { margin-top: -0.2em !important; }
 }

@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { FeedbackDialog } from "./ui/feedback-dialog";
+// import { FeedbackDialog } from "./ui/feedback-dialog";
 import { Button } from "@/components/ui/button";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { LogOut, Menu, User } from "lucide-react";
-import { UsageDisplay } from "./UsageDisplay";
+// import { UsageDisplay } from "./UsageDisplay";
 import { trackEvent } from "@/lib/analytics";
 import {
   DropdownMenu,
@@ -15,7 +15,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Link } from "wouter";
+
+import { UsageDisplay } from "./UsageDisplay";
+import { FeedbackDialog } from "./ui/feedback-dialog";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;

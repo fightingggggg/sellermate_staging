@@ -63,6 +63,10 @@ service cloud.firestore {
       match /usage/{date} {
         allow read, write, create, update, delete: if request.auth != null;
       }
+      // 월별 사용량 서브컬렉션 권한 추가
+      match /usageMonthly/{month} {
+        allow read, write, create, update, delete: if request.auth != null;
+      }
     }
 
     // 기존 keyword_history 컬렉션도 로그인 사용자만

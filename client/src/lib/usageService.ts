@@ -9,7 +9,8 @@ import {
   collection,
   query,
   where,
-  getDocs
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { MEMBERSHIP_LIMITS } from '@/types';
@@ -45,6 +46,23 @@ export class UsageService {
       .replace(/-/g, '_dash_')
       .replace(/\+/g, '_plus_');
     return `users/${safeEmail}/usage`;
+  }
+
+  // 월별 사용량 경로 (예: users/{safeEmail}/usageMonthly/2025-08)
+  private static getMonthlyUsageCollectionPath(userEmail: string): string {
+    const safeEmail = userEmail
+      .replace(/\./g, '_dot_')
+      .replace(/@/g, '_at_')
+      .replace(/-/g, '_dash_')
+      .replace(/\+/g, '_plus_');
+    return `users/${safeEmail}/usageMonthly`;
+  }
+
+  private static getCurrentMonthString(): string {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`; // YYYY-MM
   }
 
   // 사용자의 멤버십 타입 확인
@@ -165,15 +183,25 @@ export class UsageService {
     try {
       const usagePath = this.getUsageCollectionPath(userEmail);
       const today = this.getTodayString();
-      const docRef = doc(db, usagePath, today);
-      
-      await setDoc(docRef, {
+      const dailyRef = doc(db, usagePath, today);
+
+      const monthlyPath = this.getMonthlyUsageCollectionPath(userEmail);
+      const monthKey = this.getCurrentMonthString();
+      const monthlyRef = doc(db, monthlyPath, monthKey);
+
+      const batch = writeBatch(db);
+      batch.set(dailyRef, {
         keywordAnalysis: increment(1),
         lastUpdated: serverTimestamp()
       }, { merge: true });
-      
+      batch.set(monthlyRef, {
+        keywordAnalysis: increment(1),
+        lastUpdated: serverTimestamp()
+      }, { merge: true });
+
+      await batch.commit();
+
       console.log(`[Usage] Keyword analysis count incremented for ${userEmail}`);
-      
       // 전역 이벤트 발생으로 사용량 표시 업데이트
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('usage-updated'));
@@ -189,15 +217,25 @@ export class UsageService {
     try {
       const usagePath = this.getUsageCollectionPath(userEmail);
       const today = this.getTodayString();
-      const docRef = doc(db, usagePath, today);
-      
-      await setDoc(docRef, {
+      const dailyRef = doc(db, usagePath, today);
+
+      const monthlyPath = this.getMonthlyUsageCollectionPath(userEmail);
+      const monthKey = this.getCurrentMonthString();
+      const monthlyRef = doc(db, monthlyPath, monthKey);
+
+      const batch = writeBatch(db);
+      batch.set(dailyRef, {
         productOptimization: increment(1),
         lastUpdated: serverTimestamp()
       }, { merge: true });
-      
+      batch.set(monthlyRef, {
+        productOptimization: increment(1),
+        lastUpdated: serverTimestamp()
+      }, { merge: true });
+
+      await batch.commit();
+
       console.log(`[Usage] Product optimization count incremented for ${userEmail}`);
-      
       // 전역 이벤트 발생으로 사용량 표시 업데이트
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('usage-updated'));

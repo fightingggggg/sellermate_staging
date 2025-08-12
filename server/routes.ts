@@ -356,19 +356,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       ## 상품명 생성 규칙 (매우 중요)
         - **입력값에 제공된 단어만 사용할 것 (새로운 단어 생성 금지)**
-        - **${query}는 모두 원본 형태 그대로 반드시 개별 단독 사용 필수**
-        - 필수 키워드가 2개 이상인 경우 단어 연속 배치 금지
+        - **필수 키워드 각각 단어 모두 원본 형태 그대로 사용 (단어 절대 변경 금지)**
+        - 필수 키워드는 비연속 배치
         - 정확히 ${keywordCount}개의 단어만 사용 
         - **입력값의 단어, 띄어쓰기 등 원본 그대로 사용(어떠한 형태도 변경 금지)**
-        - 동일 단어 반복 금지 (단,필수 키워드와 동일 상위 키워드는 떨어져서 반복 가능)
+        - 동일 단어 반복 금지 (단,필수 키워드와 동일 상위 키워드는 반복 가능)
         - 상위 키워드 배열 순서가 중요도 순서
+        - 지역은 하나만 사용
 
       ## 상품명 구성 순서
         * 해당 항목이 없는 경우 생략하고 상위 키워드 순서대로 배치 
         1.브랜드/제조사
         2.시리즈
-        3.모델명
-        4.필수 키워드
+        3.필수 키워드
+        4.모델명
         4.다양한 상품 유형
         5.색상
         6.소재 
@@ -384,7 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const request = {
         model: 'claude-3-5-haiku-20241022',
         temperature: 0.2,
-        top_p: 0.2,
+        top_p: 0.1,
         max_tokens: 500,
         system: '너는 규칙을 준수하는 네이버 스마트스토어 SEO 전문가.',
         messages: [
@@ -2819,20 +2820,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 3. 사용량 확인 (키워드 분석 + 상품 최적화)
-      const usageDoc = await db.collection("usage").doc(uid).get();
-      let totalUsage = 0;
-      
-      if (usageDoc.exists) {
-        const usageData = usageDoc.data();
-        const keywordUsage = usageData?.keywordAnalysis?.current || 0;
-        const productUsage = usageData?.productOptimization?.current || 0;
-        totalUsage = keywordUsage + productUsage;
+      // 최근 결제일 이후 ~ 오늘까지의 일별 사용량 합산 (이메일 경로 + UID 경로 모두 확인)
+      const toDateKey = (d: Date) => d.toISOString().split('T')[0]; // YYYY-MM-DD (UTC)
+      const startKey = toDateKey(latestPaymentDate);
+      const endKey = toDateKey(now);
+
+      // usersInfo에서 이메일 조회 후 safeEmail 생성
+      let safeEmail: string | null = null;
+      try {
+        const userInfoDoc = await db.collection('usersInfo').doc(uid).get();
+        const email = userInfoDoc.exists ? (userInfoDoc.data()?.email || null) : null;
+        if (email) {
+          safeEmail = email
+            .replace(/\./g, '_dot_')
+            .replace(/@/g, '_at_')
+            .replace(/-/g, '_dash_')
+            .replace(/\+/g, '_plus_');
+        }
+      } catch (e) {
+        console.warn('[Refund] usersInfo 조회 실패, email 경로 스킵:', e);
       }
+
+      const uidSanitized = uid.replace(/[^a-zA-Z0-9]/g, '_');
+      const fieldPath = admin.firestore.FieldPath.documentId();
+
+      async function sumUsageForPath(userDocId: string): Promise<{ keyword: number; product: number }> {
+        const colRef = db.collection('users').doc(userDocId).collection('usage');
+        const snap = await colRef
+          .orderBy(fieldPath)
+          .startAt(startKey)
+          .endAt(endKey)
+          .get();
+        let keywordSum = 0;
+        let productSum = 0;
+        snap.forEach(docSnap => {
+          const data = docSnap.data() || {};
+          const keyword = Number(data.keywordAnalysis || 0);
+          const product = Number(data.productOptimization || 0);
+          keywordSum += isNaN(keyword) ? 0 : keyword;
+          productSum += isNaN(product) ? 0 : product;
+        });
+        return { keyword: keywordSum, product: productSum };
+      }
+
+      let keywordUsageSum = 0;
+      let productUsageSum = 0;
+      if (safeEmail) {
+        const sums = await sumUsageForPath(safeEmail);
+        keywordUsageSum += sums.keyword;
+        productUsageSum += sums.product;
+      }
+      // uid 기반 경로도 합산 (중복이 있어도 >0인지 여부만 판단)
+      const sumsByUid = await sumUsageForPath(uidSanitized);
+      keywordUsageSum += sumsByUid.keyword;
+      productUsageSum += sumsByUid.product;
+      const totalUsage = keywordUsageSum + productUsageSum;
 
       if (totalUsage > 0) {
         return res.status(400).json({ 
-          error: "Usage exists", 
-          message: "사용량이 있어서 취소할 수 없습니다." 
+          error: 'Usage exists', 
+          message: '키워드 경쟁률 분석 및 상품명 최적화 서비스를 이미 사용하셨습니다.' 
         });
       }
 
@@ -2959,8 +3006,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cancelConditions: {
           daysSincePayment: daysSincePayment,
           totalUsage: totalUsage,
-          keywordUsage: usageDoc.exists ? (usageDoc.data()?.keywordAnalysis?.current || 0) : 0,
-          productUsage: usageDoc.exists ? (usageDoc.data()?.productOptimization?.current || 0) : 0,
+          keywordUsage: keywordUsageSum,
+          productUsage: productUsageSum,
           originalSubscriptionStatus: originalStatus // 원래 구독 상태 추가
         }
       };
