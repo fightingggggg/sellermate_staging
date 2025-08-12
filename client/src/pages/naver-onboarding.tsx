@@ -316,8 +316,17 @@ export default function NaverOnboarding() {
           throw new Error("인증 세션이 만료되었습니다. 인증번호를 다시 요청해주세요.");
         }
         const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
-        await linkWithCredential(auth.currentUser, credential);
-        console.log("[ONBOARDING] 소셜 계정에 전화번호 연결 완료");
+        try {
+          await linkWithCredential(auth.currentUser, credential);
+          console.log("[ONBOARDING] 소셜 계정에 전화번호 연결 완료");
+        } catch (linkErr: any) {
+          if (linkErr?.code === "auth/provider-already-linked") {
+            console.warn("[ONBOARDING] 전화번호 제공자(provider)가 이미 연결되어 있음. 성공으로 간주하고 진행", linkErr);
+            // 이미 연결된 상태이므로 그대로 진행
+          } else {
+            throw linkErr;
+          }
+        }
       } else {
         // 이메일 회원가입인 경우: 기존 방식 유지
         const confirmationResult = (window as any).confirmationResult;
@@ -337,6 +346,13 @@ export default function NaverOnboarding() {
     } catch (err: any) {
       console.error("[ONBOARDING] 휴대폰 인증 실패", err);
       let msg: string;
+      if (err?.code === "auth/provider-already-linked") {
+        // 이미 연결된 상태이므로 성공으로 간주
+        setPhoneDone(true);
+        setStep("done");
+        toast({ title: "이미 인증됨", description: "해당 계정에는 이미 전화번호가 연결되어 있어요." });
+        return;
+      }
       if (err?.code === "auth/invalid-verification-code" || err?.message?.includes("invalid-verification-code")) {
         msg = "인증번호가 올바르지 않아요. 다시 입력해주세요.";
       } else if (err?.code === "auth/invalid-verification-id") {
