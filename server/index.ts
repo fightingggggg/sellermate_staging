@@ -27,7 +27,12 @@ const cspDirectives: Record<string, string[]> = {
     "https://www.google-analytics.com",
     "https://www.googleadservices.com",
     "https://pagead2.googlesyndication.com",
-    "https://googleads.g.doubleclick.net"
+    "https://googleads.g.doubleclick.net",
+    // reCAPTCHA 로더 및 자원 허용
+    "https://www.google.com",
+    "https://www.gstatic.com",
+    "https://www.recaptcha.net",
+    "https://recaptcha.google.com"
   ],
   styleSrc: [
     "'self'",
@@ -52,11 +57,21 @@ const cspDirectives: Record<string, string[]> = {
     "https://region1.google-analytics.com",
     "https://stats.g.doubleclick.net",
     "https://www.googleadservices.com",
-    "https://pagead2.googlesyndication.com"
+    "https://pagead2.googlesyndication.com",
+    // reCAPTCHA 통신 허용
+    "https://www.google.com",
+    "https://www.gstatic.com",
+    "https://www.recaptcha.net",
+    "https://recaptcha.google.com"
   ],
   frameSrc: [
     "'self'",
-    "https://www.googletagmanager.com"
+    "https://www.googletagmanager.com",
+    // reCAPTCHA iframe 허용
+    "https://www.google.com",
+    "https://www.gstatic.com",
+    "https://www.recaptcha.net",
+    "https://recaptcha.google.com"
   ]
 };
 if (isDev) {
