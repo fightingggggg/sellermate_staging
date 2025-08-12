@@ -90,7 +90,7 @@ export class AutoPaymentScheduler {
 
     // 매일 오전 7시(한국시간)에 모든 만료된 구독을 배치로 처리
     // 타임존을 Asia/Seoul로 고정해 서버 로컬 타임존과 무관하게 동일 동작
-    cron.schedule('35 13 * * *', async () => {
+    cron.schedule('47 13 * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -105,7 +105,7 @@ export class AutoPaymentScheduler {
     }, { timezone: 'Asia/Seoul' });
 
     // 추가 스케줄러: 오전 9시에 재시도 (실패한 구독 처리)
-    cron.schedule('38 13 * * *', async () => {
+    cron.schedule('51 13 * * *', async () => {
       console.log('=== 자동 결제 재시도 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -507,6 +507,25 @@ export class AutoPaymentScheduler {
       
       if (response.ok && result.resultCode === '0000') {
         console.log(`결제 성공: ${orderId}`);
+        
+        // 결제 성공 정보를 payments 컬렉션에 저장 (자동결제)
+        try {
+          const db = admin.firestore();
+          await db.collection('payments').doc(orderId).set({
+            uid: uid,
+            orderId: orderId,
+            amount: 9900,
+            goodsName: "스토어부스터 부스터 플랜 (자동결제)",
+            status: "SUCCESS",
+            tid: result.tid,
+            isAutoPayment: true,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            completedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+          console.log(`결제 성공 정보 저장 완료: ${orderId}`);
+        } catch (paymentSaveError) {
+          console.error(`결제 성공 정보 저장 실패: ${uid}`, paymentSaveError);
+        }
         
         // 결제 성공 이메일 알림 전송
         try {
