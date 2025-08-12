@@ -44,7 +44,7 @@ export class AutoPaymentScheduler {
   private isRunning = false;
   private processingQueue = new Set<string>(); // 중복 처리 방지
   private retryCount = new Map<string, number>(); // 재시도 횟수 관리
-  private readonly MAX_RETRIES = 1;
+  private readonly MAX_RETRIES = 2;
   private readonly BATCH_SIZE = 100; // 배치 처리 크기 증가 (더 효율적)
   private readonly PAYMENT_TIMEOUT = 30000; // 30초 타임아웃
   private readonly CONCURRENT_LIMIT = 10; // 동시 처리 제한 (API 호출 제한 고려)
@@ -90,7 +90,7 @@ export class AutoPaymentScheduler {
 
     // 매일 오전 7시(한국시간)에 모든 만료된 구독을 배치로 처리
     // 타임존을 Asia/Seoul로 고정해 서버 로컬 타임존과 무관하게 동일 동작
-    cron.schedule('11 14 * * *', async () => {
+    cron.schedule('18 14 * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -105,7 +105,7 @@ export class AutoPaymentScheduler {
     }, { timezone: 'Asia/Seoul' });
 
     // 추가 스케줄러: 오전 9시에 재시도 (실패한 구독 처리)
-    cron.schedule('13 14 * * *', async () => {
+    cron.schedule('20 14 * * *', async () => {
       console.log('=== 자동 결제 재시도 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -301,11 +301,34 @@ export class AutoPaymentScheduler {
         // 실패 시 재시도 카운트 증가
         this.retryCount.set(uid, currentRetries + 1);
         console.log(`결제 실패 (${currentRetries + 1}/${this.MAX_RETRIES}): ${uid}`);
+
+        // 재시도 한도에 도달하면 만료 처리
+        if (currentRetries + 1 >= this.MAX_RETRIES) {
+          try {
+            const db = admin.firestore();
+            await this.expireSubscription(db, uid, result.errorMessage || 'Payment failed', { skipPaymentLog: true });
+            // 만료되었으므로 재시도 큐에서 제거
+            this.retryCount.delete(uid);
+          } catch (expireErr) {
+            console.error(`만료 처리 실패: ${uid}`, expireErr);
+          }
+        }
       }
     } catch (error) {
       // 오류 시 재시도 카운트 증가
       this.retryCount.set(uid, currentRetries + 1);
       console.error(`결제 처리 오류 (${currentRetries + 1}/${this.MAX_RETRIES}): ${uid}`, error);
+
+      // 재시도 한도에 도달하면 만료 처리
+      if (currentRetries + 1 >= this.MAX_RETRIES) {
+        try {
+          const db = admin.firestore();
+          await this.expireSubscription(db, uid, (error as any)?.message || 'Unknown error', { skipPaymentLog: true });
+          this.retryCount.delete(uid);
+        } catch (expireErr) {
+          console.error(`만료 처리 실패: ${uid}`, expireErr);
+        }
+      }
     } finally {
       // 처리 완료 표시 제거
       this.processingQueue.delete(uid);
@@ -421,10 +444,13 @@ export class AutoPaymentScheduler {
         // 구독 연장
         await this.extendSubscription(db, uid, paymentResult.orderId);
       } else {
-        // 구독 만료 처리 (이미 executePayment에서 실패 로그를 남겼으므로 중복 로그는 생략)
-        await this.expireSubscription(db, uid, paymentResult.errorMessage || 'Payment failed', { skipPaymentLog: true });
+        // 첫 실패 시에는 즉시 만료하지 않고, 재시도 스케줄에서 한도 초과 시 만료 처리
+        await db.collection('subscriptions').doc(uid).set({
+          lastPaymentAttempt: admin.firestore.FieldValue.serverTimestamp(),
+          paymentFailureReason: paymentResult.errorMessage || 'Payment failed'
+        }, { merge: true });
       }
-
+       
       return paymentResult;
     } catch (error) {
       console.error('구독 결제 처리 중 오류:', error);
