@@ -90,7 +90,7 @@ export class AutoPaymentScheduler {
 
     // 매일 오전 7시(한국시간)에 모든 만료된 구독을 배치로 처리
     // 타임존을 Asia/Seoul로 고정해 서버 로컬 타임존과 무관하게 동일 동작
-    cron.schedule('20 13 * * *', async () => {
+    cron.schedule('35 13 * * *', async () => {
       console.log('=== 자동 결제 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -105,7 +105,7 @@ export class AutoPaymentScheduler {
     }, { timezone: 'Asia/Seoul' });
 
     // 추가 스케줄러: 오전 9시에 재시도 (실패한 구독 처리)
-    cron.schedule('23 13 * * *', async () => {
+    cron.schedule('38 13 * * *', async () => {
       console.log('=== 자동 결제 재시도 스케줄러 실행 시작 ===');
       console.log('실행 시간:', new Date().toISOString());
       
@@ -159,9 +159,10 @@ export class AutoPaymentScheduler {
       while (hasMore) {
         // 만료된 구독 찾기 (배치 크기 제한) - ACTIVE 상태만 처리 (CANCELLED는 제외)
         const todayKstStartUtc = this.getKstStartOfTodayUtc();
+        const nextDayKstStartUtc = new Date(todayKstStartUtc.getTime() + 24 * 60 * 60 * 1000);
         const subscriptionsQuery = await db.collection('subscriptions')
           .where('status', '==', 'ACTIVE')
-          .where('endDate', '<=', todayKstStartUtc)
+          .where('endDate', '<', nextDayKstStartUtc)
           .limit(this.BATCH_SIZE)
           .get();
 
