@@ -19,7 +19,7 @@ import { auth } from "@/lib/firebase";
 export default function SubscriptionPage() {
   const { currentUser } = useAuth();
   const [, navigate] = useLocation();
-  const { loading, error, getBillingKeyStatus, requestPayment, testBillingPayment, getSubscriptionInfo, runAutoPayment } = useNicePay();
+  const { loading, error, getBillingKeyStatus, requestPayment } = useNicePay();
   const { toast } = useToast();
   
   const [billingKeyStatus, setBillingKeyStatus] = useState<any>(null);
@@ -195,29 +195,25 @@ export default function SubscriptionPage() {
     // 에러 초기화
     setAgeError(null);
     
-    // 이메일 로그인 사용자 체크
-    if (userProvider === 'email') {
+    // 이메일/기타 로그인 사용자는 소셜 전환 유도 (네이버/카카오만 나이 확인 진행)
+    if (userProvider !== 'naver' && userProvider !== 'kakao') {
       setShowLoginModal(true);
       return;
     }
     
-    // 나이 확인 중이면 대기
+    // 나이 확인 중이면 대기 (소셜 사용자 대상)
     if (ageLoading) {
       setAgeError('나이 확인 중입니다. 잠시 후 다시 시도해주세요.');
       return;
     }
     
-    // 나이 확인
+    // 나이 확인 (만 14세 미만 차단)
     if (userAge !== null && userAge < 14) {
       setAgeError('만 14세 미만은 결제가 불가능합니다.');
       return;
     }
     
-    // 나이 정보가 없는 경우
-    if (userAge === null && !ageLoading) {
-      setShowLoginModal(true);
-      return;
-    }
+    // 소셜 사용자에서 생년월일 정보가 없는 경우 결제 허용 (추가 차단 없음)
     
     // 구독 상태 확인
     if (subscriptionStatus === 'active') {
@@ -287,29 +283,25 @@ export default function SubscriptionPage() {
       return;
     }
     
-    // 이메일 로그인 사용자 체크
-    if (userProvider === 'email') {
+    // 이메일/기타 로그인 사용자는 소셜 전환 유도 (네이버/카카오만 나이 확인 진행)
+    if (userProvider !== 'naver' && userProvider !== 'kakao') {
       setShowLoginModal(true);
       return;
     }
     
-    // 나이 확인 중이면 대기
+    // 나이 확인 중이면 대기 (소셜 사용자 대상)
     if (ageLoading) {
       setAgeError('나이 확인 중입니다. 잠시 후 다시 시도해주세요.');
       return;
     }
     
-    // 나이 확인
+    // 나이 확인 (만 14세 미만 차단)
     if (userAge !== null && userAge < 14) {
       setAgeError('만 14세 미만은 결제가 불가능합니다.');
       return;
     }
     
-    // 나이 정보가 없는 경우
-    if (userAge === null && !ageLoading) {
-      setShowLoginModal(true);
-      return;
-    }
+    // 소셜 사용자에서 생년월일 정보가 없는 경우 결제 허용 (추가 차단 없음)
 
     // 일반 카드 선택 시 등록된 카드가 없으면 모달 표시
     if (selectedPaymentMethod === 'card' && !billingKeyStatus?.hasBillingKey) {
@@ -514,16 +506,16 @@ export default function SubscriptionPage() {
                   disabled={
                     loading || 
                     paymentStatus === 'processing' || 
-                    ageLoading || 
+                    ((userProvider === 'naver' || userProvider === 'kakao') && ageLoading) || 
                     subscriptionLoading ||
-                    (userAge !== null && userAge < 14) ||
+                    ((userProvider === 'naver' || userProvider === 'kakao') && (userAge !== null && userAge < 14)) ||
                     subscriptionStatus === 'active' ||
                     subscriptionStatus === 'cancelled'
                   }
                 >
-                  {ageLoading || subscriptionLoading ? (
+                  {(((userProvider === 'naver' || userProvider === 'kakao') && ageLoading) || subscriptionLoading) ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : userAge !== null && userAge < 14 ? '만 14세 미만은 결제 불가' :
+                  ) : ((userProvider === 'naver' || userProvider === 'kakao') && userAge !== null && userAge < 14) ? '만 14세 미만은 결제 불가' :
                      subscriptionStatus === 'active' ? '이미 구독 중입니다' :
                      subscriptionStatus === 'cancelled' ? '구독 만료일까지 이용 가능' :
                      paymentStatus === 'processing' ? '처리중...' : 
