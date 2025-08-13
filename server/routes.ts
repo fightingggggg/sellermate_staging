@@ -2157,38 +2157,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("=== 나이스페이먼츠 웹훅 수신 시작 ===");
       
-      // IP 화이트리스트 검증 강화 (나이스페이에서만 허용)
-      const clientIP = req.ip || (req.connection as any).remoteAddress;
-      const xForwardedFor = req.headers['x-forwarded-for'] as string;
-      const realIP = req.headers['x-real-ip'] as string;
-      
-      // 실제 클라이언트 IP 결정 (프록시 환경 고려)
-      let actualIP = clientIP || '';
-      if (xForwardedFor) {
-        // X-Forwarded-For는 쉼표로 구분된 IP 목록 (첫 번째가 실제 클라이언트)
-        actualIP = xForwardedFor.split(',')[0].trim();
-      } else if (realIP) {
-        actualIP = realIP;
-      }
-      
-             const allowedIPs = [
-         // 운영 시 최신 나이스페이 IP로 유지/확장 필요. CIDR 허용 불가 시 목록으로 관리.
-         '203.238.37.15',
-         '203.238.37.16',
-         '203.238.37.25',
-         '127.0.0.1',
-         '::1'
-       ];
-      
-      console.log("웹훅 요청 IP 정보:", { 
-        clientIP, 
-        xForwardedFor, 
-        realIP, 
-        actualIP 
+      // IP 화이트리스트 검증 (Express trust proxy 기반 주소만 신뢰)
+      // req.ip: trust proxy=1 기준으로 가장 가까운 클라이언트 IP
+      // req.ips: X-Forwarded-For 파싱 결과 배열(Express가 처리한 값), 첫 요소가 실제 클라이언트
+      const candidateIps: string[] = Array.isArray((req as any).ips) && (req as any).ips.length > 0
+        ? (req as any).ips
+        : [req.ip].filter(Boolean);
+
+      const requestIp = (candidateIps[0] || req.ip || '') as string; // 최우선 후보
+
+      // 환경변수에서 허용 IP 확장 (콤마 구분). 공백 제거
+      const envAllowed = (process.env.NICEPAY_ALLOWED_IPS || "")
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const allowedIPs = [
+        // 운영 시 최신 나이스페이 IP로 유지/확장 필요. CIDR 허용 불가 시 목록으로 관리.
+        '203.238.37.15',
+        '203.238.37.16',
+        '203.238.37.25',
+        '127.0.0.1',
+        '::1',
+        ...envAllowed,
+      ];
+
+      console.log("웹훅 요청 IP 정보:", {
+        requestIp,
+        candidateIps,
       });
-      
-      if (!allowedIPs.includes(actualIP)) {
-        console.error("허용되지 않은 IP에서 웹훅 요청:", actualIP);
+
+      if (!allowedIPs.includes(requestIp)) {
+        console.error("허용되지 않은 IP에서 웹훅 요청:", requestIp);
         // 나이스페이 요구사항: HTTP 200 + "OK" 응답
         res.setHeader('Content-Type', 'text/html;charset=utf-8');
         return res.status(200).send("OK");
