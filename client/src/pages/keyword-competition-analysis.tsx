@@ -903,8 +903,8 @@ export default function KeywordCompetitionAnalysisPage() {
       e.preventDefault();
 
       // GA4 – 판단 섹션 최적화 버튼 클릭 추적
-      const menuName = path.includes('complete') ? '완벽한_상품명_최적화' : '빠른_상품명_최적화';
-      trackEvent('Navigation', menuName, null, {
+      const eventName = path.includes('complete') ? 'menu_product_optimizer_complete' : 'menu_product_optimizer_quick';
+      trackEvent('CardMenu', eventName, null, {
         from_page: '키워드_경쟁률_분석',
         section: '판단_섹션',
         keyword: keyword.trim(),
@@ -923,8 +923,8 @@ export default function KeywordCompetitionAnalysisPage() {
   const handleTopMenuNavigate = (e: React.MouseEvent, path: string) => {
     e.preventDefault();
     // GA – 메뉴 카드 클릭 추적
-    const menuName = path.includes('complete') ? '완벽한_상품명_최적화' : '빠른_상품명_최적화';
-    trackEvent('Navigation', menuName, null, {
+    const eventName = path.includes('complete') ? 'menu_product_optimizer_complete' : 'menu_product_optimizer_quick';
+    trackEvent('CardMenu', eventName, null, {
       from_page: '키워드_경쟁률_분석',
     });
     // 기본 화면이 뜨도록 모든 관련 데이터 제거
@@ -939,7 +939,6 @@ export default function KeywordCompetitionAnalysisPage() {
       resetToInitial();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // SPA 네비게이션으로 이동
       navigate(path);
     }
   };

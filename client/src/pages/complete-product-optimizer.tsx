@@ -65,9 +65,9 @@ export default function CompleteProductOptimizerPage() {
     e.preventDefault();
     
     // GA4 – 완벽한 상품명 최적화 페이지에서 메뉴 버튼 클릭 추적
-    const menuName = path.includes('keyword-competition-analysis') ? '키워드_경쟁률_분석' : 
-                    path.includes('quick') ? '빠른_상품명_최적화' : '완벽한_상품명_최적화';
-    trackEvent('Navigation', menuName, null, {
+    const eventName = path.includes('keyword-competition-analysis') ? 'menu_keyword_analysis' : 
+                      path.includes('quick') ? 'menu_product_optimizer_quick' : 'menu_product_optimizer_complete';
+    trackEvent('CardMenu', eventName, null, {
       from_page: '완벽한_상품명_최적화',
     });
     
@@ -90,8 +90,8 @@ export default function CompleteProductOptimizerPage() {
     e.preventDefault();
     
     // GA4 – 완벽한 상품명 최적화에서 다른 최적화로 이동 시 추적
-    const menuName = path.includes('quick') ? '빠른_상품명_최적화' : '키워드_경쟁률_분석';
-    trackEvent('Navigation', menuName, null, {
+    const eventName = path.includes('quick') ? 'menu_product_optimizer_quick' : 'menu_keyword_analysis';
+    trackEvent('CardMenu', eventName, null, {
       from_page: '완벽한_상품명_최적화',
     });
     
@@ -138,7 +138,7 @@ export default function CompleteProductOptimizerPage() {
               </CardHeader>
               <CardContent className="pt-0 pb-2">
                 <CardDescription className="text-xs text-gray-600">
-                월간 검색량과 1페이지 묶음상품, 리뷰 수, 순위로 노출 경쟁률 확인
+                  월간 검색량과 1페이지 묶음상품, 리뷰 수, 순위로 노출 경쟁률 확인
                 </CardDescription>
               </CardContent>
             </Card>
@@ -152,7 +152,7 @@ export default function CompleteProductOptimizerPage() {
               </CardHeader>
               <CardContent className="pt-0 pb-2">
                 <CardDescription className="text-xs text-gray-600">
-                실제 상위 키워드, 검색 로직, 네이버 SEO를 고려한 상품명
+                  실제 상위 키워드, 검색 로직, 네이버 SEO를 고려한 상품명
                 </CardDescription>
               </CardContent>
             </Card>
@@ -166,7 +166,7 @@ export default function CompleteProductOptimizerPage() {
               </CardHeader>
               <CardContent className="pt-0 pb-2">
                 <CardDescription className="text-xs text-gray-600">
-                실제 상위 키워드, 네이버 SEO를 고려한 상품명
+                  실제 상위 키워드, 네이버 SEO를 고려한 상품명
                 </CardDescription>
               </CardContent>
             </Card>

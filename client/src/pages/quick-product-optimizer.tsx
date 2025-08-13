@@ -20,9 +20,9 @@ export default function QuickProductOptimizerPage() {
     e.preventDefault();
     
     // GA4 – 빠른 상품명 최적화 페이지에서 메뉴 버튼 클릭 추적
-    const menuName = path.includes('keyword-competition-analysis') ? '키워드_경쟁률_분석' : 
-                    path.includes('complete') ? '완벽한_상품명_최적화' : '빠른_상품명_최적화';
-    trackEvent('Navigation', menuName, null, {
+    const eventName = path.includes('keyword-competition-analysis') ? 'menu_keyword_analysis' : 
+                      path.includes('complete') ? 'menu_product_optimizer_complete' : 'menu_product_optimizer_quick';
+    trackEvent('CardMenu', eventName, null, {
       from_page: '빠른_상품명_최적화',
     });
     
@@ -45,14 +45,13 @@ export default function QuickProductOptimizerPage() {
 
   return (
     <DashboardLayout>
- <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8 space-y-6">
         {/* 경험 헤더 */}
         <h2 className="text-center text-base text-gray-700 mb-3 font-semibold mt-6">
           실제 이용자 중 <span className="font-bold text-blue-600">55%가</span> <span className="font-bold text-blue-600">상품명만 바꿔서</span>
           <br className="block sm:hidden" />
           <span className="font-bold text-blue-600"> 순위 상승을 경험</span>했어요!
         </h2>
-
 
         {/* 상단 메뉴 카드 */}
         <div className="grid md:grid-cols-3 gap-4 mb-6 max-w-2xl mx-auto">
@@ -64,7 +63,7 @@ export default function QuickProductOptimizerPage() {
               </CardHeader>
               <CardContent className="pt-0 pb-2">
                 <CardDescription className="text-xs text-gray-600">
-                월간 검색량과 1페이지 묶음상품, 리뷰 수, 순위로 노출 경쟁률 확인
+                  월간 검색량과 1페이지 묶음상품, 리뷰 수, 순위로 노출 경쟁률 확인
                 </CardDescription>
               </CardContent>
             </Card>
