@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { MEMBERSHIP_LIMITS } from '@/types';
+import { getKSTDateKeyWith7AMCutoff, getKSTMonthKeyWith7AMCutoff } from '@/lib/utils';
 
 // CustomEvent 타입 확장
 declare global {
@@ -59,10 +60,7 @@ export class UsageService {
   }
 
   private static getCurrentMonthString(): string {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    return `${y}-${m}`; // YYYY-MM
+    return getKSTMonthKeyWith7AMCutoff();
   }
 
   // 사용자의 멤버십 타입 확인
@@ -108,7 +106,7 @@ export class UsageService {
   }
 
   private static getTodayString(): string {
-    return new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    return getKSTDateKeyWith7AMCutoff();
   }
 
   // 사용자의 일일 사용량 가져오기

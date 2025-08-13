@@ -70,3 +70,35 @@ export function formatCardNumberWithPrefix(cardNoPrefix: string, cardNo?: string
   
   return '****-****-****-****';
 }
+
+// 한국 시간(KST, UTC+9) 기준으로 07:00 이전은 전날로 간주하는 날짜 키를 생성합니다.
+export function getKSTDateKeyWith7AMCutoff(): string {
+  const nowUtcMs = Date.now();
+  const kstMs = nowUtcMs + 9 * 60 * 60 * 1000; // UTC -> KST
+  const kst = new Date(kstMs);
+
+  // 07:00 이전이면 전날로 이동
+  if (kst.getHours() < 7) {
+    kst.setDate(kst.getDate() - 1);
+  }
+
+  const y = kst.getFullYear();
+  const m = String(kst.getMonth() + 1).padStart(2, '0');
+  const d = String(kst.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// 위와 동일 기준의 월 키(YYYY-MM)를 생성합니다. (1일 07:00 이전은 전월로 간주)
+export function getKSTMonthKeyWith7AMCutoff(): string {
+  const nowUtcMs = Date.now();
+  const kstMs = nowUtcMs + 9 * 60 * 60 * 1000; // UTC -> KST
+  const kst = new Date(kstMs);
+
+  if (kst.getHours() < 7) {
+    kst.setDate(kst.getDate() - 1);
+  }
+
+  const y = kst.getFullYear();
+  const m = String(kst.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}

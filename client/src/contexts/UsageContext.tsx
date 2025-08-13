@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { doc, onSnapshot, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { MEMBERSHIP_LIMITS } from '@/types';
+import { getKSTDateKeyWith7AMCutoff } from '@/lib/utils';
 
 interface UsageStat {
   current: number;
@@ -43,8 +44,8 @@ export function UsageProvider({ children }: { children: ReactNode }) {
       .replace(/-/g, '_dash_')
       .replace(/\+/g, '_plus_');
 
-    const today = new Date().toISOString().split('T')[0];
-    const docRef = doc(db, `users/${safeEmail}/usage`, today);
+    const todayKey = getKSTDateKeyWith7AMCutoff();
+    const docRef = doc(db, `users/${safeEmail}/usage`, todayKey);
 
     const unsubscribe = onSnapshot(docRef, async (snap) => {
       const data = snap.exists() ? snap.data() as any : {};

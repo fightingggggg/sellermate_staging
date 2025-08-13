@@ -508,7 +508,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('=== [keyword-competition] API 호출 시작 ===');
     console.log('raw query:', req.url);
     console.log('parsed keyword:', req.query);
-    console.log('headers:', req.headers);
+    {
+      const { authorization, Authorization, cookie, Cookie, ...safeHeaders } = (req.headers as Record<string, any>);
+      console.log('headers:', safeHeaders);
+    }
     
     const keyword = (req.query.keyword as string || '').trim();
     console.log('trimmed keyword:', keyword);

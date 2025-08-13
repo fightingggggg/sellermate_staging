@@ -1226,8 +1226,6 @@ export default function ProfilePage() {
                                <Button 
                                  variant="outline" 
                                  size="sm"
-                                 disabled={true}
-                                 className="opacity-50 cursor-not-allowed"
                                  onClick={() => {
                                    setPaymentHistoryOpen(true);
                                    fetchPaymentHistory();
