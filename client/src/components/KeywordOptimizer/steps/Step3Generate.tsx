@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { UsageService } from "@/lib/usageService";
 import RobotVerificationDialog from "@/components/ui/robot-verification-dialog";
 import { Link } from "wouter";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CHROME_EXTENSION_ID } from "@/lib/constants";
+import { CHROME_EXTENSION_ID, CHROME_WEBSTORE_URL } from "@/lib/constants";
 
 // react-wordcloud (CSR only)
 const ReactWordcloud = dynamic(() => import("react-wordcloud"), { ssr: false });
@@ -3031,7 +3031,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
               <Button
                 onClick={() => {
                   trackEvent('Extension', 'install_click', 'Modal');
-                  window.open("https://chromewebstore.google.com/detail/%EC%8A%A4%EB%A7%88%ED%8A%B8%EC%8A%A4%ED%86%A0%EC%96%B4-%EC%83%81%EC%9C%84%EB%85%B8%EC%B6%9C-%EC%B5%9C%EC%A0%81%ED%99%94-%EB%8F%84%EA%B5%AC/plgdaggkagiakemkoclkpkbdiocllbbi?hl=ko", "_blank");
+                  window.open(CHROME_WEBSTORE_URL, "_blank");
                 }}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3"
               >

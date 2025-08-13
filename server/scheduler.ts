@@ -729,7 +729,7 @@ export class AutoPaymentScheduler {
         await sendSubscriptionExpiredEmail(userEmail, {
           plan: subscription.plan || 'BOOSTER',
           expiredDate: new Date(),
-          renewalUrl: `${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}/subscription`
+          renewalUrl: `${process.env.CLIENT_ORIGIN || 'https://storebooster.ai.kr'}/subscription`
         });
         console.log(`구독 만료 이메일 전송 완료: ${userEmail}`);
       }

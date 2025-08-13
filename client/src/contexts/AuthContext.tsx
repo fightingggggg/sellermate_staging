@@ -20,6 +20,7 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { User, UserProfile } from "@/types";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, onSnapshot, writeBatch } from "firebase/firestore";
+import { CHROME_EXTENSION_ID } from "@/lib/constants";
 
 interface AuthContextProps {
   currentUser: User | null;
@@ -73,8 +74,7 @@ export function useAuth() {
 const LOCAL_STORAGE_KEY = "lastUser";
 
 const EXTENSION_IDS = [
-  "eekjgnjcpmcfeikolboahljpboadaojm",
-  "plgdaggkagiakemkoclkpkbdiocllbbi",
+  CHROME_EXTENSION_ID,
 ];
 
 function sendMessageToAnyExtension(message: any): Promise<boolean> {

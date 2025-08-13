@@ -112,7 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     );
   }
   if (process.env.NODE_ENV === 'staging') {
-    corsAllowedOrigins.push('https://port-0-sellermate-staging-md04rxx4d82849cd.sel5.cloudtype.app');
+    corsAllowedOrigins.push('https://storebooster.ai.kr');
   }
   const corsOptions: cors.CorsOptions = {
     origin: corsAllowedOrigins,
@@ -2503,7 +2503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               plan: subscriptionData.plan || 'BOOSTER',
               cancelledDate: new Date(),
               endDate: subscriptionData.endDate?.toDate?.() || new Date(),
-              reactivationUrl: `${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}/subscription`
+              reactivationUrl: `${process.env.CLIENT_ORIGIN || 'https://storebooster.ai.kr'}/subscription`
             });
             console.log(`멤버십 해지 이메일 전송 완료: ${userEmail}`);
           }
@@ -3722,12 +3722,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authHeader = req.headers.authorization || '';
       const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
       if (!token) {
-        console.warn('[UsageDebug][Server] consume 요청: 토큰 없음');
+        // console.warn('[UsageDebug][Server] consume 요청: 토큰 없음');
         return res.status(401).json({ allowed: false, message: 'Missing Authorization Bearer token' });
       }
       const decoded = await admin.auth().verifyIdToken(token);
       const uid = decoded.uid;
       const db = admin.firestore();
+      // console.log('[UsageDebug][Server] consume 요청 수신 ←', { uid, now: new Date().toISOString() });
       console.log('[UsageDebug][Server] consume 요청 수신 ←', { uid, now: new Date().toISOString() });
 
       // 멤버십 타입 확인 (기존 로직 재사용)
@@ -3790,13 +3791,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authHeader = req.headers.authorization || '';
       const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
       if (!token) {
-        console.warn('[UsageDebug][Server] status 요청: 토큰 없음');
+        // console.warn('[UsageDebug][Server] status 요청: 토큰 없음');
         return res.status(401).json({ message: 'Missing Authorization Bearer token' });
       }
       const decoded = await admin.auth().verifyIdToken(token);
       const uid = decoded.uid;
       const db = admin.firestore();
-      console.log('[UsageDebug][Server] status 요청 수신 ←', { uid, origin: req.headers.origin, ua: req.headers['user-agent'] });
+      // console.log('[UsageDebug][Server] status 요청 수신 ←', { uid, origin: req.headers.origin, ua: req.headers['user-agent'] });
+      // console.log('[UsageDebug][Server] status 요청 수신 ←', { uid, origin: req.headers.origin, ua: req.headers['user-agent'] });
 
       // 멤버십 타입 확인
       let membershipType = 'basic';
@@ -3811,7 +3813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      console.log('[UsageDebug][Server] status 멤버십 판정 →', { uid, membershipType });
+      // console.log('[UsageDebug][Server] status 멤버십 판정 →', { uid, membershipType });
 
       const limit = membershipType === 'basic' ? 20 : Number.MAX_SAFE_INTEGER;
       const now = new Date();
@@ -3820,7 +3822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ref = db.collection('extensionUsage').doc(docId);
       const snap = await ref.get();
       const current = snap.exists ? (snap.data()?.count || 0) : 0;
-      console.log('[UsageDebug][Server] status 현재 카운트 →', { uid, monthKey, exists: snap.exists, current, limit });
+      // console.log('[UsageDebug][Server] status 현재 카운트 →', { uid, monthKey, exists: snap.exists, current, limit });
 
       const payload = {
         success: true,
@@ -3831,7 +3833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           limit
         }
       };
-      console.log('[UsageDebug][Server] status 응답 →', payload);
+      // console.log('[UsageDebug][Server] status 응답 →', payload);
       return res.json(payload);
     } catch (error) {
       console.error('extension-usage/status error:', error);

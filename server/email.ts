@@ -54,7 +54,7 @@ export async function sendVerificationEmail(email: string): Promise<void> {
   // Firebase 이메일 인증 링크 생성
   const actionCodeSettings = {
     // 이메일 인증 후 사용자가 이동할 URL (프론트엔드 라우트)
-    url: `${process.env.CLIENT_ORIGIN || "http://localhost:5173"}/login`,
+    url: `${process.env.CLIENT_ORIGIN || "https://storebooster.ai.kr"}/login`,
     handleCodeInApp: false,
   } as admin.auth.ActionCodeSettings;
 
