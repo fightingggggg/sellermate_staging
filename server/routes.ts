@@ -2958,6 +2958,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const cancelResult = await response.json();
+
+      // NICEPAY 사업자 응답 코드 확인 (성공: '0000')
+      if (!cancelResult || cancelResult.resultCode !== '0000') {
+        console.error("나이스페이 결제 취소 실패 코드:", cancelResult);
+        return res.status(400).json({
+          error: 'NicePay cancel failed',
+          message: cancelResult?.resultMsg || '결제 취소가 실패했습니다.',
+          detail: cancelResult
+        });
+      }
+
       console.log("나이스페이 결제 취소 성공 응답 수신");
 
       // 6. 구독 상태를 EXPIRED로 변경 (즉시 서비스 중단)
