@@ -532,9 +532,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       apiKeyLength: apiKey?.length || 0,
       apiSecretLength: apiSecret?.length || 0,
       customerIdLength: customerId?.length || 0,
-      apiKeyPrefix: apiKey ? apiKey.substring(0, 10) : 'undefined',
-      apiSecretPrefix: apiSecret ? apiSecret.substring(0, 10) : 'undefined',
-      customerIdPrefix: customerId ? customerId.substring(0, 10) : 'undefined',
       nodeEnv: process.env.NODE_ENV,
       allEnvVars: Object.keys(process.env).filter(key => key.includes('NAVER'))
     });
@@ -564,10 +561,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('[keyword-competition] 요청 헤더:', {
         'Content-Type': 'application/json; charset=UTF-8',
-        'X-API-KEY': apiKey ? `${apiKey.substring(0, 10)}...` : 'undefined',
+        'X-API-KEY': apiKey ? '[HIDDEN]' : 'undefined',
         'X-Customer': customerId,
         'X-Timestamp': timestamp,
-        'X-Signature': signature ? `${signature.substring(0, 10)}...` : 'undefined'
+        'X-Signature': '[HIDDEN]'
       });
 
       const resp = await fetch(url, {
@@ -1261,11 +1258,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "NicePay credentials not configured" });
       }
 
+      if (secretKey.length < 16) {
+        throw new Error('NICEPAY_SECRET_KEY must be at least 16 characters');
+      }
+      const encryptionKey = crypto.createHash('sha256').update(secretKey).digest().subarray(0, 16); // 128-bit derived key
+
       const orderId = `BILL_${Date.now()}_${uid}`;
       
       // 카드 정보 암호화 (AES-128)
       const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
-      const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
       
       // 민감한 정보 최소 로깅
       console.log("암호화 정보:", {
@@ -1274,7 +1275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // AES-128 암호화 (AES/ECB/PKCS5padding)
-      const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
+      const cipher = crypto.createCipheriv('aes-128-ecb', encryptionKey, null);
       let encData = cipher.update(plainText, 'utf8', 'hex');
       encData += cipher.final('hex');
 
@@ -1410,18 +1411,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const orderId = `BILL_${Date.now()}_${uid}`;
       
-      // 카드 정보 암호화 (AES-128)
-      const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
-      const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
-      
-      console.log("암호화 정보:", {
-        plainText: '***',
-        encryptionKey: '***',
-        encryptionKeyLength: encryptionKey.length
-      });
+     // 카드 정보 암호화 (AES-128)
+const plainText = `cardNo=...`;
+if (secretKey.length < 16) {
+  throw new Error('NICEPAY_SECRET_KEY must be at least 16 characters');
+}
+const encryptionKey = crypto
+  .createHash('sha256')
+  .update(secretKey)
+  .digest()
+  .subarray(0, 16);          // 128-bit derived key
 
       // AES-128 암호화 (AES/ECB/PKCS5padding)
-      const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
+      const cipher = crypto.createCipheriv('aes-128-ecb', encryptionKey, null);
       let encData = cipher.update(plainText, 'utf8', 'hex');
       encData += cipher.final('hex');
 
@@ -2034,126 +2036,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // 테스트용 빌키 발급 엔드포인트
-  app.post("/api/nicepay/billing-key/test", async (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: "Access denied in production" });
-    }
-    try {
-      console.log("=== 테스트 빌키 발급 요청 시작 ===");
-      console.log("요청 본문 수신");
+  // app.post("/api/nicepay/billing-key/test", async (req, res) => {
+  //   if (process.env.NODE_ENV === 'production') {
+  //     return res.status(403).json({ error: "Access denied in production" });
+  //   }
+  //   try {
+  //     console.log("=== 테스트 빌키 발급 요청 시작 ===");
+  //     console.log("요청 본문 수신");
       
-      const { uid, cardNo, expYear, expMonth, idNo, cardPw } = req.body;
+  //     const { uid, cardNo, expYear, expMonth, idNo, cardPw } = req.body;
       
-      // 필수 필드 검증
-      if (!uid || !cardNo || !expYear || !expMonth || !idNo || !cardPw) {
-        console.error("필수 필드 누락:", { uid, cardNo: cardNo ? "있음" : "없음", expYear, expMonth, idNo: idNo ? "있음" : "없음", cardPw: cardPw ? "있음" : "없음" });
-        return res.status(400).json({ 
-          error: "Missing required fields", 
-          message: "uid, cardNo, expYear, expMonth, idNo, cardPw are required" 
-        });
-      }
+  //     // 필수 필드 검증
+  //     if (!uid || !cardNo || !expYear || !expMonth || !idNo || !cardPw) {
+  //       console.error("필수 필드 누락:", { uid, cardNo: cardNo ? "있음" : "없음", expYear, expMonth, idNo: idNo ? "있음" : "없음", cardPw: cardPw ? "있음" : "없음" });
+  //       return res.status(400).json({ 
+  //         error: "Missing required fields", 
+  //         message: "uid, cardNo, expYear, expMonth, idNo, cardPw are required" 
+  //       });
+  //     }
 
-      const clientId = process.env.NICEPAY_CLIENT_ID;
-      const secretKey = process.env.NICEPAY_SECRET_KEY;
+  //     const clientId = process.env.NICEPAY_CLIENT_ID;
+  //     const secretKey = process.env.NICEPAY_SECRET_KEY;
       
-      if (!clientId || !secretKey) {
-        console.error("NicePay 인증 정보가 설정되지 않음");
-        return res.status(500).json({ error: "NicePay credentials not configured" });
-      }
+  //     if (!clientId || !secretKey) {
+  //       console.error("NicePay 인증 정보가 설정되지 않음");
+  //       return res.status(500).json({ error: "NicePay credentials not configured" });
+  //     }
 
-      const orderId = `TEST_BILL_${Date.now()}_${uid}`;
+  //     const orderId = `TEST_BILL_${Date.now()}_${uid}`;
       
-      // 카드 정보 암호화 (AES-128)
-      const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
-      const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
+  //     // 카드 정보 암호화 (AES-128)
+  //     const plainText = `cardNo=${cardNo}&expYear=${expYear}&expMonth=${expMonth}&idNo=${idNo}&cardPw=${cardPw}`;
+  //     const encryptionKey = secretKey.substring(0, 16); // SecretKey 앞 16자리
       
-      console.log("암호화 준비 완료");
+  //     console.log("암호화 준비 완료");
 
-      // AES-128 암호화 (AES/ECB/PKCS5padding)
-      const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
-      let encData = cipher.update(plainText, 'utf8', 'hex');
-      encData += cipher.final('hex');
+  //     // AES-128 암호화 (AES/ECB/PKCS5padding)
+  //     const cipher = crypto.createCipheriv('aes-128-ecb', Buffer.from(encryptionKey), null);
+  //     let encData = cipher.update(plainText, 'utf8', 'hex');
+  //     encData += cipher.final('hex');
 
-      console.log("암호화 완료:", {
-        encDataLength: encData.length
-      });
+  //     console.log("암호화 완료:", {
+  //       encDataLength: encData.length
+  //     });
 
-      // ediDate 생성
-      const ediDate = new Date().toISOString();
+  //     // ediDate 생성
+  //     const ediDate = new Date().toISOString();
       
-      // signData 생성
-      const signData = crypto.createHash('sha256')
-        .update(orderId + ediDate + secretKey)
-        .digest('hex');
+  //     // signData 생성
+  //     const signData = crypto.createHash('sha256')
+  //       .update(orderId + ediDate + secretKey)
+  //       .digest('hex');
 
-      // 빌키 발급 API 요청
-      const billingKeyRequestData = {
-        encData: encData,
-        orderId: orderId,
-        ediDate: ediDate,
-        signData: signData
-      };
+  //     // 빌키 발급 API 요청
+  //     const billingKeyRequestData = {
+  //       encData: encData,
+  //       orderId: orderId,
+  //       ediDate: ediDate,
+  //       signData: signData
+  //     };
 
-      console.log("빌키 발급 API 요청 데이터 준비 완료");
+  //     console.log("빌키 발급 API 요청 데이터 준비 완료");
 
-      const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
+  //     const authHeader = Buffer.from(`${clientId}:${secretKey}`).toString('base64');
       
-      console.log("API 호출 시작:", 'https://api.nicepay.co.kr/v1/subscribe/regist');
+  //     console.log("API 호출 시작:", 'https://api.nicepay.co.kr/v1/subscribe/regist');
       
-      const response = await fetch('https://api.nicepay.co.kr/v1/subscribe/regist', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${authHeader}`
-        },
-        body: JSON.stringify(billingKeyRequestData)
-      });
+  //     const response = await fetch('https://api.nicepay.co.kr/v1/subscribe/regist', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': `Basic ${authHeader}`
+  //       },
+  //       body: JSON.stringify(billingKeyRequestData)
+  //     });
 
-      console.log("API 응답 상태:", response.status);
-      const result = await response.json();
-      console.log("빌키 발급 API 응답 수신");
+  //     console.log("API 응답 상태:", response.status);
+  //     const result = await response.json();
+  //     console.log("빌키 발급 API 응답 수신");
 
-      if (response.ok && result.resultCode === '0000') {
-        // 빌키 발급 성공
-        const db = admin.firestore();
-        await db.collection("billingKeys").doc(uid).set({
-          billingKey: result.bid,
-          orderId: orderId,
-          status: "ACTIVE",
-          tid: result.tid,
-          cardCode: result.cardCode,
-          cardName: result.cardName,
-          cardNo: maskCardNumber(cardNo), // 마스킹된 카드 번호 저장
-          cardNoPrefix: cardNo.substring(0, 2), // 카드 번호 앞 2자리 저장
-          authDate: result.authDate,
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+  //     if (response.ok && result.resultCode === '0000') {
+  //       // 빌키 발급 성공
+  //       const db = admin.firestore();
+  //       await db.collection("billingKeys").doc(uid).set({
+  //         billingKey: result.bid,
+  //         orderId: orderId,
+  //         status: "ACTIVE",
+  //         tid: result.tid,
+  //         cardCode: result.cardCode,
+  //         cardName: result.cardName,
+  //         cardNo: maskCardNumber(cardNo), // 마스킹된 카드 번호 저장
+  //         cardNoPrefix: cardNo.substring(0, 2), // 카드 번호 앞 2자리 저장
+  //         authDate: result.authDate,
+  //         createdAt: admin.firestore.FieldValue.serverTimestamp()
+  //       });
 
-        console.log("=== 테스트 빌키 발급 완료 ===");
-        res.json({
-          success: true,
-          billingKey: result.bid,
-          message: "테스트 빌키가 성공적으로 발급되었습니다.",
-          result: result
-        });
-      } else {
-        console.error("테스트 빌키 발급 실패:", result);
-        res.status(400).json({
-          success: false,
-          error: result.resultMsg || "테스트 빌키 발급에 실패했습니다.",
-          result: result
-        });
-      }
+  //       console.log("=== 테스트 빌키 발급 완료 ===");
+  //       res.json({
+  //         success: true,
+  //         billingKey: result.bid,
+  //         message: "테스트 빌키가 성공적으로 발급되었습니다.",
+  //         result: result
+  //       });
+  //     } else {
+  //       console.error("테스트 빌키 발급 실패:", result);
+  //       res.status(400).json({
+  //         success: false,
+  //         error: result.resultMsg || "테스트 빌키 발급에 실패했습니다.",
+  //         result: result
+  //       });
+  //     }
 
-    } catch (error: any) {
-      console.error("=== 테스트 빌키 발급 요청 에러 ===");
-      console.error("에러:", error);
-      res.status(500).json({ 
-        error: "Internal server error", 
-        message: error.message 
-      });
-    }
-  });
+  //   } catch (error: any) {
+  //     console.error("=== 테스트 빌키 발급 요청 에러 ===");
+  //     console.error("에러:", error);
+  //     res.status(500).json({ 
+  //       error: "Internal server error", 
+  //       message: error.message 
+  //     });
+  //   }
+  // });
 
   // 웹훅 콜백 처리 (결제 완료 알림) - 나이스페이먼츠 공식 문서 준수
   app.post("/api/nicepay/webhook", async (req, res) => {

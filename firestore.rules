@@ -4,68 +4,80 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 로그인한 사용자만 자신의 analysisLogs 접근 가능
+    // ✅ 로그인한 사용자만 자신의 analysisLogs 접근 가능
     match /analysisLogs/{userEmail}/{document=**} {
       allow read, write: if request.auth != null && request.auth.token.email == userEmail;
     }
 
-    // usersInfo: 본인만 읽기/쓰기
+    // ✅ 로그인한 사용자가 자신의 userinfo 접근 가능
     match /usersInfo/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      // 휴대폰 번호 중복 체크 등을 위해 읽기는 공개, 쓰기는 본인만
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // 계정 삭제 기록: 본인만 읽기/쓰기
+    // 계정 삭제 기록: 읽기는 공개(재가입 제한 체크), 쓰기는 본인만
     match /accountDeletions/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
     
     match /notifications/{email} {
       allow read, write: if request.auth != null && 
                            request.auth.token.email == email;
     }
-
-    // 구독 정보: 문서 ID = uid 기준 본인만 읽기/쓰기
-    match /subscriptions/{subscriptionId} {
-      allow read, write: if request.auth != null && request.auth.uid == subscriptionId;
-    }
     
-    match /productLogs/{userEmail}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.token.email == userEmail;
-    }
+    // 구독 정보 (로그인한 사용자만 자신의 구독 정보 읽기/쓰기)
+      match /subscriptions/{subscriptionId} {
+        allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+        allow write: if request.auth != null
+                     && request.auth.uid == request.resource.data.uid
+                     && subscriptionId == request.auth.uid;
+      }
 
-    // 소셜 액세스 토큰: 클라이언트 전면 차단 (Admin SDK만 접근)
-    match /socialTokens/{uid} {
-      allow read, write: if false;
-    }
 
-    // 결제 수단 정보: 클라이언트 전면 차단 (Admin SDK만 접근)
-    match /billingKeys/{uid} {
-      allow read, write: if false;
-    }
 
-    // 결제 내역 (본인만 읽기)
+       // 결제 수단 정보 (접근금지)
+        match /billingKeys/{uid} {
+          allow read, write: if false;
+        }
+        
+      match /billingCards/{uid} {
+        allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+        allow write: if request.auth != null
+                     && request.auth.uid == request.resource.data.uid
+                     && uid == request.auth.uid;
+        }
+    
+           // 결제 내역 (본인만 읽기)
     match /payments/{paymentId} {
       allow read: if request.auth != null && resource.data.uid == request.auth.uid;
     }
-
-    // 구독 해지 사유: 문서 ID를 uid로 사용, 본인만 읽기/쓰기 가능
+    
+ // 구독 해지 사유: 문서 ID를 uid로 사용, 본인만 읽기/쓰기 가능
     match /subscriptionCancellations/{uid} {
       allow read, create, update: if request.auth != null && request.auth.uid == uid;
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
+  
+    // 소셜 액세스 토큰 (서버 전용)
+    match /socialTokens/{uid} {
+      allow read, write: if false;
+    }
 
-    // 사용자 문서 및 히스토리 서브컬렉션 규칙  
+
+   // 사용자 문서 및 히스토리 서브컬렉션 규칙  
     match /users/{userId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
       match /history/{historyId} {
-        allow read, write, create, update, delete: if request.auth != null;
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
       match /usage/{date} {
-        allow read, write, create, update, delete: if request.auth != null;
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
       // 월별 사용량 서브컬렉션 권한 추가
       match /usageMonthly/{month} {
-        allow read, write, create, update, delete: if request.auth != null;
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
 
@@ -76,13 +88,13 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && resource.data.userEmail == request.auth.token.email;
     }
     
+    
     // 기타 모든 문서 접근 거부
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
-
 // 새로운 구조의 주요 장점:
 // 1. 사용자별 서브컬렉션으로 데이터 격리
 // 2. 더 효율적인 쿼리 성능
