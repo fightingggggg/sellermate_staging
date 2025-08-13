@@ -12,6 +12,8 @@ export default function NaverTabActivationHandler() {
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
+      if (event.source !== window) return;
+      if (event.origin !== window.location.origin) return;
       if (event.data?.type === "PROMPT_NAVER_TAB_ACTIVATION") {
         setAnalysisTabId(event.data.analysisTabId);
         setOpen(true);
@@ -26,7 +28,7 @@ export default function NaverTabActivationHandler() {
       window.postMessage({
         type: "ACTIVATE_NAVER_SHOPPING_TAB",
         analysisTabId: analysisTabId,
-      }, "*");
+      }, window.location.origin);
     }
     setOpen(false);
   };
@@ -36,9 +38,9 @@ export default function NaverTabActivationHandler() {
       window.postMessage({
         type: "CANCEL_NAVER_SHOPPING_TAB",
         analysisTabId: analysisTabId,
-      }, "*");
+      }, window.location.origin);
       // 진행 중 플래그 해제용
-      window.postMessage({ type: "SEO_ANALYSIS_CANCELLED" }, "*");
+      window.postMessage({ type: "SEO_ANALYSIS_CANCELLED" }, window.location.origin);
     }
     setOpen(false);
   };

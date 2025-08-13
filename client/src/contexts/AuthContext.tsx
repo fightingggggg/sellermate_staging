@@ -73,15 +73,19 @@ export function useAuth() {
 
 const LOCAL_STORAGE_KEY = "lastUser";
 
-const EXTENSION_IDS = [
+const EXTENSION_IDS: string[] = [
   CHROME_EXTENSION_ID,
-];
+].filter(Boolean) as string[];
 
 function sendMessageToAnyExtension(message: any): Promise<boolean> {
   return new Promise((resolve) => {
     const chromeAny: any = (typeof window !== "undefined" ? (window as any).chrome : undefined);
     if (!chromeAny || !chromeAny.runtime || typeof chromeAny.runtime.sendMessage !== "function") {
       console.warn("[ExtensionBridge] chrome.runtime.sendMessage unavailable");
+      resolve(false);
+      return;
+    }
+    if (EXTENSION_IDS.length === 0) {
       resolve(false);
       return;
     }

@@ -125,7 +125,9 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
   // ===== Step1에서 가져온 메시지 핸들러 =====
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === "SEO_ANALYSIS_RESULT") {
+      if (event.source !== window) return;
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'SEO_ANALYSIS_RESULT') {
         const data = event.data.data;
         if (Array.isArray(data.categoriesDetailed)) {
           data.categoriesDetailed = [...data.categoriesDetailed].sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
@@ -136,57 +138,30 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         setAnalysisData(data);
         setCtxAnalysisData(data);
         setAnalysisKeyword(latestQueryRef.current);
-        
-        // 🔄 새로운 분석 결과가 도착했으므로 이전 생성 결과 초기화
-        setGenName(null);
-        setGenReason(null);
-        setGenDisabled(false);
+        setSelectedCategoryIndex(0);
+        setIsOptimizing(false);
+        optimizationInProgressRef.current = false;
 
-        // ✅ 사용량 1회 증가 – Step3에서도 재분석 시 카운트 반영
         if (currentUser?.email) {
           (async () => {
             try {
               await UsageService.incrementProductOptimization(currentUser.email!);
-              console.log('[Usage] Product optimization usage incremented (Step3)');
+              console.log('[Usage] Product optimization usage incremented after successful analysis (Step3)');
             } catch (error) {
               console.error('[Usage] Failed to increment usage (Step3):', error);
             }
           })();
         }
 
-        // 새 분석이므로 2단계/3단계 데이터 초기화
-        setSynonymGroups([]);
-        setCombResult({});
-        setSelectedMain(latestQueryRef.current);
-        setGeneratedProductNames([]);
-        setGeneratedReason("");
-        setGeneratedTags([]);
-        setGeneratedCategories([]);
-
-        // 🆕 새로운 분석이므로 카테고리 인덱스 초기화 (기존 결과가 있을 때는 유지)
-        setSelectedCategoryIndex(0);
-        setIsOptimizing(false);
-        optimizationInProgressRef.current = false;
-
-        // 히스토리에 저장
         if (currentUser?.email && latestQueryRef.current) {
           const actualPageIndex = data._pageIndex || 1;
-          console.log('[Step3] Saving history for:', currentUser.email, latestQueryRef.current, 'page:', actualPageIndex);
           HistoryService.saveHistory(
             currentUser.email,
             latestQueryRef.current,
             'complete-optimizer',
             data,
             actualPageIndex
-          ).then(docId => {
-            console.log('[Step3] History saved successfully:', docId);
-          }).catch(error => {
-            console.error('[Step3] Failed to save history:', error);
-            // 히스토리 저장 실패 시 조용히 처리 (분석 결과는 정상적으로 표시)
-            if (error.message && error.message.includes('히스토리 저장 제한')) {
-              console.log('[Step3] History limit reached, but analysis completed successfully');
-            }
-          });
+          ).catch(() => {});
         }
       }
     };
@@ -201,6 +176,8 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       let resolved = false;
       
       const messageHandler = (event: MessageEvent) => {
+        if (event.source !== window) return;
+        if (event.origin !== window.location.origin) return;
         if (event.data.type === "EXTENSION_STATUS" && !resolved) {
           console.log('[Step3] 확장프로그램 설치 확인됨 (postMessage):', event.data.installed);
           resolved = true;
@@ -211,7 +188,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
       window.addEventListener("message", messageHandler);
       console.log('[Step3] 확장프로그램 설치 확인 요청 전송 (postMessage)');
-      window.postMessage({ type: "CHECK_EXTENSION" }, "*");
+      window.postMessage({ type: "CHECK_EXTENSION" }, window.location.origin);
 
       
       if (typeof (window as any).chrome !== 'undefined' && (window as any).chrome.runtime && (window as any).chrome.runtime.sendMessage) {
@@ -260,7 +237,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         type: "ACTIVATE_NAVER_SHOPPING_TAB",
         data: {}
       },
-      "*"
+      window.location.origin
     );
   };
 
@@ -323,7 +300,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
           timeoutMs: 0, // 즉시 실행
         },
       },
-      "*"
+      window.location.origin
     );
   };
 

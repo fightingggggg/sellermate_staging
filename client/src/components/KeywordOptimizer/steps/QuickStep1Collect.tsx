@@ -154,6 +154,8 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (event.source !== window) return;
+      if (event.origin !== window.location.origin) return;
       if (event.data.type === "SEO_ANALYSIS_RESULT") {
         // 카테고리 정렬 및 데이터 설정
         const data = event.data.data;
@@ -256,6 +258,8 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
       
       // 방법 1: postMessage를 통한 확인 (현재 페이지에 content script가 있을 때)
       const messageHandler = (event: MessageEvent) => {
+        if (event.source !== window) return;
+        if (event.origin !== window.location.origin) return;
         if (event.data.type === "EXTENSION_STATUS" && !resolved) {
           console.log('[Web] 확장프로그램 설치 확인됨 (postMessage):', event.data.installed);
           resolved = true;
@@ -266,7 +270,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
 
       window.addEventListener("message", messageHandler);
       console.log('[Web] 확장프로그램 설치 확인 요청 전송 (postMessage)');
-      window.postMessage({ type: "CHECK_EXTENSION" }, "*");
+      window.postMessage({ type: "CHECK_EXTENSION" }, window.location.origin);
 
       // 방법 2: Chrome Extension API를 통한 직접 확인
       
@@ -317,7 +321,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         type: "ACTIVATE_NAVER_SHOPPING_TAB",
         data: {}
       },
-      "*"
+      window.location.origin
     );
   };
 
@@ -416,7 +420,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
           timeoutMs: 0, // 즉시 실행
         },
       },
-      "*"
+      window.location.origin
     );
 
     // 새 query 분석을 시작하므로 이전 2단계/3단계 데이터 초기화

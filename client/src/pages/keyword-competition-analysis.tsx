@@ -521,6 +521,8 @@ export default function KeywordCompetitionAnalysisPage() {
       let resolved = false;
 
       const messageHandler = (event: MessageEvent) => {
+        if (event.source !== window) return;
+        if (event.origin !== window.location.origin) return;
         if (event.data.type === "EXTENSION_STATUS" && !resolved) {
           resolved = true;
           window.removeEventListener("message", messageHandler);
@@ -529,7 +531,7 @@ export default function KeywordCompetitionAnalysisPage() {
       };
 
       window.addEventListener("message", messageHandler);
-      window.postMessage({ type: "CHECK_EXTENSION" }, "*");
+      window.postMessage({ type: "CHECK_EXTENSION" }, window.location.origin);
 
       if (typeof (window as any).chrome !== "undefined" && (window as any).chrome.runtime && (window as any).chrome.runtime.sendMessage) {
         try {
@@ -572,7 +574,7 @@ export default function KeywordCompetitionAnalysisPage() {
         type: "ACTIVATE_NAVER_SHOPPING_TAB",
         data: {}
       },
-      "*"
+      window.location.origin
     );
   };
 
@@ -687,7 +689,7 @@ export default function KeywordCompetitionAnalysisPage() {
           timeoutMs: 0, // 최적화: 5000ms → 2000ms
         },
       },
-      "*"
+      window.location.origin
     );
   }, [keyword, currentUser]);
 
@@ -829,7 +831,7 @@ export default function KeywordCompetitionAnalysisPage() {
               timeoutMs: 0, // 최적화: 5000ms → 2000ms
             },
           },
-          "*"
+          window.location.origin
         );
       }, 0);
       
