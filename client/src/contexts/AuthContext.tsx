@@ -130,8 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 직전에 확장 프로그램으로 전달한 idToken 을 기억하여, 같은 내용을 반복 전송하지 않도록 합니다.
-  const lastSentIdTokenRef = useRef<string | null>(null);
+  // 직전에 확장 프로그램에 전달한 로그인 키(이메일+멤버십)를 기억하여 중복 전송을 방지합니다.
+  const lastSentLoginKeyRef = useRef<string | null>(null);
   const profileUnsubRef = useRef<()=>void>();
 
   // currentUser가 바뀔 때마다 localStorage에 저장
@@ -717,35 +717,35 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
         // 2) 이미 동일 토큰을 전달했다면 중복 전송을 방지합니다.
         if (typeof window !== "undefined" && user) {
           try {
-            const token = await user.getIdToken();
-            if (token !== lastSentIdTokenRef.current) {
-              // 멤버십 타입 조회 (실패 시 기본 basic)
-              let membershipType: 'basic' | 'booster' = 'basic';
-              try {
-                const tokenForMembership = await user.getIdToken();
-                const resp = await fetch(`/api/membership/type/${user.uid}`, {
-                  headers: { Authorization: `Bearer ${tokenForMembership}` }
-                });
-                if (resp.ok) {
-                  const data = await resp.json();
-                  membershipType = data?.data?.membershipType === 'booster' ? 'booster' : 'basic';
-                }
-              } catch (e) {
-                console.warn('[AuthContext] 멤버십 조회 실패, basic으로 진행');
+            // 멤버십 타입 조회 (실패 시 기본 basic)
+            let membershipType: 'basic' | 'booster' = 'basic';
+            try {
+              const tokenForMembership = await user.getIdToken();
+              const resp = await fetch(`/api/membership/type/${user.uid}`, {
+                headers: { Authorization: `Bearer ${tokenForMembership}` }
+              });
+              if (resp.ok) {
+                const data = await resp.json();
+                membershipType = data?.data?.membershipType === 'booster' ? 'booster' : 'basic';
               }
+            } catch (e) {
+              console.warn('[AuthContext] 멤버십 조회 실패, basic으로 진행');
+            }
 
+            // 이메일+멤버십 조합으로 중복 전송 방지
+            const loginKey = `${user.email ?? ''}|${membershipType}`;
+            if (loginKey !== lastSentLoginKeyRef.current) {
               // 확장 프로그램으로 직접 전달 (postMessage 사용 금지)
               try {
                 await sendMessageToAnyExtension({
                   type: "SET_LOGIN_STATUS",
                   email: user.email,
-                  idToken: token,
                   membershipType,
                   ts: Date.now(),
                 });
               } catch {}
 
-              lastSentIdTokenRef.current = token;
+              lastSentLoginKeyRef.current = loginKey;
             }
           } catch (err) {
             console.error("토큰 가져오기 실패", err);
@@ -760,11 +760,11 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
         profileUnsubRef.current = undefined;
 
         // 이전에 로그인 상태였던 경우에만 로그아웃 메시지를 1회 전송합니다.
-        if (typeof window !== "undefined" && lastSentIdTokenRef.current !== null) {
+        if (typeof window !== "undefined" && lastSentLoginKeyRef.current !== null) {
           try {
             await sendMessageToAnyExtension({ type: "LOGOUT", ts: Date.now() });
           } catch {}
-          lastSentIdTokenRef.current = null;
+          lastSentLoginKeyRef.current = null;
         }
       }
       setLoading(false);
