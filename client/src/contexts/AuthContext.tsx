@@ -72,6 +72,40 @@ export function useAuth() {
 
 const LOCAL_STORAGE_KEY = "lastUser";
 
+const EXTENSION_IDS = [
+  "eekjgnjcpmcfeikolboahljpboadaojm",
+  "plgdaggkagiakemkoclkpkbdiocllbbi",
+];
+
+function sendMessageToAnyExtension(message: any): Promise<boolean> {
+  return new Promise((resolve) => {
+    const chromeAny: any = (typeof window !== "undefined" ? (window as any).chrome : undefined);
+    if (!chromeAny || !chromeAny.runtime || typeof chromeAny.runtime.sendMessage !== "function") {
+      console.warn("[ExtensionBridge] chrome.runtime.sendMessage unavailable");
+      resolve(false);
+      return;
+    }
+    let resolved = false;
+    let pending = EXTENSION_IDS.length;
+    EXTENSION_IDS.forEach((id) => {
+      try {
+        chromeAny.runtime.sendMessage(id, message, (resp: any) => {
+          pending -= 1;
+          if (!resolved && resp && (resp.ok === true || resp.success === true)) {
+            resolved = true;
+            resolve(true);
+          } else if (pending === 0 && !resolved) {
+            resolve(false);
+          }
+        });
+      } catch (e) {
+        pending -= 1;
+        if (pending === 0 && !resolved) resolve(false);
+      }
+    });
+  });
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // localStorage에서 초기값을 불러옴
   const getInitialUser = () => {
@@ -317,10 +351,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await signOut(auth);
       setUserProfile(null);
-      // 확장 프로그램에 로그아웃을 전파하지 않음 (단방향 동기화)
-      if (typeof window !== 'undefined') {
-        window.postMessage({ type: 'WEB_LOGOUT', ts: Date.now() }, '*');
-      }
+      // 확장 프로그램에 직접 로그아웃 전달 (postMessage 사용 금지)
+      try {
+        await sendMessageToAnyExtension({ type: "LOGOUT" });
+      } catch {}
     } catch (error: any) {
       console.error("Error logging out", error);
       setError(error.message || "로그아웃 중 오류가 발생했습니다.");
@@ -696,16 +730,17 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
                 console.warn('[AuthContext] 멤버십 조회 실패, basic으로 진행');
               }
 
-              window.postMessage(
-                {
-                  type: "WEB_LOGIN_STATUS",
+              // 확장 프로그램으로 직접 전달 (postMessage 사용 금지)
+              try {
+                await sendMessageToAnyExtension({
+                  type: "SET_LOGIN_STATUS",
                   email: user.email,
-                  idToken: token,   // ← 제거 권고
+                  idToken: token,
                   membershipType,
                   ts: Date.now(),
-                },
-                "*",
-              );
+                });
+              } catch {}
+
               lastSentIdTokenRef.current = token;
             }
           } catch (err) {
@@ -722,7 +757,9 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
 
         // 이전에 로그인 상태였던 경우에만 로그아웃 메시지를 1회 전송합니다.
         if (typeof window !== "undefined" && lastSentIdTokenRef.current !== null) {
-          window.postMessage({ type: "WEB_LOGOUT", ts: Date.now() }, "*");
+          try {
+            await sendMessageToAnyExtension({ type: "LOGOUT", ts: Date.now() });
+          } catch {}
           lastSentIdTokenRef.current = null;
         }
       }
