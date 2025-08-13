@@ -706,14 +706,6 @@ export default function KeywordCompetitionAnalysisPage() {
       setKeyword(keywordParam);
       setIsAnalyzing(true); // 데이터 수신 대기 상태
       
-      // 확장 분석 트리거: content script에 웹 요청 분석 플래그 설정 및 분석 시작 신호 전달
-      try {
-        window.postMessage({
-          type: 'START_SEO_ANALYSIS',
-          data: { productName: keywordParam, pageIndex: 1, timeoutMs: 0 }
-        }, window.location.origin);
-      } catch {}
-      
       // URL에서 source, keyword 파라미터 모두 제거 (깔끔한 URL 유지 + 중복 실행 방지)
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('source');
