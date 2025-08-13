@@ -90,6 +90,10 @@ function sendMessageToAnyExtension(message: any): Promise<boolean> {
     EXTENSION_IDS.forEach((id) => {
       try {
         chromeAny.runtime.sendMessage(id, message, (resp: any) => {
+          // lastError를 소비하여 경고 방지
+          if (chromeAny.runtime && chromeAny.runtime.lastError) {
+            void chromeAny.runtime.lastError.message;
+          }
           pending -= 1;
           if (!resolved && resp && (resp.ok === true || resp.success === true)) {
             resolved = true;
