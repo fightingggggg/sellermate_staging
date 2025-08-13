@@ -83,6 +83,17 @@ export async function sendVerificationEmail(email: string): Promise<void> {
   await transporter.sendMail(mailOptions);
 }
 
+function escapeHtml(input: string | number | undefined | null): string {
+  if (input === undefined || input === null) return '';
+  const s = String(input);
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ------------------------------------------------------------------
 // 결제 성공 알림 이메일 전송
 // ------------------------------------------------------------------
@@ -102,11 +113,11 @@ export async function sendPaymentSuccessEmail(email: string, paymentData: {
         <h2 style="color: #4169E1; text-align: center;">결제가 완료되었습니다</h2>
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #4169E1; margin-top: 0;">결제 정보</h3>
-          <p><strong>주문번호:</strong> ${paymentData.orderId}</p>
-          <p><strong>상품명:</strong> ${paymentData.goodsName}</p>
+          <p><strong>주문번호:</strong> ${escapeHtml(paymentData.orderId)}</p>
+          <p><strong>상품명:</strong> ${escapeHtml(paymentData.goodsName)}</p>
           <p><strong>결제금액:</strong> ${paymentData.amount.toLocaleString()}원</p>
-                      <p><strong>결제일시:</strong> ${paymentData.paymentDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
-          ${paymentData.nextBillingDate ? `<p><strong>다음 결제일:</strong> ${paymentData.nextBillingDate.toLocaleDateString('ko-KR')}</p>` : ''}
+          <p><strong>결제일시:</strong> ${escapeHtml(paymentData.paymentDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }))}</p>
+          ${paymentData.nextBillingDate ? `<p><strong>다음 결제일:</strong> ${escapeHtml(paymentData.nextBillingDate.toLocaleDateString('ko-KR'))}</p>` : ''}
         </div>
         <p style="text-align: center;">스토어 부스터 서비스를 이용해 주셔서 감사합니다.</p>
         <p style="text-align: center;">문의사항이 있으시면 언제든지 연락주세요.</p>
@@ -137,11 +148,11 @@ export async function sendPaymentFailureEmail(email: string, paymentData: {
         <h2 style="color: #dc3545; text-align: center;">결제가 실패했습니다</h2>
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #dc3545; margin-top: 0;">결제 정보</h3>
-          <p><strong>주문번호:</strong> ${paymentData.orderId}</p>
-          <p><strong>상품명:</strong> ${paymentData.goodsName}</p>
+          <p><strong>주문번호:</strong> ${escapeHtml(paymentData.orderId)}</p>
+          <p><strong>상품명:</strong> ${escapeHtml(paymentData.goodsName)}</p>
           <p><strong>결제금액:</strong> ${paymentData.amount.toLocaleString()}원</p>
-                      <p><strong>실패일시:</strong> ${paymentData.failureDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
-          <p><strong>실패사유:</strong> ${paymentData.errorMessage}</p>
+          <p><strong>실패일시:</strong> ${escapeHtml(paymentData.failureDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }))}</p>
+          <p><strong>실패사유:</strong> ${escapeHtml(paymentData.errorMessage)}</p>
         </div>
         <p style="text-align: center;">결제 정보를 확인하고 다시 시도해 주세요.</p>
         <p style="text-align: center;">문제가 지속되면 고객센터로 문의해 주세요.</p>
@@ -173,12 +184,12 @@ export async function sendRefundSuccessEmail(email: string, refundData: {
         <h2 style="color: #4169E1; text-align: center;">환불이 완료되었습니다</h2>
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #4169E1; margin-top: 0;">환불 정보</h3>
-          <p><strong>원주문번호:</strong> ${refundData.orderId}</p>
-          <p><strong>환불주문번호:</strong> ${refundData.refundOrderId}</p>
-          <p><strong>상품명:</strong> ${refundData.goodsName}</p>
+          <p><strong>원주문번호:</strong> ${escapeHtml(refundData.orderId)}</p>
+          <p><strong>환불주문번호:</strong> ${escapeHtml(refundData.refundOrderId)}</p>
+          <p><strong>상품명:</strong> ${escapeHtml(refundData.goodsName)}</p>
           <p><strong>환불금액:</strong> ${refundData.amount.toLocaleString()}원</p>
-                      <p><strong>환불일시:</strong> ${refundData.refundDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
-          ${refundData.refundReason ? `<p><strong>환불사유:</strong> ${refundData.refundReason}</p>` : ''}
+          <p><strong>환불일시:</strong> ${escapeHtml(refundData.refundDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }))}</p>
+          ${refundData.refundReason ? `<p><strong>환불사유:</strong> ${escapeHtml(refundData.refundReason)}</p>` : ''}
         </div>
         <p style="text-align: center;">환불 금액은 3-7일 내에 결제 수단으로 환급됩니다.</p>
         <p style="text-align: center;">문의사항이 있으시면 언제든지 연락주세요.</p>
@@ -207,13 +218,13 @@ export async function sendSubscriptionExpiredEmail(email: string, subscriptionDa
         <h2 style="color: #4169E1; text-align: center;">구독이 만료되었습니다</h2>
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #4169E1; margin-top: 0;">구독 정보</h3>
-          <p><strong>구독 플랜:</strong> ${subscriptionData.plan}</p>
-                      <p><strong>만료일시:</strong> ${subscriptionData.expiredDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
+          <p><strong>구독 플랜:</strong> ${escapeHtml(subscriptionData.plan)}</p>
+          <p><strong>만료일시:</strong> ${escapeHtml(subscriptionData.expiredDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }))}</p>
         </div>
         <p style="text-align: center;">서비스 이용을 계속하시려면 구독을 갱신해 주세요.</p>
         ${subscriptionData.renewalUrl ? `
         <div style="text-align: center; margin: 20px 0;">
-          <a href="${subscriptionData.renewalUrl}" style="background-color: #4169E1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">구독 갱신하기</a>
+          <a href="${escapeHtml(subscriptionData.renewalUrl)}" style="background-color: #4169E1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">구독 갱신하기</a>
         </div>
         ` : ''}
         <p style="margin-top: 20px; text-align: center; color: #666; font-size: 12px;">© 스토어 부스터 팀</p>
@@ -242,9 +253,9 @@ export async function sendMembershipCancellationEmail(email: string, cancellatio
         <h2 style="color: #4169E1; text-align: center;">멤버십이 해지되었습니다</h2>
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #4169E1; margin-top: 0;">해지 정보</h3>
-          <p><strong>구독 플랜:</strong> ${cancellationData.plan}</p>
-          <p><strong>해지일시:</strong> ${cancellationData.cancelledDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
-          <p><strong>서비스 종료일:</strong> ${cancellationData.endDate.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
+          <p><strong>구독 플랜:</strong> ${escapeHtml(cancellationData.plan)}</p>
+          <p><strong>해지일시:</strong> ${escapeHtml(cancellationData.cancelledDate.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }))}</p>
+          <p><strong>서비스 종료일:</strong> ${escapeHtml(cancellationData.endDate.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }))}</p>
         </div>
         <p style="text-align: center;">해지 예정일까지는 부스터 멤버십의 모든 기능을 정상적으로 사용할 수 있습니다.</p>
         <p style="text-align: center;">서비스 종료 전에 멤버십을 재활성화하시면 연속으로 이용하실 수 있습니다.</p>

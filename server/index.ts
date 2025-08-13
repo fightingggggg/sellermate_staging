@@ -25,7 +25,7 @@ const cspDirectives: Record<string, string[]> = {
   frameAncestors: ["'none'"],
   scriptSrc: [
     "'self'",
-    "'unsafe-inline'", // GA 스니펫 등 인라인 초기화 허용
+    // "'unsafe-inline'", // 프로덕션 기본 제거
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
     "https://www.googleadservices.com",
@@ -82,6 +82,8 @@ if (isDev) {
   cspDirectives.connectSrc.push("ws:");
   cspDirectives.scriptSrc.push("http://localhost:5173", "http://127.0.0.1:5173");
   cspDirectives.connectSrc.push("http://localhost:5173", "http://127.0.0.1:5173");
+  // 개발 편의를 위해 인라인 스크립트 허용 (프로덕션에서는 비허용)
+  cspDirectives.scriptSrc.push("'unsafe-inline'");
   // 개발에서 GA/GTM iframe 렌더 시 제한 완화
   cspDirectives.frameSrc.push("https://www.google.com", "https://www.youtube.com");
 }
@@ -168,7 +170,7 @@ app.use((req, res, next) => {
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
+    // throw err; // 응답 후 예외 재-throw 제거 (프로세스 안정성)
   });
 
   // importantly only setup vite in development and after

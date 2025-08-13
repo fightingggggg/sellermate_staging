@@ -2156,7 +2156,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/nicepay/webhook", async (req, res) => {
     try {
       console.log("=== 나이스페이먼츠 웹훅 수신 시작 ===");
-      
+
+      // Content-Type 검증: JSON이 아닐 경우 무시 (200 OK)
+      const contentType = req.headers['content-type'] || '';
+      if (typeof contentType === 'string' && !contentType.toLowerCase().includes('application/json')) {
+        console.warn('[Webhook] Unsupported Content-Type, ignoring:', contentType);
+        res.setHeader('Content-Type', 'text/html;charset=utf-8');
+        return res.status(200).send("OK");
+      }
+
       // IP 화이트리스트 검증 (Express trust proxy 기반 주소만 신뢰)
       // req.ip: trust proxy=1 기준으로 가장 가까운 클라이언트 IP
       // req.ips: X-Forwarded-For 파싱 결과 배열(Express가 처리한 값), 첫 요소가 실제 클라이언트
