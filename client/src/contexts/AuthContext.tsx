@@ -732,14 +732,19 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
               console.warn('[AuthContext] 멤버십 조회 실패, basic으로 진행');
             }
 
-            // 이메일+멤버십 조합으로 중복 전송 방지
-            const loginKey = `${user.email ?? ''}|${membershipType}`;
+            // 이메일이 없을 수 있어 phoneNumber 또는 uid로 대체
+            const identifier = (user.email ?? user.phoneNumber ?? user.uid) || '';
+
+            // 이메일+멤버십 조합으로 중복 전송 방지 → 식별자(email||phone||uid)+멤버십
+            const loginKey = `${identifier}|${membershipType}`;
             if (loginKey !== lastSentLoginKeyRef.current) {
               // 확장 프로그램으로 직접 전달 (postMessage 사용 금지)
               try {
                 await sendMessageToAnyExtension({
                   type: "SET_LOGIN_STATUS",
-                  email: user.email,
+                  email: user.email || null,
+                  phoneNumber: user.phoneNumber || (userProfile as any)?.number || null,
+                  uid: user.uid,
                   membershipType,
                   ts: Date.now(),
                 });
