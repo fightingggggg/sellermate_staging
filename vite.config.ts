@@ -28,21 +28,6 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    // 번들 크기 최적화
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // 큰 라이브러리들을 별도 청크로 분리
-          vendor: ['react', 'react-dom'],
-          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
-          charts: ['recharts', 'd3', 'react-wordcloud'],
-          utils: ['date-fns', 'clsx', 'tailwind-merge']
-        }
-      }
-    },
-    // 청크 크기 경고 임계값 조정
-    chunkSizeWarningLimit: 1000
   },
   server: {
     allowedHosts: ['storebooster.ai.kr', 'localhost', '127.0.0.1'], // 프로덕션 도메인 추가
