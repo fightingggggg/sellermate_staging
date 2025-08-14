@@ -16,8 +16,7 @@ interface QuickAIResultProps {
 }
 
 export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
-  // 선택된 카테고리 인덱스를 포함하여 컨텍스트 값 가져오기
-  const { analysisData, mainKeyword, aiResult, setAiResult, selectedCategoryIndex } = useOptimizer();
+  const { analysisData, mainKeyword, aiResult, setAiResult } = useOptimizer();
   const { currentUser } = useAuth();
   const pageIndex = (analysisData as any)?._pageIndex ?? 1;
   const [loading, setLoading] = useState(false);
@@ -74,21 +73,44 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     // set immediately to prevent duplicate
     hasCalledRef.current = true;
 
-    // ================================
-    // (1) 카테고리 선택에 따른 데이터 분기
-    // ================================
-    const categories = Array.isArray(analysisData.categoriesDetailed) ? analysisData.categoriesDetailed : [];
-    const catData =
-      categories.length > 0 && selectedCategoryIndex >= 0 && selectedCategoryIndex < categories.length
-        ? categories[selectedCategoryIndex]
-        : null;
-
-    // 키워드·태그·키워드 개수 데이터는 선택된 카테고리를 우선 사용하고, 없으면 전체 데이터를 사용합니다.
-    const keywordsArr: any[] = Array.isArray(catData?.keywords)
-      ? (catData as any).keywords
-      : Array.isArray(analysisData.keywords)
-      ? analysisData.keywords
-      : [];
+    // 카테고리가 2개 이상이면 첫 번째 카테고리의 키워드 사용, 그렇지 않으면 전체 키워드 사용
+    let keywordsArr: any[] = [];
+    const hasMultipleCategories = Array.isArray(analysisData.categoriesDetailed) && analysisData.categoriesDetailed.length >= 2;
+    
+    console.log("[QuickAIResult] === 카테고리 분석 시작 ===");
+    console.log("[QuickAIResult] analysisData.categoriesDetailed:", analysisData.categoriesDetailed);
+    console.log("[QuickAIResult] categoriesDetailed 개수:", analysisData.categoriesDetailed?.length || 0);
+    console.log("[QuickAIResult] hasMultipleCategories:", hasMultipleCategories);
+    
+    if (hasMultipleCategories) {
+      // 카테고리가 2개 이상인 경우: 첫 번째 카테고리의 키워드 사용
+      const firstCategory = analysisData.categoriesDetailed[0];
+      console.log("[QuickAIResult] 첫 번째 카테고리 데이터:", firstCategory);
+      console.log("[QuickAIResult] 첫 번째 카테고리의 keywords:", firstCategory?.keywords);
+      console.log("[QuickAIResult] keywords 타입:", typeof firstCategory?.keywords);
+      console.log("[QuickAIResult] keywords 배열 여부:", Array.isArray(firstCategory?.keywords));
+      
+      if (firstCategory && Array.isArray(firstCategory.keywords)) {
+        keywordsArr = firstCategory.keywords;
+        console.log("[QuickAIResult] ✅ 첫 번째 카테고리의 키워드 사용:", keywordsArr.length, "개");
+        console.log("[QuickAIResult] 사용된 키워드들:", keywordsArr);
+      } else {
+        // fallback: 전체 키워드 사용
+        keywordsArr = Array.isArray(analysisData.keywords) ? analysisData.keywords : [];
+        console.log("[QuickAIResult] ⚠️ fallback: 전체 키워드 사용 (첫 번째 카테고리에 키워드 없음)");
+        console.log("[QuickAIResult] 전체 키워드:", keywordsArr.length, "개");
+      }
+    } else {
+      // 카테고리가 1개이거나 없는 경우: 전체 키워드 사용
+      keywordsArr = Array.isArray(analysisData.keywords) ? analysisData.keywords : [];
+      console.log("[QuickAIResult] 카테고리가 1개이거나 없음 - 전체 키워드 사용:", keywordsArr.length, "개");
+    }
+    
+    console.log("[QuickAIResult] === 최종 사용된 키워드 배열 ===");
+    console.log("[QuickAIResult] keywordsArr 길이:", keywordsArr.length);
+    console.log("[QuickAIResult] keywordsArr 내용:", keywordsArr);
+    console.log("[QuickAIResult] === 카테고리 분석 끝 ===");
+    
     keywordsArrRef.current = keywordsArr;
 
     // 상위 12위와 동점인 키워드까지 모두 포함하도록 계산
@@ -108,7 +130,7 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     let keywordCount = 10; // 기본값
 
     // 1) keywordCounts 형태(Array | Obj) 우선
-    const kcSrc = catData?.keywordCounts ?? analysisData.keywordCounts;
+    const kcSrc = analysisData.keywordCounts;
     let kcArr: { key: string; value: number }[] = [];
     if (Array.isArray(kcSrc) && kcSrc.length > 0) {
       kcArr = kcSrc as any;
@@ -147,7 +169,46 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       analysis: any,
       displayKeywords: string[]
     ) => {
-      const tagsRaw: any[] = Array.isArray(analysis.tags) ? analysis.tags : [];
+      // 카테고리가 2개 이상이면 첫 번째 카테고리의 태그 사용, 그렇지 않으면 전체 태그 사용
+      let tagsRaw: any[] = [];
+      const hasMultipleCategories = Array.isArray(analysis.categoriesDetailed) && analysis.categoriesDetailed.length >= 2;
+      
+      console.log("[QuickAIResult-Tags] === 태그 분석 시작 ===");
+      console.log("[QuickAIResult-Tags] analysis.categoriesDetailed:", analysis.categoriesDetailed);
+      console.log("[QuickAIResult-Tags] categoriesDetailed 개수:", analysis.categoriesDetailed?.length || 0);
+      console.log("[QuickAIResult-Tags] hasMultipleCategories:", hasMultipleCategories);
+      
+      if (hasMultipleCategories) {
+        // 카테고리가 2개 이상인 경우: 첫 번째 카테고리의 태그 사용
+        const firstCategory = analysis.categoriesDetailed[0];
+        console.log("[QuickAIResult-Tags] 첫 번째 카테고리 데이터:", firstCategory);
+        console.log("[QuickAIResult-Tags] 첫 번째 카테고리의 tags:", firstCategory?.tags);
+        console.log("[QuickAIResult-Tags] tags 타입:", typeof firstCategory?.tags);
+        console.log("[QuickAIResult-Tags] tags 배열 여부:", Array.isArray(firstCategory?.tags));
+        
+        if (firstCategory && Array.isArray(firstCategory.tags)) {
+          tagsRaw = firstCategory.tags;
+          console.log("[QuickAIResult-Tags] ✅ 첫 번째 카테고리의 태그 사용 (배열):", tagsRaw.length, "개");
+        } else if (firstCategory && firstCategory.tags && typeof firstCategory.tags === 'object') {
+          // 태그가 객체 형태인 경우 배열로 변환
+          tagsRaw = Object.entries(firstCategory.tags).map(([key, value]) => ({ key, value }));
+          console.log("[QuickAIResult-Tags] ✅ 첫 번째 카테고리의 태그 사용 (객체→배열):", tagsRaw.length, "개");
+        } else {
+          // fallback: 전체 태그 사용
+          tagsRaw = Array.isArray(analysis.tags) ? analysis.tags : [];
+          console.log("[QuickAIResult-Tags] ⚠️ fallback: 전체 태그 사용 (첫 번째 카테고리에 태그 없음)");
+        }
+      } else {
+        // 카테고리가 1개이거나 없는 경우: 전체 태그 사용
+        tagsRaw = Array.isArray(analysis.tags) ? analysis.tags : [];
+        console.log("[QuickAIResult-Tags] 카테고리가 1개이거나 없음 - 전체 태그 사용:", tagsRaw.length, "개");
+      }
+      
+      console.log("[QuickAIResult-Tags] === 최종 사용된 태그 배열 ===");
+      console.log("[QuickAIResult-Tags] tagsRaw 길이:", tagsRaw.length);
+      console.log("[QuickAIResult-Tags] tagsRaw 내용:", tagsRaw);
+      console.log("[QuickAIResult-Tags] === 태그 분석 끝 ===");
+      
       const topTags = tagsRaw
         .map((t: any) => ({ key: t.key ?? t.label ?? t.tag ?? "", value: Number(t.value ?? t.count ?? 0) }))
         .filter((t) => t.key)
@@ -185,6 +246,13 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       try {
         const keywordStr = keywordsRef.current.join(', ');
 
+        console.log("[QuickAIResult] === API 호출 정보 ===");
+        console.log("[QuickAIResult] 메인 키워드:", mainKeyword);
+        console.log("[QuickAIResult] 전송될 키워드 문자열:", keywordStr);
+        console.log("[QuickAIResult] keywordsRef.current:", keywordsRef.current);
+        console.log("[QuickAIResult] keywordCount:", keywordCountRef.current);
+        console.log("[QuickAIResult] === API 호출 시작 ===");
+
         console.log("[QuickAIResult] fetch /api/generate-name", { query: mainKeyword, keyword: keywordStr, keywordCount: keywordCountRef.current });
 
         const resp = await fetch("/api/generate-name", {
@@ -195,7 +263,7 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
         if (resp.ok) {
           const json = await resp.json();
           const topKeywords = keywordsRef.current;
-          const tags = calcRecommendedTags(json.productName, catData || analysisData, topKeywords);
+          const tags = calcRecommendedTags(json.productName, analysisData, topKeywords);
           const cats = calcRecommendedCategories(analysisData);
           
           // Context에 AI 결과 저장
@@ -262,13 +330,6 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
 
     const hadPrevGenerated = aiResult !== null;
 
-    // 선택된 카테고리에 맞는 데이터 계산 (재생성 시에도 동일 로직 적용)
-    const regenCategories = Array.isArray(analysisData?.categoriesDetailed) ? analysisData.categoriesDetailed : [];
-    const catData =
-      regenCategories.length > 0 && selectedCategoryIndex >= 0 && selectedCategoryIndex < regenCategories.length
-        ? regenCategories[selectedCategoryIndex]
-        : null;
-
     // 🔒 사용량 제한 체크 – 버튼 클릭 시 즉시 확인
     if (currentUser?.email) {
       try {
@@ -291,12 +352,45 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
         return;
       }
 
-      // 1) 키워드 목록 계산 (카테고리 우선)
-      const keywordsArr: any[] = Array.isArray(catData?.keywords)
-        ? (catData as any).keywords
-        : Array.isArray(analysisData.keywords)
-        ? analysisData.keywords
-        : [];
+      // 1) 키워드 목록 계산
+      // 카테고리가 2개 이상이면 첫 번째 카테고리의 키워드 사용, 그렇지 않으면 전체 키워드 사용
+      let keywordsArr: any[] = [];
+      const hasMultipleCategories = Array.isArray(analysisData.categoriesDetailed) && analysisData.categoriesDetailed.length >= 2;
+      
+      console.log("[QuickAIResult-regenerate] === 카테고리 분석 시작 ===");
+      console.log("[QuickAIResult-regenerate] analysisData.categoriesDetailed:", analysisData.categoriesDetailed);
+      console.log("[QuickAIResult-regenerate] categoriesDetailed 개수:", analysisData.categoriesDetailed?.length || 0);
+      console.log("[QuickAIResult-regenerate] hasMultipleCategories:", hasMultipleCategories);
+      
+      if (hasMultipleCategories) {
+        // 카테고리가 2개 이상인 경우: 첫 번째 카테고리의 키워드 사용
+        const firstCategory = analysisData.categoriesDetailed[0];
+        console.log("[QuickAIResult-regenerate] 첫 번째 카테고리 데이터:", firstCategory);
+        console.log("[QuickAIResult-regenerate] 첫 번째 카테고리의 keywords:", firstCategory?.keywords);
+        console.log("[QuickAIResult-regenerate] keywords 타입:", typeof firstCategory?.keywords);
+        console.log("[QuickAIResult-regenerate] keywords 배열 여부:", Array.isArray(firstCategory?.keywords));
+        
+        if (firstCategory && Array.isArray(firstCategory.keywords)) {
+          keywordsArr = firstCategory.keywords;
+          console.log("[QuickAIResult-regenerate] ✅ 첫 번째 카테고리의 키워드 사용:", keywordsArr.length, "개");
+          console.log("[QuickAIResult-regenerate] 사용된 키워드들:", keywordsArr);
+        } else {
+          // fallback: 전체 키워드 사용
+          keywordsArr = Array.isArray(analysisData.keywords) ? analysisData.keywords : [];
+          console.log("[QuickAIResult-regenerate] ⚠️ fallback: 전체 키워드 사용 (첫 번째 카테고리에 키워드 없음)");
+          console.log("[QuickAIResult-regenerate] 전체 키워드:", keywordsArr.length, "개");
+        }
+      } else {
+        // 카테고리가 1개이거나 없는 경우: 전체 키워드 사용
+        keywordsArr = Array.isArray(analysisData.keywords) ? analysisData.keywords : [];
+        console.log("[QuickAIResult-regenerate] 카테고리가 1개이거나 없음 - 전체 키워드 사용:", keywordsArr.length, "개");
+      }
+      
+      console.log("[QuickAIResult-regenerate] === 최종 사용된 키워드 배열 ===");
+      console.log("[QuickAIResult-regenerate] keywordsArr 길이:", keywordsArr.length);
+      console.log("[QuickAIResult-regenerate] keywordsArr 내용:", keywordsArr);
+      console.log("[QuickAIResult-regenerate] === 카테고리 분석 끝 ===");
+      
       const sortedKeywords = [...keywordsArr].sort((a, b) => (b.value || 0) - (a.value || 0));
       let topKeywordsWithTies = sortedKeywords.slice(0, 12);
       if (sortedKeywords.length > 12) {
@@ -307,7 +401,7 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       keywordsRef.current = filteredKeywords.map((k) => k.key);
 
       // 2) 키워드수 계산 로직 재사용
-      const kcSrc = catData?.keywordCounts ?? analysisData.keywordCounts;
+      const kcSrc = analysisData.keywordCounts;
       let kcArr: { key: string; value: number }[] = [];
       if (Array.isArray(kcSrc) && kcSrc.length > 0) {
         kcArr = kcSrc as any;
@@ -348,6 +442,13 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     try {
       const keywordStr = keywordsRef.current.join(', ');
 
+      console.log("[QuickAIResult-regenerate] === API 호출 정보 ===");
+      console.log("[QuickAIResult-regenerate] 메인 키워드:", mainKeyword);
+      console.log("[QuickAIResult-regenerate] 전송될 키워드 문자열:", keywordStr);
+      console.log("[QuickAIResult-regenerate] keywordsRef.current:", keywordsRef.current);
+      console.log("[QuickAIResult-regenerate] keywordCount:", keywordCountRef.current);
+      console.log("[QuickAIResult-regenerate] === API 호출 시작 ===");
+
       console.log("[QuickAIResult] regenerate /api/generate-name", { query: mainKeyword, keyword: keywordStr, keywordCount: keywordCountRef.current });
 
       const resp = await fetch("/api/generate-name", {
@@ -363,11 +464,46 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       const json = await resp.json();
 
       const tags = (() => {
-        const tagsRaw: any[] = Array.isArray(catData?.tags)
-          ? (catData as any).tags
-          : Array.isArray(analysisData?.tags)
-          ? analysisData.tags
-          : [];
+        // 카테고리가 2개 이상이면 첫 번째 카테고리의 태그 사용, 그렇지 않으면 전체 태그 사용
+        let tagsRaw: any[] = [];
+        const hasMultipleCategories = Array.isArray(analysisData?.categoriesDetailed) && analysisData.categoriesDetailed.length >= 2;
+        
+        console.log("[QuickAIResult-regenerate-Tags] === 태그 분석 시작 ===");
+        console.log("[QuickAIResult-regenerate-Tags] analysisData.categoriesDetailed:", analysisData?.categoriesDetailed);
+        console.log("[QuickAIResult-regenerate-Tags] categoriesDetailed 개수:", analysisData?.categoriesDetailed?.length || 0);
+        console.log("[QuickAIResult-regenerate-Tags] hasMultipleCategories:", hasMultipleCategories);
+        
+        if (hasMultipleCategories) {
+          // 카테고리가 2개 이상인 경우: 첫 번째 카테고리의 태그 사용
+          const firstCategory = analysisData.categoriesDetailed[0];
+          console.log("[QuickAIResult-regenerate-Tags] 첫 번째 카테고리 데이터:", firstCategory);
+          console.log("[QuickAIResult-regenerate-Tags] 첫 번째 카테고리의 tags:", firstCategory?.tags);
+          console.log("[QuickAIResult-regenerate-Tags] tags 타입:", typeof firstCategory?.tags);
+          console.log("[QuickAIResult-regenerate-Tags] tags 배열 여부:", Array.isArray(firstCategory?.tags));
+          
+          if (firstCategory && Array.isArray(firstCategory.tags)) {
+            tagsRaw = firstCategory.tags;
+            console.log("[QuickAIResult-regenerate-Tags] ✅ 첫 번째 카테고리의 태그 사용 (배열):", tagsRaw.length, "개");
+          } else if (firstCategory && firstCategory.tags && typeof firstCategory.tags === 'object') {
+            // 태그가 객체 형태인 경우 배열로 변환
+            tagsRaw = Object.entries(firstCategory.tags).map(([key, value]) => ({ key, value }));
+            console.log("[QuickAIResult-regenerate-Tags] ✅ 첫 번째 카테고리의 태그 사용 (객체→배열):", tagsRaw.length, "개");
+          } else {
+            // fallback: 전체 태그 사용
+            tagsRaw = Array.isArray(analysisData?.tags) ? analysisData.tags : [];
+            console.log("[QuickAIResult-regenerate-Tags] ⚠️ fallback: 전체 태그 사용 (첫 번째 카테고리에 태그 없음)");
+          }
+        } else {
+          // 카테고리가 1개이거나 없는 경우: 전체 태그 사용
+          tagsRaw = Array.isArray(analysisData?.tags) ? analysisData.tags : [];
+          console.log("[QuickAIResult-regenerate-Tags] 카테고리가 1개이거나 없음 - 전체 태그 사용:", tagsRaw.length, "개");
+        }
+        
+        console.log("[QuickAIResult-regenerate-Tags] === 최종 사용된 태그 배열 ===");
+        console.log("[QuickAIResult-regenerate-Tags] tagsRaw 길이:", tagsRaw.length);
+        console.log("[QuickAIResult-regenerate-Tags] tagsRaw 내용:", tagsRaw);
+        console.log("[QuickAIResult-regenerate-Tags] === 태그 분석 끝 ===");
+        
         const topTags = tagsRaw
           .map((t: any) => ({ key: t.key ?? t.label ?? t.tag ?? "", value: Number(t.value ?? t.count ?? 0) }))
           .filter((t) => t.key)

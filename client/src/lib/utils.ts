@@ -73,23 +73,31 @@ export function formatCardNumberWithPrefix(cardNoPrefix: string, cardNo?: string
 
 // 한국 시간(KST, UTC+9) 기준으로 자정(00:00)부터 같은 날로 간주하는 날짜 키를 생성합니다.
 export function getKSTDateKeyWith7AMCutoff(): string {
-  const nowUtcMs = Date.now();
-  const kstMs = nowUtcMs + 9 * 60 * 60 * 1000; // UTC -> KST
-  const kst = new Date(kstMs);
-
-  const y = kst.getFullYear();
-  const m = String(kst.getMonth() + 1).padStart(2, '0');
-  const d = String(kst.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const now = new Date();
+  
+  // 한국시간대로 날짜 문자열 가져오기
+  const kstDateString = now.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  // "YYYY. MM. DD" 형식을 "YYYY-MM-DD"로 변환
+  return kstDateString.replace(/\. /g, '-').replace('.', '');
 }
 
 // 한국 시간 기준 자정(00:00)부터 같은 달로 간주하는 월 키(YYYY-MM)를 생성합니다.
 export function getKSTMonthKeyWith7AMCutoff(): string {
-  const nowUtcMs = Date.now();
-  const kstMs = nowUtcMs + 9 * 60 * 60 * 1000; // UTC -> KST
-  const kst = new Date(kstMs);
-
-  const y = kst.getFullYear();
-  const m = String(kst.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
+  const now = new Date();
+  
+  // 한국시간대로 날짜 문자열 가져오기
+  const kstDateString = now.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit'
+  });
+  
+  // "YYYY. MM" 형식을 "YYYY-MM"로 변환
+  return kstDateString.replace('. ', '-').replace('.', '');
 }
