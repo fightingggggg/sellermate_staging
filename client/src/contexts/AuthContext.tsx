@@ -43,7 +43,7 @@ interface AuthContextProps {
     currentPassword: string,
     newPassword: string,
   ) => Promise<boolean>;
-  deleteUserAccount: () => Promise<boolean>;
+  deleteUserAccount: (deletionRefId?: string) => Promise<{ success: boolean; error?: string }>;
   sendPasswordReset: (email: string) => Promise<boolean>;
   verifyEmail: () => Promise<boolean>;
   error: string | null;
@@ -61,7 +61,7 @@ const AuthContext = createContext<AuthContextProps>({
   fetchUserProfile: async () => null, // ✅ 이 줄이 누락되었음
   updateUserEmail: async () => false,
   updateUserPassword: async () => false,
-  deleteUserAccount: async () => false,
+  deleteUserAccount: async () => ({ success: false }),
   sendPasswordReset: async () => false,
   verifyEmail: async () => false,
   error: null,
@@ -504,11 +504,12 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
   }
 
   //탈퇴
-  async function deleteUserAccount(password?: string): Promise<boolean> {
+  async function deleteUserAccount(deletionRefId?: string, password?: string): Promise<{ success: boolean; error?: string }> {
     setError(null);
     if (!auth.currentUser || !currentUser) {
-      setError("로그인이 필요합니다.");
-      return false;
+      const errorMsg = "로그인이 필요합니다.";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     // Firebase Auth 삭제 전에 uid를 저장
@@ -556,6 +557,50 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
       try {
         await deleteUser(auth.currentUser);
         console.log("[AUTH-DELETE] Successfully deleted Firebase Auth user for uid:", userUid);
+        
+        // 3. 소셜 계정 연결 해제 (Firebase Auth 삭제 성공 시에만 수행)
+        try {
+          if (socialProvider === "naver") {
+            await fetch("/api/auth/naver/unlink", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
+              },
+              body: JSON.stringify({ uid: userUid }),
+            });
+            console.log("[SOCIAL-UNLINK] Successfully unlinked Naver account");
+          } else if (socialProvider === "kakao") {
+            await fetch("/api/auth/kakao/unlink", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
+              },
+              body: JSON.stringify({ uid: userUid }),
+            });
+            console.log("[SOCIAL-UNLINK] Successfully unlinked Kakao account");
+          }
+        } catch (unlinkErr) {
+          console.warn("[SOCIAL-UNLINK] warning", unlinkErr);
+        }
+        
+        // 4. socialTokens 문서 삭제 (Firebase Auth 삭제 성공 시에만 수행)
+        try {
+          const idTokenForServer = preDeleteIdToken;
+          await fetch('/api/auth/social-tokens/delete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(idTokenForServer ? { Authorization: `Bearer ${idTokenForServer}` } : {}),
+            },
+            body: JSON.stringify({ uid: userUid }),
+          });
+          console.log('[SERVER-DELETE] Requested socialTokens delete for uid:', userUid);
+        } catch (socialTokensErr) {
+          console.warn('[SERVER-DELETE] socialTokens server delete failed (ignored):', socialTokensErr);
+        }
+        
       } catch (authError) {
         console.error("[AUTH-DELETE] Error deleting Firebase Auth user:", authError);
         
@@ -570,56 +615,26 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
           }
         }
         
+        // Firebase Auth 삭제 실패 시 저장된 탈퇴 사유도 삭제
+        if (deletionRefId) {
+          try {
+            console.log("[DELETION-REASON-DELETE] Attempting to delete accountDeletions for refId:", deletionRefId);
+            await deleteDoc(doc(db, "accountDeletions", deletionRefId));
+            console.log("[DELETION-REASON-DELETE] Successfully deleted accountDeletions for refId:", deletionRefId);
+          } catch (deletionError) {
+            console.error("[DELETION-REASON-DELETE] Error deleting accountDeletions:", deletionError);
+          }
+        }
+        
         // Firebase Auth 오류를 다시 throw하여 상위에서 처리
         throw authError;
       }
 
-      // 3. 소셜 계정 연결 해제 (Firebase Auth 삭제 후 수행)
-      try {
-        if (socialProvider === "naver") {
-          await fetch("/api/auth/naver/unlink", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
-            },
-            body: JSON.stringify({ uid: userUid }),
-          });
-        } else if (socialProvider === "kakao") {
-          await fetch("/api/auth/kakao/unlink", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(preDeleteIdToken ? { Authorization: `Bearer ${preDeleteIdToken}` } : {}),
-            },
-            body: JSON.stringify({ uid: userUid }),
-          });
-        }
-      } catch (unlinkErr) {
-        console.warn("[SOCIAL-UNLINK] warning", unlinkErr);
-      }
-
-      // 4. socialTokens 문서 삭제 (클라이언트 권한 이슈 방지: 서버 API로 삭제)
-      try {
-        const idTokenForServer = preDeleteIdToken;
-        await fetch('/api/auth/social-tokens/delete', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(idTokenForServer ? { Authorization: `Bearer ${idTokenForServer}` } : {}),
-          },
-          body: JSON.stringify({ uid: userUid }),
-        });
-        console.log('[SERVER-DELETE] Requested socialTokens delete for uid:', userUid);
-      } catch (socialTokensErr) {
-        console.warn('[SERVER-DELETE] socialTokens server delete failed (ignored):', socialTokensErr);
-      }
-
-      // (소셜 언링크 및 socialTokens 삭제는 Auth 삭제 이후에 수행됨)
+      // (소셜 언링크 및 socialTokens 삭제는 Firebase Auth 삭제 성공 시에만 수행됨)
 
       setCurrentUser(null);
       setUserProfile(null);
-      return true;
+      return { success: true };
     } catch (error: any) {
       console.error("Error deleting account", error);
 
@@ -644,7 +659,7 @@ async function fetchUserProfile(): Promise<UserProfile | null> {
       }
 
       setError(errorMessage);
-      return false;
+      return { success: false, error: errorMessage };
     }
   }
 

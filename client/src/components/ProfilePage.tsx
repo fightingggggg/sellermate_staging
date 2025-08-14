@@ -167,8 +167,9 @@ export default function ProfilePage() {
       }
 
       // 1. 탈퇴 사유를 먼저 저장
+      let deletionRefId: string;
       try {
-        const deletionRefId = auth.currentUser?.uid ?? userProfile?.uid ?? Math.random().toString(36).substr(2, 9);
+        deletionRefId = auth.currentUser?.uid ?? userProfile?.uid ?? Math.random().toString(36).substr(2, 9);
         const deletionData: Record<string, any> = {
           reason: data.reason,
           timestamp: serverTimestamp(),
@@ -191,9 +192,9 @@ export default function ProfilePage() {
       }
 
       // 2. Firebase Auth 삭제 시도
-      const success = await deleteUserAccount();
+      const result = await deleteUserAccount(deletionRefId);
       
-      if (success) {
+      if (result.success) {
         toast({
           title: "회원 탈퇴 완료",
           description: "계정이 성공적으로 삭제되었습니다.",
@@ -201,8 +202,8 @@ export default function ProfilePage() {
         setDeleteDialogOpen(false);
         navigate("/");
       } else {
-        // success가 false인 경우 AuthContext의 error 메시지를 사용
-        const errorMessage = authError || "계정 탈퇴에 실패했습니다. 다시 시도해주세요.";
+        // result.error에 구체적인 에러 메시지가 포함되어 있음
+        const errorMessage = result.error || "계정 탈퇴에 실패했습니다. 다시 시도해주세요.";
         toast({
           title: "회원 탈퇴 실패",
           description: errorMessage,
