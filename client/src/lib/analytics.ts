@@ -6,7 +6,9 @@ declare global {
   }
 }
 
-const GA_ID = (import.meta as any).env.VITE_GA_MEASUREMENT_ID as string | undefined;
+import { firebaseMeasurementId } from "./firebase";
+
+const GA_ID = ((import.meta as any).env.VITE_GA_MEASUREMENT_ID as string | undefined) || firebaseMeasurementId;
 const ADS_ID = (import.meta as any).env.VITE_GADS_ID as string | undefined;
 const isProd = (import.meta as any).env.PROD as boolean;
 

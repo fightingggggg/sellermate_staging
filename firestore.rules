@@ -81,6 +81,7 @@ service cloud.firestore {
       }
     }
 
+
     // 기존 keyword_history 컬렉션도 로그인 사용자만
     match /keyword_history/{historyId} {
       allow read: if request.auth != null && resource.data.userEmail == request.auth.token.email;
