@@ -1,17 +1,18 @@
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  increment, 
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  increment,
   serverTimestamp,
   Timestamp,
   collection,
   query,
   where,
   getDocs,
-  writeBatch
+  writeBatch,
 } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 import { db } from './firebase';
 import { MEMBERSHIP_LIMITS } from '@/types';
 import { getKSTDateKeyWith7AMCutoff, getKSTMonthKeyWith7AMCutoff } from '@/lib/utils';
@@ -40,23 +41,27 @@ interface UsageLimit {
 }
 
 export class UsageService {
-  private static getUsageCollectionPath(userEmail: string): string {
-    const safeEmail = userEmail
+  private static getUserId(userEmail: string): string {
+    // 가능하면 Firebase UID 사용 (보안 규칙과 일치)
+    if (auth.currentUser?.uid) return auth.currentUser.uid;
+
+    // UID를 얻을 수 없는 예외적 상황에서는 기존 safeEmail 방식을 fallback
+    return userEmail
       .replace(/\./g, '_dot_')
       .replace(/@/g, '_at_')
       .replace(/-/g, '_dash_')
       .replace(/\+/g, '_plus_');
-    return `users/${safeEmail}/usage`;
+  }
+
+  private static getUsageCollectionPath(userEmail: string): string {
+    const userId = this.getUserId(userEmail);
+    return `users/${userId}/usage`;
   }
 
   // 월별 사용량 경로 (예: users/{safeEmail}/usageMonthly/2025-08)
   private static getMonthlyUsageCollectionPath(userEmail: string): string {
-    const safeEmail = userEmail
-      .replace(/\./g, '_dot_')
-      .replace(/@/g, '_at_')
-      .replace(/-/g, '_dash_')
-      .replace(/\+/g, '_plus_');
-    return `users/${safeEmail}/usageMonthly`;
+    const userId = this.getUserId(userEmail);
+    return `users/${userId}/usageMonthly`;
   }
 
   private static getCurrentMonthString(): string {
@@ -66,17 +71,13 @@ export class UsageService {
   // 사용자의 멤버십 타입 확인
   private static async getUserMembershipType(userEmail: string): Promise<'basic' | 'booster'> {
     try {
-      const safeEmail = userEmail
-        .replace(/\./g, '_dot_')
-        .replace(/@/g, '_at_')
-        .replace(/-/g, '_dash_')
-        .replace(/\+/g, '_plus_');
-      
+      const userId = this.getUserId(userEmail);
+
       // subscriptions 컬렉션에서 활성 또는 취소된 구독 확인
       const subscriptionsRef = collection(db, 'subscriptions');
       const q = query(
         subscriptionsRef,
-        where('uid', '==', safeEmail),
+        where('uid', '==', userId),
         where('status', 'in', ['ACTIVE', 'CANCELLED'])
       );
       
