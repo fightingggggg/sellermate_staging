@@ -202,17 +202,17 @@ export default function NaverOnboarding() {
       const phoneNumber = buildE164(countryCode, number);
 
       // 소셜에서 가져온 전화번호와 입력한 전화번호 비교
-      // if (socialPhone) {
-      //   if (!comparePhoneNumbers(socialPhone, number)) {
-      //     toast({
-      //       variant: "destructive",
-      //       title: "전화번호 불일치",
-      //       description: `${provider === "naver" ? "네이버" : "카카오"}에 등록된 전화번호와 입력하신 전화번호가 다릅니다. 동일한 휴대폰 번호를 입력해주세요.`,
-      //     });
-      //     setLoading(false);
-      //     return;
-      //   }
-      // }
+      if (socialPhone) {
+        if (!comparePhoneNumbers(socialPhone, number)) {
+          toast({
+            variant: "destructive",
+            title: "전화번호 불일치",
+            description: `${provider === "naver" ? "네이버" : "카카오"}에 등록된 전화번호와 입력하신 전화번호가 다릅니다. 동일한 휴대폰 번호를 입력해주세요.`,
+          });
+          setLoading(false);
+          return;
+        }
+      }
 
       // 휴대폰 번호 중복 여부 확인
       try {
