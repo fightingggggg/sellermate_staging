@@ -10,6 +10,7 @@ import FooterSection from "../components/FooterSection";
 import FaqSection from "../components/FaqSection";
 import DashboardLayout from "@/components/DashboardLayout";
 import ReviewSection from "../components/ReviewSection";
+import UpgradeNoticeModal from "@/components/UpgradeNoticeModal";
 
 import { trackEvent, trackTimeSpent } from "@/lib/analytics";
 import { useEffect, useState, lazy, Suspense } from "react";
@@ -29,6 +30,9 @@ export default function Home() {
   const isMobile = useIsMobile();
   const [showPcOnlyModal, setShowPcOnlyModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  
+  // 업그레이드 안내 팝업
+  const [showUpgradeNotice, setShowUpgradeNotice] = useState(false);
 
   const handleAnalyzeClick = () => {
     // 모바일 체크 - PC 전용 기능
@@ -96,6 +100,26 @@ export default function Home() {
   //     cleanupHome();
   //   };
   // }, []);
+
+  // 업그레이드 안내 팝업 표시 여부 확인
+  useEffect(() => {
+    const isUpgradeNoticeDismissed = localStorage.getItem("upgrade-notice-dismissed");
+    if (!isUpgradeNoticeDismissed) {
+      setShowUpgradeNotice(true);
+    }
+
+    // 개발자용 키보드 단축키: Ctrl+Shift+U로 업그레이드 팝업 리셋
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'U') {
+        localStorage.removeItem("upgrade-notice-dismissed");
+        setShowUpgradeNotice(true);
+        console.log("업그레이드 안내 팝업 리셋됨");
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   if (loading) {
     return (
@@ -424,6 +448,11 @@ export default function Home() {
           </Suspense>
         </DialogContent>
       </Dialog>
+      {/* 업그레이드 안내 팝업 */}
+      <UpgradeNoticeModal 
+        open={showUpgradeNotice} 
+        onOpenChange={setShowUpgradeNotice} 
+      />
       </div>
     </DashboardLayout>
   );

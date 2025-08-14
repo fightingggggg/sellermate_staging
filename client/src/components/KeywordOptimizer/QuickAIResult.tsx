@@ -94,6 +94,11 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
         keywordsArr = firstCategory.keywords;
         console.log("[QuickAIResult] ✅ 첫 번째 카테고리의 키워드 사용:", keywordsArr.length, "개");
         console.log("[QuickAIResult] 사용된 키워드들:", keywordsArr);
+      } else if (firstCategory && firstCategory.keywords && typeof firstCategory.keywords === 'object') {
+        // 키워드가 객체 형태인 경우 배열로 변환
+        keywordsArr = Object.entries(firstCategory.keywords).map(([key, value]) => ({ key, value }));
+        console.log("[QuickAIResult] ✅ 첫 번째 카테고리의 키워드 사용 (객체→배열):", keywordsArr.length, "개");
+        console.log("[QuickAIResult] 사용된 키워드들:", keywordsArr);
       } else {
         // fallback: 전체 키워드 사용
         keywordsArr = Array.isArray(analysisData.keywords) ? analysisData.keywords : [];
@@ -373,6 +378,11 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
         if (firstCategory && Array.isArray(firstCategory.keywords)) {
           keywordsArr = firstCategory.keywords;
           console.log("[QuickAIResult-regenerate] ✅ 첫 번째 카테고리의 키워드 사용:", keywordsArr.length, "개");
+          console.log("[QuickAIResult-regenerate] 사용된 키워드들:", keywordsArr);
+        } else if (firstCategory && firstCategory.keywords && typeof firstCategory.keywords === 'object') {
+          // 키워드가 객체 형태인 경우 배열로 변환
+          keywordsArr = Object.entries(firstCategory.keywords).map(([key, value]) => ({ key, value }));
+          console.log("[QuickAIResult-regenerate] ✅ 첫 번째 카테고리의 키워드 사용 (객체→배열):", keywordsArr.length, "개");
           console.log("[QuickAIResult-regenerate] 사용된 키워드들:", keywordsArr);
         } else {
           // fallback: 전체 키워드 사용

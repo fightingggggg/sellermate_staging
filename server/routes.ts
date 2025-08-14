@@ -3841,6 +3841,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============= 확장프로그램용 사용량 API (토큰 없이 식별자로 요청) =============
+  
+  // 식별자(이메일/폰/UID)로 Firebase UID 찾기 헬퍼 함수
+  async function findUidByIdentifier(identifier: string): Promise<string | null> {
+    try {
+      const db = admin.firestore();
+      
+      // 1. 이메일로 찾기
+      if (identifier.includes('@')) {
+        try {
+          const userRecord = await admin.auth().getUserByEmail(identifier);
+          return userRecord.uid;
+        } catch (e) {
+          // 이메일로 찾지 못함, 다른 방법 시도
+        }
+      }
+      
+      // 2. 폰번호로 찾기
+      if (identifier.startsWith('+') || /^\d+$/.test(identifier)) {
+        try {
+          const phoneNumber = identifier.startsWith('+') ? identifier : `+82${identifier}`;
+          const userRecord = await admin.auth().getUserByPhoneNumber(phoneNumber);
+          return userRecord.uid;
+        } catch (e) {
+          // 폰번호로 찾지 못함, 다른 방법 시도
+        }
+      }
+      
+      // 3. UID로 직접 확인
+      try {
+        await admin.auth().getUser(identifier);
+        return identifier; // 유효한 UID
+      } catch (e) {
+        // UID도 아님
+      }
+      
+      // 4. Firestore users 컬렉션에서 커스텀 필드로 검색
+      const usersRef = db.collection('users');
+      
+      // 이메일 필드로 검색
+      if (identifier.includes('@')) {
+        const emailQuery = await usersRef.where('email', '==', identifier).limit(1).get();
+        if (!emailQuery.empty) {
+          return emailQuery.docs[0].id;
+        }
+      }
+      
+      // 폰번호 필드로 검색  
+      const phoneQuery = await usersRef.where('phoneNumber', '==', identifier).limit(1).get();
+      if (!phoneQuery.empty) {
+        return phoneQuery.docs[0].id;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('findUidByIdentifier error:', error);
+      return null;
+    }
+  }
+
+  // POST /api/usage/consume - 확장프로그램용 사용량 소비 (식별자 기반)
+  app.post('/api/usage/consume', async (req, res) => {
+    try {
+      const { identifier, action, timestamp } = req.body;
+      
+      if (!identifier) {
+        return res.status(400).json({ 
+          allowed: false, 
+          message: 'identifier is required' 
+        });
+      }
+
+      console.log('[UsageDebug][Server][Extension] consume 요청 수신 ←', { 
+        identifier: identifier.slice(0, 10) + '***', // 로그용 마스킹
+        action, 
+        timestamp,
+        now: new Date().toISOString() 
+      });
+
+      // 식별자로 UID 찾기
+      const uid = await findUidByIdentifier(identifier);
+      if (!uid) {
+        console.log('[UsageDebug][Server][Extension] consume UID 찾기 실패 →', { identifier: identifier.slice(0, 10) + '***' });
+        return res.status(404).json({ 
+          allowed: false, 
+          message: 'User not found' 
+        });
+      }
+
+      const db = admin.firestore();
+      console.log('[UsageDebug][Server][Extension] consume UID 찾기 성공 →', { uid });
+
+      // 멤버십 타입 확인
+      let membershipType = 'basic';
+      const subscriptionDoc = await db.collection('subscriptions').doc(uid).get();
+      if (subscriptionDoc.exists) {
+        const subscriptionData = subscriptionDoc.data();
+        if (subscriptionData?.plan === 'BOOSTER') {
+          const endDate = subscriptionData.endDate?.toDate?.() || new Date();
+          const now = new Date();
+          if (endDate > now) {
+            membershipType = 'booster';
+          }
+        }
+      }
+      console.log('[UsageDebug][Server][Extension] consume 멤버십 판정 →', { uid, membershipType });
+
+      if (membershipType === 'booster') {
+        console.log('[UsageDebug][Server][Extension] consume 부스터 → 카운트 소모 없이 허용');
+        return res.json({ 
+          allowed: true, 
+          membershipType, 
+          currentCount: 0, 
+          limit: Number.MAX_SAFE_INTEGER 
+        });
+      }
+
+      const limit = 20;
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYYMM
+      const docId = `${uid}_${monthKey}`;
+      const ref = db.collection('extensionUsage').doc(docId);
+
+      const result = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const current = snap.exists ? (snap.data()?.count || 0) : 0;
+        console.log('[UsageDebug][Server][Extension] consume 현재 카운트 →', { uid, monthKey, current, limit });
+        
+        if (current >= limit) {
+          return { allowed: false, currentCount: current, limit, membershipType };
+        }
+        
+        const next = current + 1;
+        if (snap.exists) {
+          tx.update(ref, { 
+            count: next, 
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastAction: action || 'seo_analysis'
+          });
+        } else {
+          tx.set(ref, { 
+            count: next, 
+            month: monthKey, 
+            uid,
+            lastAction: action || 'seo_analysis',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(), 
+            updatedAt: admin.firestore.FieldValue.serverTimestamp() 
+          });
+        }
+        return { allowed: true, currentCount: next, limit, membershipType };
+      });
+
+      console.log('[UsageDebug][Server][Extension] consume 결과 →', { uid, result });
+      
+      if (!result.allowed) {
+        return res.status(429).json(result);
+      }
+      return res.json(result);
+      
+    } catch (error) {
+      console.error('[Extension] usage/consume error:', error);
+      return res.status(500).json({ 
+        allowed: false, 
+        message: 'Internal server error' 
+      });
+    }
+  });
+
+  // POST /api/usage/check - 확장프로그램용 사용량 조회 (식별자 기반)
+  app.post('/api/usage/check', async (req, res) => {
+    try {
+      const { identifier, timestamp } = req.body;
+      
+      if (!identifier) {
+        return res.status(400).json({ 
+          allowed: false, 
+          message: 'identifier is required' 
+        });
+      }
+
+      console.log('[UsageDebug][Server][Extension] check 요청 수신 ←', { 
+        identifier: identifier.slice(0, 10) + '***', // 로그용 마스킹
+        timestamp,
+        now: new Date().toISOString() 
+      });
+
+      // 식별자로 UID 찾기
+      const uid = await findUidByIdentifier(identifier);
+      if (!uid) {
+        console.log('[UsageDebug][Server][Extension] check UID 찾기 실패 →', { identifier: identifier.slice(0, 10) + '***' });
+        return res.status(404).json({ 
+          allowed: false, 
+          message: 'User not found' 
+        });
+      }
+
+      const db = admin.firestore();
+      console.log('[UsageDebug][Server][Extension] check UID 찾기 성공 →', { uid });
+
+      // 멤버십 타입 확인
+      let membershipType = 'basic';
+      const subscriptionDoc = await db.collection('subscriptions').doc(uid).get();
+      if (subscriptionDoc.exists) {
+        const subscriptionData = subscriptionDoc.data();
+        if (subscriptionData?.plan === 'BOOSTER') {
+          const endDate = subscriptionData.endDate?.toDate?.() || new Date();
+          const now = new Date();
+          if (endDate > now) {
+            membershipType = 'booster';
+          }
+        }
+      }
+      console.log('[UsageDebug][Server][Extension] check 멤버십 판정 →', { uid, membershipType });
+
+      const limit = membershipType === 'basic' ? 20 : Number.MAX_SAFE_INTEGER;
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYYMM
+      const docId = `${uid}_${monthKey}`;
+      const ref = db.collection('extensionUsage').doc(docId);
+      const snap = await ref.get();
+      const current = snap.exists ? (snap.data()?.count || 0) : 0;
+      const allowed = current < limit;
+
+      console.log('[UsageDebug][Server][Extension] check 현재 카운트 →', { 
+        uid, 
+        monthKey, 
+        exists: snap.exists, 
+        current, 
+        limit, 
+        allowed 
+      });
+
+      const result = {
+        allowed,
+        membershipType,
+        currentCount: current,
+        limit
+      };
+
+      console.log('[UsageDebug][Server][Extension] check 응답 →', result);
+      return res.json(result);
+      
+    } catch (error) {
+      console.error('[Extension] usage/check error:', error);
+      return res.status(500).json({ 
+        allowed: false, 
+        message: 'Internal server error' 
+      });
+    }
+  });
+
   const port = Number(process.env.PORT) || 5005;
   const httpServer = createServer(app);
 
