@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { auth, db } from "@/lib/firebase";
-import { signInWithCustomToken, RecaptchaVerifier, signInWithPhoneNumber, updateEmail, updateProfile, PhoneAuthProvider, linkWithCredential, ConfirmationResult } from "firebase/auth";
+import { signInWithCustomToken, RecaptchaVerifier, signInWithPhoneNumber, updateEmail, updateProfile, PhoneAuthProvider, linkWithCredential, ConfirmationResult, reauthenticateWithCredential } from "firebase/auth";
 import { doc, setDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -202,17 +202,17 @@ export default function NaverOnboarding() {
       const phoneNumber = buildE164(countryCode, number);
 
       // 소셜에서 가져온 전화번호와 입력한 전화번호 비교
-      if (socialPhone) {
-        if (!comparePhoneNumbers(socialPhone, number)) {
-          toast({
-            variant: "destructive",
-            title: "전화번호 불일치",
-            description: `${provider === "naver" ? "네이버" : "카카오"}에 등록된 전화번호와 입력하신 전화번호가 다릅니다. 동일한 휴대폰 번호를 입력해주세요.`,
-          });
-          setLoading(false);
-          return;
-        }
-      }
+      // if (socialPhone) {
+      //   if (!comparePhoneNumbers(socialPhone, number)) {
+      //     toast({
+      //       variant: "destructive",
+      //       title: "전화번호 불일치",
+      //       description: `${provider === "naver" ? "네이버" : "카카오"}에 등록된 전화번호와 입력하신 전화번호가 다릅니다. 동일한 휴대폰 번호를 입력해주세요.`,
+      //     });
+      //     setLoading(false);
+      //     return;
+      //   }
+      // }
 
       // 휴대폰 번호 중복 여부 확인
       try {
@@ -303,8 +303,10 @@ export default function NaverOnboarding() {
     }
 
     setLoading(true);
+    // try/catch 바깥에서 참조할 수 있도록 변수 선선언
+    let phoneNum = "";
     try {
-      const phoneNum = buildE164(countryCode, number);
+      phoneNum = buildE164(countryCode, number);
       
       // 소셜 로그인인 경우: 전화번호를 현재 소셜 계정에 연결
       if (provider && (provider === "naver" || provider === "kakao")) {
@@ -321,8 +323,22 @@ export default function NaverOnboarding() {
           console.log("[ONBOARDING] 소셜 계정에 전화번호 연결 완료");
         } catch (linkErr: any) {
           if (linkErr?.code === "auth/provider-already-linked") {
-            console.warn("[ONBOARDING] 전화번호 제공자(provider)가 이미 연결되어 있음. 성공으로 간주하고 진행", linkErr);
-            // 이미 연결된 상태이므로 그대로 진행
+            // 이미 전화번호 제공자가 연결되어 있는 경우, 현재 계정의 전화번호와 사용자가 입력한 번호가 동일한지 확인합니다.
+            const currentPhone = auth.currentUser?.phoneNumber || "";
+            if (currentPhone && comparePhoneNumbers(currentPhone, phoneNum)) {
+              try {
+                // 이미 연결된 전화번호라면 재인증(reauthenticate)으로 SMS 코드 유효성만 확인
+                await reauthenticateWithCredential(auth.currentUser, credential);
+                console.log("[ONBOARDING] 기존 전화번호 재인증 성공");
+              } catch (reauthErr: any) {
+                console.error("[ONBOARDING] 재인증 실패", reauthErr);
+                throw reauthErr; // 코드가 잘못된 경우 에러 전파
+              }
+            } else {
+              // 다른 번호가 이미 연결된 경우 예외 처리
+              console.error("[ONBOARDING] 다른 전화번호가 이미 연결되어 있어 인증에 실패합니다.");
+              throw linkErr;
+            }
           } else {
             throw linkErr;
           }
@@ -347,10 +363,29 @@ export default function NaverOnboarding() {
       console.error("[ONBOARDING] 휴대폰 인증 실패", err);
       let msg: string;
       if (err?.code === "auth/provider-already-linked") {
-        // 이미 연결된 상태이므로 성공으로 간주
-        setPhoneDone(true);
-        setStep("done");
-        toast({ title: "이미 인증됨", description: "해당 계정에는 이미 전화번호가 연결되어 있어요." });
+        // 이미 전화번호 제공자가 연결되어 있는 경우 입력한 번호와 동일한지 확인합니다.
+        const currentPhone = auth.currentUser?.phoneNumber || "";
+        if (currentPhone && comparePhoneNumbers(currentPhone, phoneNum)) {
+          try {
+            // credential은 try 블록 내부에서만 선언되었으므로 여기서는 재생성
+            const verificationId = verificationIdRef.current || (window as any).verificationId;
+            if (verificationId) {
+              const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
+              await reauthenticateWithCredential(auth.currentUser!, credential);
+              console.log("[ONBOARDING] 기존 전화번호 재인증 성공(outer catch)");
+            }
+          } catch (reauthErr) {
+            console.error("[ONBOARDING] 재인증 실패(outer catch)", reauthErr);
+            toast({ variant: "destructive", title: "인증 실패", description: "인증번호가 올바르지 않습니다." });
+            return;
+          }
+          setPhoneDone(true);
+          setStep("done");
+          toast({ title: "이미 인증됨", description: "해당 계정에는 이미 동일한 휴대폰 번호가 연결되어 있습니다." });
+          return;
+        }
+        // 번호가 다르면 오류 처리
+        toast({ variant: "destructive", title: "인증 실패", description: "다른 휴대폰 번호가 이미 연결되어 있습니다." });
         return;
       }
       if (err?.code === "auth/invalid-verification-code" || err?.message?.includes("invalid-verification-code")) {
