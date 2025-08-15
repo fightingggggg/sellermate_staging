@@ -89,18 +89,14 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && resource.data.userEmail == request.auth.token.email;
     }
     
-    // 키워드 경쟁률 분석 데이터 컬렉션 (날짜별)
+    // 키워드 경쟁률 분석 데이터 컬렉션 (날짜별) - 서버 전용
     match /keywordAnalysis/{dateKey}/{analysisId} {
-      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow read, write: if false; // 클라이언트에서는 접근 불가 (서버 전용)
     }
     
-    // 상품명 최적화 데이터 컬렉션 (날짜별)
+    // 상품명 최적화 데이터 컬렉션 (날짜별) - 서버 전용  
     match /productNameOptimize/{dateKey}/{optimizeId} {
-      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow read, write: if false; // 클라이언트에서는 접근 불가 (서버 전용)
     }
     
     
