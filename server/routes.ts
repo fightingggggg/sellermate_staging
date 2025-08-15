@@ -102,16 +102,11 @@ async function verifyAuthUid(req: any, res: any): Promise<string | null> {
 async function extractUidFromToken(req: any): Promise<string | null> {
   try {
     const authHeader: string = req.headers?.authorization || '';
-    console.log('[Auth] 토큰 추출 시도:', { hasAuthHeader: !!authHeader, startsWithBearer: authHeader.startsWith('Bearer ') });
-    
     if (!authHeader.startsWith('Bearer ')) {
-      console.warn('[Auth] Bearer 토큰이 없음');
       return null;
     }
     const token = authHeader.slice(7);
-    console.log('[Auth] 토큰 검증 시도 중...');
     const decoded = await admin.auth().verifyIdToken(token);
-    console.log('[Auth] 토큰 검증 성공:', { uid: decoded.uid });
     return decoded.uid;
   } catch (e: any) {
     console.warn('[Auth] Token extract failed:', e?.message || e);
@@ -121,26 +116,20 @@ async function extractUidFromToken(req: any): Promise<string | null> {
 
 // 데이터 저장 헬퍼 함수들
 async function saveKeywordAnalysisData(uid: string | null, keyword: string, data: any) {
-  console.log('[keywordAnalysis] 저장 시작:', { uid: uid ? 'exists' : 'null', keyword });
-  
-  if (!uid) {
-    console.warn('[keywordAnalysis] UID가 없어서 저장 중단');
-    return;
-  }
+  if (!uid) return;
   
   try {
     const db = admin.firestore();
     
     // 현재 날짜를 YYYY-MM-DD 형식으로 생성
     const today = new Date();
-    const dateKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dateStr = today.getFullYear() + '-' + 
+                   String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                   String(today.getDate()).padStart(2, '0');
     
-    console.log('[keywordAnalysis] 저장 데이터 구성 중:', { uid, dateKey, keyword });
-    
-    // history와 동일한 필드 구조로 저장 + 사용자 uid 추가
+    // history와 동일한 필드 구조로 저장
     const analysisItem = {
-      uid: uid,
-      dateKey: dateKey, // 날짜 필드 추가
+      uid: uid, // uid 필드 추가 (데이터 분석을 위해)
       keyword: keyword.trim(),
       type: 'keyword-competition', // history의 type 필드와 동일한 방식
       data: data, // 응답 데이터
@@ -152,41 +141,28 @@ async function saveKeywordAnalysisData(uid: string | null, keyword: string, data
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
     
-    console.log('[keywordAnalysis] Firestore 저장 시도 중...');
-    await db.collection('keywordAnalysis').add(analysisItem);
-    console.log('[keywordAnalysis] 데이터 저장 완료:', { uid, keyword, dateKey });
+    await db.collection('keywordAnalysis').doc(dateStr).collection('records').add(analysisItem);
+    console.log('[keywordAnalysis] 데이터 저장 완료:', { uid, keyword, date: dateStr });
   } catch (error) {
     console.error('[keywordAnalysis] 데이터 저장 실패:', error);
-    console.error('[keywordAnalysis] 에러 상세:', {
-      name: (error as any)?.name,
-      message: (error as any)?.message,
-      code: (error as any)?.code,
-      details: (error as any)?.details
-    });
   }
 }
 
 async function saveProductNameOptimizeData(uid: string | null, requestData: any, responseData: any) {
-  console.log('[productNameOptimize] 저장 시작:', { uid: uid ? 'exists' : 'null', query: requestData?.query });
-  
-  if (!uid) {
-    console.warn('[productNameOptimize] UID가 없어서 저장 중단');
-    return;
-  }
+  if (!uid) return;
   
   try {
     const db = admin.firestore();
     
     // 현재 날짜를 YYYY-MM-DD 형식으로 생성
     const today = new Date();
-    const dateKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dateStr = today.getFullYear() + '-' + 
+                   String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                   String(today.getDate()).padStart(2, '0');
     
-    console.log('[productNameOptimize] 저장 데이터 구성 중:', { uid, dateKey, query: requestData.query });
-    
-    // history와 동일한 필드 구조로 저장 + 사용자 uid 추가
+    // history와 동일한 필드 구조로 저장
     const optimizeItem = {
-      uid: uid,
-      dateKey: dateKey, // 날짜 필드 추가
+      uid: uid, // uid 필드 추가 (데이터 분석을 위해)
       keyword: requestData.query.trim(), // 쿼리를 keyword로 저장
       type: 'product-name-optimize', // history의 type 필드와 동일한 방식
       data: {
@@ -208,17 +184,10 @@ async function saveProductNameOptimizeData(uid: string | null, requestData: any,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
     
-    console.log('[productNameOptimize] Firestore 저장 시도 중...');
-    await db.collection('productNameOptimize').add(optimizeItem);
-    console.log('[productNameOptimize] 데이터 저장 완료:', { uid, query: requestData.query, dateKey });
+    await db.collection('productNameOptimize').doc(dateStr).collection('records').add(optimizeItem);
+    console.log('[productNameOptimize] 데이터 저장 완료:', { uid, query: requestData.query, date: dateStr });
   } catch (error) {
     console.error('[productNameOptimize] 데이터 저장 실패:', error);
-    console.error('[productNameOptimize] 에러 상세:', {
-      name: (error as any)?.name,
-      message: (error as any)?.message,
-      code: (error as any)?.code,
-      details: (error as any)?.details
-    });
   }
 }
 
@@ -268,52 +237,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API Endpoint to check server status
   app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'SEO Dashboard API is running' });
-  });
-
-  // 테스트용 데이터 저장 엔드포인트 (디버깅용)
-  app.post('/api/test-storage', async (req, res) => {
-    try {
-      console.log('=== 테스트 저장 시작 ===');
-      
-      // 토큰에서 UID 추출
-      const uid = await extractUidFromToken(req);
-      console.log('테스트: UID 추출 결과:', { uid: uid ? 'exists' : 'null' });
-      
-      if (!uid) {
-        return res.status(401).json({ error: 'UID 추출 실패', message: '토큰이 유효하지 않습니다.' });
-      }
-
-      // 테스트 데이터
-      const testKeyword = '테스트키워드';
-      const testData = { test: true, timestamp: new Date().toISOString() };
-      const testRequestData = { query: '테스트쿼리', keyword: '테스트키워드', keywordCount: 5 };
-      const testResponseData = { productName: '테스트상품명', reason: '테스트이유' };
-
-      // keywordAnalysis 테스트
-      console.log('테스트: keywordAnalysis 저장 시도');
-      await saveKeywordAnalysisData(uid, testKeyword, testData);
-      
-      // productNameOptimize 테스트  
-      console.log('테스트: productNameOptimize 저장 시도');
-      await saveProductNameOptimizeData(uid, testRequestData, testResponseData);
-
-      console.log('=== 테스트 저장 완료 ===');
-      res.json({ 
-        success: true, 
-        message: '테스트 데이터 저장 완료',
-        uid: uid,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error: any) {
-      console.error('=== 테스트 저장 실패 ===');
-      console.error('테스트 에러:', error);
-      res.status(500).json({ 
-        error: '테스트 저장 실패', 
-        detail: error.message,
-        stack: error.stack 
-      });
-    }
   });
 
   // API Endpoint for Chrome extension to communicate with server
@@ -631,11 +554,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await taskPromise;
       
       // 상품명 최적화 데이터 저장
-      console.log('[generate-name] 데이터 저장 시작');
       const uid = await extractUidFromToken(req);
-      console.log('[generate-name] UID 추출 결과:', { uid: uid ? 'exists' : 'null' });
       await saveProductNameOptimizeData(uid, { query, keyword, keywordCount: keywordCountNum }, result);
-      console.log('[generate-name] 데이터 저장 시도 완료');
       
       return res.json(result);
     } catch (err) {
@@ -791,11 +711,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // 키워드 경쟁률 분석 데이터 저장
-      console.log('[keyword-competition] 데이터 저장 시작');
       const uid = await extractUidFromToken(req);
-      console.log('[keyword-competition] UID 추출 결과:', { uid: uid ? 'exists' : 'null' });
       await saveKeywordAnalysisData(uid, keyword, data);
-      console.log('[keyword-competition] 데이터 저장 시도 완료');
       
       console.log('[keyword-competition] API 호출 성공 완료');
       res.json(data);
