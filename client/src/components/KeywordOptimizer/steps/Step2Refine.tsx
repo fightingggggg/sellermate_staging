@@ -744,8 +744,9 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
           <Info className="w-4 h-4" />
           <AlertTitle>동의어 검사란?</AlertTitle>
           <AlertDescription>
-            동의어 검사는 서로 다른 단어처럼 보여도, 실제로 같은 의미로 검색되는 단어인지 확인하는 과정이에요.<br />
-            예: <strong>'바지'</strong>와 <strong>'팬츠'</strong>는 글씨는 다르지만, 같은 검색어로 인지되는 동의어예요.
+            서로 다른 단어처럼 보여도, 실제로 같은 의미로 검색되는지 확인하는 과정이에요.<br />
+            예를 들어, <strong>'바지'</strong>와 <strong>'팬츠'</strong>는 글자는 다르지만 같은 검색어로 인식되는 동의어예요.<br />
+            <br/><strong>검사 결과에 따라 다음 단계에서 중복 키워드가 자동 합산되므로, 비슷한 의미의 단어는 모두 확인하는 게 좋아요.</strong>
           </AlertDescription>
         </Alert>
       )}
@@ -939,9 +940,12 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
             <Info className="w-4 h-4 text-orange-600" />
             <AlertTitle>조합형 / 일체형 검사란?</AlertTitle>
             <AlertDescription>
-              메인 키워드를 생략해도 되는지, 꼭 써야 하는지를 확인하는 과정이에요.<br />
-              예:  메인 키워드가 고구마 일 때, '밤고구마'와 '꿀고구마'가 <strong>조합형</strong>이면 → <strong>'밤 꿀 고구마'</strong>처럼 고구마를 한 번만 써도 둘 다 검색되고,<br />
-              <strong>일체형</strong>이면 → <strong>'밤고구마 꿀고구마'</strong>처럼 붙여서 고구마 두 개를 써야 둘 다 검색돼요.
+              메인 키워드를 생략해도 되는지, 반드시 써야 하는지를 확인하는 과정이에요.<br />
+              예를 들어, 메인 키워드가 고구마일 때<br />
+              <strong>조합형</strong>이면: '밤고구마'와 '꿀고구마'를 입력해도 → <strong>밤 꿀 고구마</strong>처럼 '고구마'를 한 번만 써도 두 단어 모두 검색돼요.<br />
+              <strong>일체형</strong>이면: <strong>'밤고구마 꿀고구마'</strong>처럼 '고구마'를 각각 붙여 써야 두 단어 모두 검색돼요.<br />
+              
+              <br/> <strong>검사 결과에 따라 다음 단계에서 키워드가 자동 정리되므로, 메인 키워드와 함께 붙일 수 있는 단어는 모두 확인하는 게 좋아요.</strong>
             </AlertDescription>
           </Alert>
         </>
