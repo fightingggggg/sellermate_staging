@@ -98,6 +98,101 @@ async function verifyAuthUid(req: any, res: any): Promise<string | null> {
   }
 }
 
+// 토큰에서 UID 추출 (응답 없이)
+async function extractUidFromToken(req: any): Promise<string | null> {
+  try {
+    const authHeader: string = req.headers?.authorization || '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return null;
+    }
+    const token = authHeader.slice(7);
+    const decoded = await admin.auth().verifyIdToken(token);
+    return decoded.uid;
+  } catch (e: any) {
+    console.warn('[Auth] Token extract failed:', e?.message || e);
+    return null;
+  }
+}
+
+// 데이터 저장 헬퍼 함수들
+async function saveKeywordAnalysisData(uid: string | null, keyword: string, data: any) {
+  if (!uid) return;
+  
+  try {
+    const db = admin.firestore();
+    
+    // 현재 날짜를 YYYY-MM-DD 형식으로 생성
+    const today = new Date();
+    const dateKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // keywordAnalysis/{날짜} 컬렉션에 저장
+    const keywordAnalysisPath = `keywordAnalysis/${dateKey}`;
+    
+    // history와 동일한 필드 구조로 저장 + 사용자 uid 추가
+    const analysisItem = {
+      uid: uid,
+      keyword: keyword.trim(),
+      type: 'keyword-competition', // history의 type 필드와 동일한 방식
+      data: data, // 응답 데이터
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      isStarred: false,
+      pageIndex: null,
+      keywordLower: keyword.trim().toLowerCase(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+    await db.collection(keywordAnalysisPath).add(analysisItem);
+    console.log('[keywordAnalysis] 데이터 저장 완료:', { uid, keyword, dateKey });
+  } catch (error) {
+    console.error('[keywordAnalysis] 데이터 저장 실패:', error);
+  }
+}
+
+async function saveProductNameOptimizeData(uid: string | null, requestData: any, responseData: any) {
+  if (!uid) return;
+  
+  try {
+    const db = admin.firestore();
+    
+    // 현재 날짜를 YYYY-MM-DD 형식으로 생성
+    const today = new Date();
+    const dateKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // productNameOptimize/{날짜} 컬렉션에 저장
+    const productNameOptimizePath = `productNameOptimize/${dateKey}`;
+    
+    // history와 동일한 필드 구조로 저장 + 사용자 uid 추가
+    const optimizeItem = {
+      uid: uid,
+      keyword: requestData.query.trim(), // 쿼리를 keyword로 저장
+      type: 'product-name-optimize', // history의 type 필드와 동일한 방식
+      data: {
+        requestData: {
+          query: requestData.query,
+          keyword: requestData.keyword,
+          keywordCount: requestData.keywordCount
+        },
+        responseData: {
+          productName: responseData.productName,
+          reason: responseData.reason
+        }
+      },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      isStarred: false,
+      pageIndex: null,
+      keywordLower: requestData.query.trim().toLowerCase(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+    await db.collection(productNameOptimizePath).add(optimizeItem);
+    console.log('[productNameOptimize] 데이터 저장 완료:', { uid, query: requestData.query, dateKey });
+  } catch (error) {
+    console.error('[productNameOptimize] 데이터 저장 실패:', error);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS 설정 추가
   const corsAllowedOrigins: string[] = [
@@ -459,6 +554,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const result = await taskPromise;
+      
+      // 상품명 최적화 데이터 저장
+      const uid = await extractUidFromToken(req);
+      await saveProductNameOptimizeData(uid, { query, keyword, keywordCount: keywordCountNum }, result);
+      
       return res.json(result);
     } catch (err) {
       console.error('[generate-name] Claude API error detail', err);
@@ -611,6 +711,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dataKeys: data ? Object.keys(data) : [],
         fullResponse: JSON.stringify(data, null, 2)
       });
+      
+      // 키워드 경쟁률 분석 데이터 저장
+      const uid = await extractUidFromToken(req);
+      await saveKeywordAnalysisData(uid, keyword, data);
       
       console.log('[keyword-competition] API 호출 성공 완료');
       res.json(data);
