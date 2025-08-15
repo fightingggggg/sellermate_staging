@@ -89,18 +89,55 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && resource.data.userEmail == request.auth.token.email;
     }
     
-    // 키워드 경쟁률 분석 데이터 컬렉션 (단일 컬렉션, 날짜는 필드로 저장)
+    // 키워드 경쟁률 분석 데이터 컬렉션 (서버 전용 - Admin SDK에서 저장)
     match /keywordAnalysis/{analysisId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if true; // 서버에서 저장하므로 생성 허용
+      allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    
+    // 상품명 최적화 데이터 컬렉션 (서버 전용 - Admin SDK에서 저장)
+    match /productNameOptimize/{optimizeId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if true; // 서버에서 저장하므로 생성 허용
+      allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    
+    // 사용자 통계 컬렉션 (user_stats) - 이메일 기반 접근 허용
+    match /user_stats/{safeEmailId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 확장프로그램 사용량 컬렉션 (extensionUsage)
+    match /extensionUsage/{usageId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    
+    // 피드백 컬렉션 (서버에서만 쓰기, 사용자는 읽기 불가)
+    match /feedbacks/{feedbackId} {
+      allow read, write: if false;
+    }
+    
+    // 결제 취소 이력 컬렉션
+    match /paymentCancellations/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    
+    // 환불 이력 컬렉션
+    match /refunds/{refundId} {
       allow read: if request.auth != null && resource.data.uid == request.auth.uid;
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
     
-    // 상품명 최적화 데이터 컬렉션 (단일 컬렉션, 날짜는 필드로 저장)
-    match /productNameOptimize/{optimizeId} {
-      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    // 결제 락 컬렉션 (서버 전용)
+    match /paymentLocks/{uid} {
+      allow read, write: if false;
     }
     
     
