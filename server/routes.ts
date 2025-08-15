@@ -102,54 +102,35 @@ async function verifyAuthUid(req: any, res: any): Promise<string | null> {
 async function extractUidFromToken(req: any): Promise<string | null> {
   try {
     const authHeader: string = req.headers?.authorization || '';
-    console.log('[DEBUG] extractUidFromToken - authHeader exists:', !!authHeader);
-    
     if (!authHeader.startsWith('Bearer ')) {
-      console.log('[DEBUG] extractUidFromToken - No Bearer token found');
       return null;
     }
-    
     const token = authHeader.slice(7);
-    console.log('[DEBUG] extractUidFromToken - Token length:', token.length);
-    
     const decoded = await admin.auth().verifyIdToken(token);
-    console.log('[DEBUG] extractUidFromToken - Successfully decoded token for uid:', decoded.uid);
     return decoded.uid;
   } catch (e: any) {
-    console.error('[ERROR] extractUidFromToken failed:', {
-      error: e?.message || e,
-      stack: e?.stack,
-      code: e?.code
-    });
+    console.warn('[Auth] Token extract failed:', e?.message || e);
     return null;
   }
 }
 
 // 데이터 저장 헬퍼 함수들
 async function saveKeywordAnalysisData(uid: string | null, keyword: string, data: any) {
-  console.log('[DEBUG] saveKeywordAnalysisData 시작 - uid:', uid, 'keyword:', keyword);
-  
-  if (!uid) {
-    console.log('[DEBUG] saveKeywordAnalysisData - uid가 없어서 저장하지 않음');
-    return;
-  }
+  if (!uid) return;
   
   try {
-    console.log('[DEBUG] saveKeywordAnalysisData - Firestore 인스턴스 생성');
     const db = admin.firestore();
     
     // 현재 날짜를 YYYY-MM-DD 형식으로 생성
     const today = new Date();
     const dateKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
-    console.log('[DEBUG] saveKeywordAnalysisData - dateKey:', dateKey);
     
-    // keywordAnalysis/{날짜} 컬렉션에 저장
-    const keywordAnalysisPath = `keywordAnalysis/${dateKey}`;
-    console.log('[DEBUG] saveKeywordAnalysisData - 저장 경로:', keywordAnalysisPath);
+    // keywordAnalysis 컬렉션에 저장 (날짜는 필드로 포함)
     
     // history와 동일한 필드 구조로 저장 + 사용자 uid 추가
     const analysisItem = {
       uid: uid,
+      dateKey: dateKey, // 날짜 필드 추가
       keyword: keyword.trim(),
       type: 'keyword-competition', // history의 type 필드와 동일한 방식
       data: data, // 응답 데이터
@@ -161,72 +142,29 @@ async function saveKeywordAnalysisData(uid: string | null, keyword: string, data
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
     
-    console.log('[DEBUG] saveKeywordAnalysisData - 저장할 데이터:', {
-      uid: analysisItem.uid,
-      keyword: analysisItem.keyword,
-      type: analysisItem.type,
-      dataSize: JSON.stringify(data).length
-    });
-    
-    console.log('[DEBUG] saveKeywordAnalysisData - Firestore에 저장 시작');
-    
-    // Firestore 연결 테스트
-    try {
-      console.log('[DEBUG] saveKeywordAnalysisData - Firestore 연결 테스트 시작');
-      await db.collection('_test').doc('_connection').set({ test: true, timestamp: Date.now() });
-      console.log('[DEBUG] saveKeywordAnalysisData - Firestore 연결 테스트 성공');
-    } catch (testError: any) {
-      console.error('[ERROR] saveKeywordAnalysisData - Firestore 연결 테스트 실패:', {
-        error: testError?.message,
-        code: testError?.code,
-        stack: testError?.stack
-      });
-    }
-    
-    console.log('[DEBUG] saveKeywordAnalysisData - 실제 데이터 저장 시작');
-    const docRef = await db.collection(keywordAnalysisPath).add(analysisItem);
-    console.log('[SUCCESS] keywordAnalysis 데이터 저장 완료:', { 
-      uid, 
-      keyword, 
-      dateKey, 
-      documentId: docRef.id,
-      path: keywordAnalysisPath 
-    });
-  } catch (error: any) {
-    console.error('[ERROR] keywordAnalysis 데이터 저장 실패:', {
-      uid,
-      keyword,
-      error: error?.message || error,
-      stack: error?.stack,
-      code: error?.code
-    });
+    await db.collection('keywordAnalysis').add(analysisItem);
+    console.log('[keywordAnalysis] 데이터 저장 완료:', { uid, keyword, dateKey });
+  } catch (error) {
+    console.error('[keywordAnalysis] 데이터 저장 실패:', error);
   }
 }
 
 async function saveProductNameOptimizeData(uid: string | null, requestData: any, responseData: any) {
-  console.log('[DEBUG] saveProductNameOptimizeData 시작 - uid:', uid, 'query:', requestData?.query);
-  
-  if (!uid) {
-    console.log('[DEBUG] saveProductNameOptimizeData - uid가 없어서 저장하지 않음');
-    return;
-  }
+  if (!uid) return;
   
   try {
-    console.log('[DEBUG] saveProductNameOptimizeData - Firestore 인스턴스 생성');
     const db = admin.firestore();
     
     // 현재 날짜를 YYYY-MM-DD 형식으로 생성
     const today = new Date();
     const dateKey = today.toISOString().split('T')[0]; // YYYY-MM-DD
-    console.log('[DEBUG] saveProductNameOptimizeData - dateKey:', dateKey);
     
-    // productNameOptimize/{날짜} 컬렉션에 저장
-    const productNameOptimizePath = `productNameOptimize/${dateKey}`;
-    console.log('[DEBUG] saveProductNameOptimizeData - 저장 경로:', productNameOptimizePath);
+    // productNameOptimize 컬렉션에 저장 (날짜는 필드로 포함)
     
     // history와 동일한 필드 구조로 저장 + 사용자 uid 추가
     const optimizeItem = {
       uid: uid,
+      dateKey: dateKey, // 날짜 필드 추가
       keyword: requestData.query.trim(), // 쿼리를 keyword로 저장
       type: 'product-name-optimize', // history의 type 필드와 동일한 방식
       data: {
@@ -248,58 +186,14 @@ async function saveProductNameOptimizeData(uid: string | null, requestData: any,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
     
-    console.log('[DEBUG] saveProductNameOptimizeData - 저장할 데이터:', {
-      uid: optimizeItem.uid,
-      keyword: optimizeItem.keyword,
-      type: optimizeItem.type,
-      requestDataSize: JSON.stringify(requestData).length,
-      responseDataSize: JSON.stringify(responseData).length
-    });
-    
-    console.log('[DEBUG] saveProductNameOptimizeData - Firestore에 저장 시작');
-    
-    // Firestore 연결 테스트
-    try {
-      console.log('[DEBUG] saveProductNameOptimizeData - Firestore 연결 테스트 시작');
-      await db.collection('_test').doc('_connection').set({ test: true, timestamp: Date.now() });
-      console.log('[DEBUG] saveProductNameOptimizeData - Firestore 연결 테스트 성공');
-    } catch (testError: any) {
-      console.error('[ERROR] saveProductNameOptimizeData - Firestore 연결 테스트 실패:', {
-        error: testError?.message,
-        code: testError?.code,
-        stack: testError?.stack
-      });
-    }
-    
-    console.log('[DEBUG] saveProductNameOptimizeData - 실제 데이터 저장 시작');
-    const docRef = await db.collection(productNameOptimizePath).add(optimizeItem);
-    console.log('[SUCCESS] productNameOptimize 데이터 저장 완료:', { 
-      uid, 
-      query: requestData.query, 
-      dateKey,
-      documentId: docRef.id,
-      path: productNameOptimizePath 
-    });
-  } catch (error: any) {
-    console.error('[ERROR] productNameOptimize 데이터 저장 실패:', {
-      uid,
-      query: requestData?.query,
-      error: error?.message || error,
-      stack: error?.stack,
-      code: error?.code
-    });
+    await db.collection('productNameOptimize').add(optimizeItem);
+    console.log('[productNameOptimize] 데이터 저장 완료:', { uid, query: requestData.query, dateKey });
+  } catch (error) {
+    console.error('[productNameOptimize] 데이터 저장 실패:', error);
   }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // 환경 및 Firebase 확인 로그
-  console.log('[DEBUG] 서버 시작 - 환경 정보:', {
-    NODE_ENV: process.env.NODE_ENV,
-    hasFirebaseKey: !!process.env.FIREBASE_PRIVATE_KEY,
-    hasFirebaseProjectId: !!process.env.FIREBASE_PROJECT_ID,
-    hasFirebaseClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
-  });
-
   // CORS 설정 추가
   const corsAllowedOrigins: string[] = [
     'https://storebooster.ai.kr'
@@ -662,11 +556,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await taskPromise;
       
       // 상품명 최적화 데이터 저장
-      console.log('[DEBUG] generate-name - 데이터 저장 시작');
       const uid = await extractUidFromToken(req);
-      console.log('[DEBUG] generate-name - extractUidFromToken 결과:', uid);
       await saveProductNameOptimizeData(uid, { query, keyword, keywordCount: keywordCountNum }, result);
-      console.log('[DEBUG] generate-name - 데이터 저장 완료');
       
       return res.json(result);
     } catch (err) {
@@ -822,11 +713,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // 키워드 경쟁률 분석 데이터 저장
-      console.log('[DEBUG] keyword-competition - 데이터 저장 시작');
       const uid = await extractUidFromToken(req);
-      console.log('[DEBUG] keyword-competition - extractUidFromToken 결과:', uid);
       await saveKeywordAnalysisData(uid, keyword, data);
-      console.log('[DEBUG] keyword-competition - 데이터 저장 완료');
       
       console.log('[keyword-competition] API 호출 성공 완료');
       res.json(data);

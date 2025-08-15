@@ -8,11 +8,6 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 dotenv.config();
 
-// 프로덕션에서도 모든 로그가 출력되도록 강제 설정
-process.env.DEBUG = '*';
-console.log('[DEBUG] 서버 시작 시점 로그 - NODE_ENV:', process.env.NODE_ENV);
-console.log('[DEBUG] 서버 시작 시점 로그 - 현재 시간:', new Date().toISOString());
-
 const app = express();
 // reverse proxy(Cloudtype 등) 뒤 1단 프록시만 신뢰하여 X-Forwarded-* 헤더를 안전하게 처리
 app.set("trust proxy", 1);

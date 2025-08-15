@@ -89,15 +89,15 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && resource.data.userEmail == request.auth.token.email;
     }
     
-    // 키워드 경쟁률 분석 데이터 컬렉션 (날짜별)
-    match /keywordAnalysis/{dateKey}/{analysisId} {
+    // 키워드 경쟁률 분석 데이터 컬렉션 (단일 컬렉션, 날짜는 필드로 저장)
+    match /keywordAnalysis/{analysisId} {
       allow read: if request.auth != null && resource.data.uid == request.auth.uid;
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
     
-    // 상품명 최적화 데이터 컬렉션 (날짜별)
-    match /productNameOptimize/{dateKey}/{optimizeId} {
+    // 상품명 최적화 데이터 컬렉션 (단일 컬렉션, 날짜는 필드로 저장)
+    match /productNameOptimize/{optimizeId} {
       allow read: if request.auth != null && resource.data.uid == request.auth.uid;
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
