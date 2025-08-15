@@ -103,6 +103,14 @@ export default function Home() {
 
   // 업그레이드 안내 팝업 표시 여부 확인
   useEffect(() => {
+    // 직접 화면 크기를 체크하여 모바일인지 확인 (768px 미만이면 모바일)
+    const checkIsMobile = () => window.innerWidth < 768;
+    
+    // 모바일에서는 업그레이드 모달을 표시하지 않음
+    if (checkIsMobile()) {
+      return;
+    }
+
     const isUpgradeNoticeDismissed = localStorage.getItem("upgrade-notice-dismissed");
     if (!isUpgradeNoticeDismissed) {
       setShowUpgradeNotice(true);
