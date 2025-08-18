@@ -487,19 +487,56 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     try {
       const keywordStr = keywordsRef.current.join(', ');
 
+      // 재생성 시에도 키워드 개수를 새로 계산 (히스토리에서 다른 키워드 선택 시 대응)
+      let currentKeywordCount = keywordCountRef.current; // 기본값은 이전 값 사용
+      
+      const currentCategoryIndex = selectedCategoryIndex || 0;
+      const hasMultipleCategories = Array.isArray(analysisData?.categoriesDetailed) && analysisData.categoriesDetailed.length >= 2;
+      
+      if (hasMultipleCategories && analysisData?.categoriesDetailed?.[currentCategoryIndex]?.keywordCounts) {
+        // 현재 선택된 카테고리의 keywordCounts 사용
+        const selectedCategory = analysisData.categoriesDetailed[currentCategoryIndex];
+        const kcSrc = selectedCategory.keywordCounts;
+        if (kcSrc && typeof kcSrc === 'object' && Object.keys(kcSrc).length > 0) {
+          const kcArr = Object.entries(kcSrc).map(([k,v])=>({ key:k, value:Number(v) }));
+          console.log("[QuickAIResult-regenerate] 키워드 개수 새로 계산 - 정렬 전 kcArr:");
+          kcArr.forEach((item, index) => {
+            console.log(`  [${index}] key: ${item.key}, value: ${item.value}`);
+          });
+          
+          const sortedKcArr = [...kcArr].sort((a, b) => {
+            if (b.value !== a.value) {
+              return b.value - a.value; // 빈도수 내림차순
+            }
+            return Number(b.key) - Number(a.key); // 빈도수가 같으면 키워드 개수 내림차순
+          });
+          
+          console.log("[QuickAIResult-regenerate] 키워드 개수 새로 계산 - 정렬 후 sortedKcArr:");
+          sortedKcArr.forEach((item, index) => {
+            console.log(`  [${index}] key: ${item.key}, value: ${item.value}`);
+          });
+          
+          currentKeywordCount = Number(sortedKcArr[0].key);
+          console.log("[QuickAIResult-regenerate] 새로 계산된 keywordCount:", currentKeywordCount);
+          
+          // keywordCountRef 업데이트
+          keywordCountRef.current = currentKeywordCount;
+        }
+      }
+
       console.log("[QuickAIResult-regenerate] === API 호출 정보 ===");
       console.log("[QuickAIResult-regenerate] 메인 키워드:", mainKeyword);
       console.log("[QuickAIResult-regenerate] 전송될 키워드 문자열:", keywordStr);
       console.log("[QuickAIResult-regenerate] keywordsRef.current:", keywordsRef.current);
-      console.log("[QuickAIResult-regenerate] keywordCount:", keywordCountRef.current);
+      console.log("[QuickAIResult-regenerate] 최종 keywordCount:", currentKeywordCount);
       console.log("[QuickAIResult-regenerate] === API 호출 시작 ===");
 
-      console.log("[QuickAIResult] regenerate /api/generate-name", { query: mainKeyword, keyword: keywordStr, keywordCount: keywordCountRef.current });
+      console.log("[QuickAIResult] regenerate /api/generate-name", { query: mainKeyword, keyword: keywordStr, keywordCount: currentKeywordCount });
 
       const resp = await fetch("/api/generate-name", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: mainKeyword, keyword: keywordStr, keywordCount: keywordCountRef.current }),
+        body: JSON.stringify({ query: mainKeyword, keyword: keywordStr, keywordCount: currentKeywordCount }),
       });
 
       if (!resp.ok) {
@@ -604,7 +641,7 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       trackEvent('GenerateName', 'quick_regenerate_success', null, {
         keyword: mainKeyword,
         pageIndex,
-        keywordCount: keywordCountRef.current,
+        keywordCount: currentKeywordCount,
       });
 
       // 히스토리 업데이트
