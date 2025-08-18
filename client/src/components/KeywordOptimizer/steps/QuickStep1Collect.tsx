@@ -192,7 +192,17 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
 
         // 히스토리에 저장 (로그인된 사용자만)
         if (currentUser?.email && latestQueryRef.current) {
-          // (빠른 상품명은 AI 결과까지 포함해야 하므로 저장을 나중에 수행합니다)
+          // 기존 히스토리 컬렉션 저장 (레거시)
+          const pageIdx = data._pageIndex || 1;
+          HistoryService.saveHistory(
+            currentUser.email,
+            latestQueryRef.current,
+            'quick-optimizer',
+            data,
+            pageIdx
+          ).catch(()=>{});
+
+          // (빠른 상품명은 AI 결과까지 포함해야 하므로 월→uid 구조 저장은 나중에 수행합니다)
         } else {
           console.log('[Quick Optimizer] Not saving history - user email:', currentUser?.email, 'keyword:', latestQueryRef.current);
         }

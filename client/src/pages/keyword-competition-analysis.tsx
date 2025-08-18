@@ -362,6 +362,15 @@ export default function KeywordCompetitionAnalysisPage() {
     if (currentUser?.email && keyword.trim()) {
       console.log('[Keyword Analysis] Saving history for:', currentUser.email, keyword.trim());
       try {
+        // 기존 히스토리 컬렉션 저장 (레거시)
+        await HistoryService.saveHistory(
+          currentUser.email,
+          keyword.trim(),
+          'keyword-analysis',
+          dataToSave
+        );
+
+        // 월→uid 구조 저장 (신규)
         await HistoryService.saveKeywordAnalysis(
           currentUser.email,
           currentUser.uid,
