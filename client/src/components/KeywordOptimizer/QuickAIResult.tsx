@@ -44,6 +44,14 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     if (onLimitMessage) onLimitMessage(usageLimitMessage);
   }, [usageLimitMessage, onLimitMessage]);
 
+  // 메인 키워드가 변경되면 내부 호출 상태를 항상 초기화 (중복 호출 방지 해제)
+  useEffect(() => {
+    hasCalledRef.current = false;
+    lastCallKeyRef.current = null;
+    keywordsRef.current = [];
+    keywordCountRef.current = 0;
+  }, [mainKeyword]);
+
   useEffect(() => {
     if (isSample) return; // 예시 데이터면 AI 호출하지 않음
     if (!analysisData || !mainKeyword) return;
@@ -384,7 +392,9 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     }
 
     // ====== 키워드/키워드수 계산 (refs가 비어있는 경우 대비) ======
-    if (keywordsRef.current.length === 0 || keywordCountRef.current === 0) {
+    const analysisKeyword = analysisData?._keyword || mainKeyword;
+
+    if (keywordsRef.current.length === 0 || keywordCountRef.current === 0 || analysisKeyword !== mainKeyword) {
       if (!analysisData) {
         console.error('[QuickAIResult] analysisData missing – cannot regenerate');
         return;
@@ -446,33 +456,47 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       keywordsRef.current = filteredKeywords.map((k) => k.key);
 
       // 2) 키워드수 계산 로직 재사용
-      const kcSrc = analysisData.keywordCounts;
+      // === 키워드수 계산 ===
       let kcArr: { key: string; value: number }[] = [];
-      if (Array.isArray(kcSrc) && kcSrc.length > 0) {
-        kcArr = kcSrc as any;
-      } else if (kcSrc && typeof kcSrc === 'object' && Object.keys(kcSrc).length > 0) {
-        kcArr = Object.entries(kcSrc as Record<string, number>).map(([k,v])=>({ key:k, value:Number(v) }));
-      } else if (Array.isArray(analysisData.categoriesDetailed)) {
-        const agg: Record<string, number> = {};
-        analysisData.categoriesDetailed.forEach((cat: any) => {
-          const obj = cat.keywordCounts;
-          if (obj && typeof obj === 'object') {
-            for (const [k,v] of Object.entries(obj as Record<string, number>)) {
-              agg[k] = (agg[k]||0)+Number(v);
+
+      // (1) 현재 선택된 카테고리의 keywordCounts 우선 사용
+      if (Array.isArray(analysisData?.categoriesDetailed) && analysisData.categoriesDetailed.length >= 2) {
+        const currentCategoryIndex = selectedCategoryIndex || 0;
+        const selectedCategory = analysisData.categoriesDetailed[currentCategoryIndex];
+        if (selectedCategory && selectedCategory.keywordCounts && typeof selectedCategory.keywordCounts === 'object') {
+          kcArr = Object.entries(selectedCategory.keywordCounts as Record<string, number>).map(([k,v])=>({ key:k, value:Number(v) }));
+        }
+      }
+
+      // (2) 전체 keywordCounts 사용 (fallback)
+      if (kcArr.length === 0) {
+        const kcSrc = analysisData.keywordCounts;
+        if (Array.isArray(kcSrc) && kcSrc.length > 0) {
+          kcArr = kcSrc as any;
+        } else if (kcSrc && typeof kcSrc === 'object' && Object.keys(kcSrc).length > 0) {
+          kcArr = Object.entries(kcSrc as Record<string, number>).map(([k,v])=>({ key:k, value:Number(v) }));
+        } else if (Array.isArray(analysisData?.categoriesDetailed)) {
+          // 카테고리별 keywordCounts 합산
+          const agg: Record<string, number> = {};
+          analysisData.categoriesDetailed.forEach((cat: any) => {
+            const obj = cat.keywordCounts;
+            if (obj && typeof obj === 'object') {
+              for (const [k,v] of Object.entries(obj as Record<string, number>)) {
+                agg[k] = (agg[k]||0) + Number(v);
+              }
             }
-          }
-        });
-        kcArr = Object.entries(agg).map(([k,v])=>({key:k, value:Number(v)}));
+          });
+          kcArr = Object.entries(agg).map(([k,v])=>({ key:k, value:Number(v) }));
+        }
       }
 
       let keywordCount = 10;
       if (kcArr.length > 0) {
-        let best = kcArr[0];
-        kcArr.forEach((cur) => {
-          if (cur.value > best.value) best = cur;
-          else if (cur.value === best.value && Number(cur.key) > Number(best.key)) best = cur;
+        kcArr.sort((a, b) => {
+          if (b.value !== a.value) return b.value - a.value; // 빈도수 내림차순
+          return Number(b.key) - Number(a.key); // 동률이면 키워드 개수 내림차순
         });
-        keywordCount = Number(best.key);
+        keywordCount = Number(kcArr[0].key);
       }
       keywordCountRef.current = keywordCount;
     }
@@ -487,56 +511,19 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     try {
       const keywordStr = keywordsRef.current.join(', ');
 
-      // 재생성 시에도 키워드 개수를 새로 계산 (히스토리에서 다른 키워드 선택 시 대응)
-      let currentKeywordCount = keywordCountRef.current; // 기본값은 이전 값 사용
-      
-      const currentCategoryIndex = selectedCategoryIndex || 0;
-      const hasMultipleCategories = Array.isArray(analysisData?.categoriesDetailed) && analysisData.categoriesDetailed.length >= 2;
-      
-      if (hasMultipleCategories && analysisData?.categoriesDetailed?.[currentCategoryIndex]?.keywordCounts) {
-        // 현재 선택된 카테고리의 keywordCounts 사용
-        const selectedCategory = analysisData.categoriesDetailed[currentCategoryIndex];
-        const kcSrc = selectedCategory.keywordCounts;
-        if (kcSrc && typeof kcSrc === 'object' && Object.keys(kcSrc).length > 0) {
-          const kcArr = Object.entries(kcSrc).map(([k,v])=>({ key:k, value:Number(v) }));
-          console.log("[QuickAIResult-regenerate] 키워드 개수 새로 계산 - 정렬 전 kcArr:");
-          kcArr.forEach((item, index) => {
-            console.log(`  [${index}] key: ${item.key}, value: ${item.value}`);
-          });
-          
-          const sortedKcArr = [...kcArr].sort((a, b) => {
-            if (b.value !== a.value) {
-              return b.value - a.value; // 빈도수 내림차순
-            }
-            return Number(b.key) - Number(a.key); // 빈도수가 같으면 키워드 개수 내림차순
-          });
-          
-          console.log("[QuickAIResult-regenerate] 키워드 개수 새로 계산 - 정렬 후 sortedKcArr:");
-          sortedKcArr.forEach((item, index) => {
-            console.log(`  [${index}] key: ${item.key}, value: ${item.value}`);
-          });
-          
-          currentKeywordCount = Number(sortedKcArr[0].key);
-          console.log("[QuickAIResult-regenerate] 새로 계산된 keywordCount:", currentKeywordCount);
-          
-          // keywordCountRef 업데이트
-          keywordCountRef.current = currentKeywordCount;
-        }
-      }
-
       console.log("[QuickAIResult-regenerate] === API 호출 정보 ===");
       console.log("[QuickAIResult-regenerate] 메인 키워드:", mainKeyword);
       console.log("[QuickAIResult-regenerate] 전송될 키워드 문자열:", keywordStr);
       console.log("[QuickAIResult-regenerate] keywordsRef.current:", keywordsRef.current);
-      console.log("[QuickAIResult-regenerate] 최종 keywordCount:", currentKeywordCount);
+      console.log("[QuickAIResult-regenerate] keywordCount:", keywordCountRef.current);
       console.log("[QuickAIResult-regenerate] === API 호출 시작 ===");
 
-      console.log("[QuickAIResult] regenerate /api/generate-name", { query: mainKeyword, keyword: keywordStr, keywordCount: currentKeywordCount });
+      console.log("[QuickAIResult] regenerate /api/generate-name", { query: mainKeyword, keyword: keywordStr, keywordCount: keywordCountRef.current });
 
       const resp = await fetch("/api/generate-name", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: mainKeyword, keyword: keywordStr, keywordCount: currentKeywordCount }),
+        body: JSON.stringify({ query: mainKeyword, keyword: keywordStr, keywordCount: keywordCountRef.current }),
       });
 
       if (!resp.ok) {
@@ -641,7 +628,7 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       trackEvent('GenerateName', 'quick_regenerate_success', null, {
         keyword: mainKeyword,
         pageIndex,
-        keywordCount: currentKeywordCount,
+        keywordCount: keywordCountRef.current,
       });
 
       // 히스토리 업데이트
