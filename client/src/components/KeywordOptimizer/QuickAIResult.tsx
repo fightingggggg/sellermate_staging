@@ -156,15 +156,27 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     }
 
     if (kcArr.length > 0) {
-      let best = kcArr[0];
-      kcArr.forEach((cur) => {
-        if (cur.value > best.value) {
-          best = cur;
-        } else if (cur.value === best.value && Number(cur.key) > Number(best.key)) {
-          best = cur;
-        }
+      // 키워드 개수 배열 정렬: 빈도수 내림차순, 빈도수가 같으면 키워드 개수 내림차순
+      console.log('[QuickAIResult] 정렬 전 kcArr:');
+      kcArr.forEach((item, index) => {
+        console.log(`  [${index}] key: ${item.key}, value: ${item.value}`);
       });
-      keywordCount = Number(best.key);
+      
+      const sortedKcArr = [...kcArr].sort((a, b) => {
+        if (b.value !== a.value) {
+          return b.value - a.value; // 빈도수 내림차순
+        }
+        return Number(b.key) - Number(a.key); // 빈도수가 같으면 키워드 개수 내림차순
+      });
+      
+      console.log('[QuickAIResult] 정렬 후 sortedKcArr:');
+      sortedKcArr.forEach((item, index) => {
+        console.log(`  [${index}] key: ${item.key}, value: ${item.value}`);
+      });
+      
+      // 정렬된 첫 번째 요소가 최적값
+      keywordCount = Number(sortedKcArr[0].key);
+      console.log('[QuickAIResult] 선택된 keywordCount:', keywordCount);
     }
 
     keywordCountRef.current = keywordCount;

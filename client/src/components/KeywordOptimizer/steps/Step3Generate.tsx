@@ -939,7 +939,12 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         .slice(0, collapsedKeywordLen)  // 동점 포함 12위까지
         .map((k) => k.label)
         .join(', ');
+      
+      // 키워드 개수 결정: 빈도수가 같으면 키워드 개수가 큰 것을 우선 선택
+      // topKeywordCounts는 이미 정렬되어 있으므로 첫 번째 요소가 최적값
+      console.log('[Step3Generate] topKeywordCounts:', topKeywordCounts);
       const keywordCount = String(topKeywordCounts[0]?.key || '2');
+      console.log('[Step3Generate] 선택된 keywordCount:', keywordCount);
       console.log('[Step3Generate] fetch /api/generate-name', { query, keywordCount });
 
       const resp = await fetch('/api/generate-name', {
@@ -1073,7 +1078,12 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       }
       arr = Object.entries(agg).map(([k, v]) => ({ key: k, value: v }));
     }
-    return [...arr].sort((a, b) => (b.value === a.value ? Number(b.key) - Number(a.key) : b.value - a.value));
+    return [...arr].sort((a, b) => {
+      if (b.value !== a.value) {
+        return b.value - a.value; // 빈도수 내림차순
+      }
+      return Number(b.key) - Number(a.key); // 빈도수가 같으면 키워드 개수 내림차순
+    });
   }, [keywordCountsSrc, analysisData]);
 
   // 상위 키워드 카운트 배열 별칭 (기존 레거시 변수 보존)
