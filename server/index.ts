@@ -70,6 +70,10 @@ const cspDirectives: Record<string, string[]> = {
   frameSrc: [
     "'self'",
     "https://www.googletagmanager.com",
+    // Google Ads 전환 추적을 위한 도메인
+    "https://td.doubleclick.net",
+    "https://googleads.g.doubleclick.net",
+    "https://www.googleadservices.com",
     // reCAPTCHA iframe 허용
     "https://www.google.com",
     "https://www.gstatic.com",
@@ -196,7 +200,7 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
-      log(`자동 결제 스케줄러가 시작되었습니다. (5분마다 실행)`);
+      log(`자동 결제 스케줄러가 시작되었습니다.`);
     },
   );
 })();
