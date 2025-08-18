@@ -731,7 +731,26 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
             },
             pageIndex
           );
-        } catch {}
+        } catch (error) {
+          console.error('[Step2] updateHistoryWithStep2Data failed:', error);
+          // 레거시 문서가 없을 수 있으므로 새로 저장 시도
+          try {
+            await HistoryService.saveHistory(
+              currentUser.email,
+              mainKeyword,
+              'complete-optimizer',
+              {
+                currentStep: 2,
+                completeOptimizerData: {
+                  currentStep: 2,
+                  step2Data,
+                },
+              },
+              pageIndex
+            );
+            console.log('[Step2] Legacy history saved with step2 data');
+          } catch {}
+        }
       }
     }catch(e){
       console.error('조합형 검사 오류',e);
@@ -1083,14 +1102,14 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
                             {kwList.map((k) => {
                               const comb = buildCombination(k, mainKw);
                               const kind = combResult[k];
-                              const isMerge = kind === '조합형' || kind === '조립형';
-                              const isIndep = kind === '일체형' || kind === '독립형';
+                              const isMerge = kind === '조합형';
+                              const isIndep = kind === '일체형';
                               return (
                                 <div key={`combo-${mainKw}-${k}`} className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-gray-50 border whitespace-nowrap text-sm items-center">
                                   <span className={isMerge ? 'text-green-600 font-semibold' : ''}>{comb.spaced}</span>
                                   <span className={isIndep ? 'text-orange-600 font-semibold' : ''}>{comb.concat}</span>
                                   {kind && (
-                                    <span className={`text-xs mt-1 font-semibold ${isMerge ? 'text-green-600' : 'text-orange-600'}`}>{kind === '독립형' ? '일체형' : kind}</span>
+                                    <span className={`text-xs mt-1 font-semibold ${isMerge ? 'text-green-600' : 'text-orange-600'}`}>{kind}</span>
                                   )}
                                 </div>
                               );
