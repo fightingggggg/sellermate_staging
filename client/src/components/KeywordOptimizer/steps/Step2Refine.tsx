@@ -493,15 +493,19 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
         };
         
         try {
-          await HistoryService.updateHistoryWithStep2Data(
+          await HistoryService.saveCompleteProductNameOptimize(
             currentUser.email,
+            currentUser.uid,
             mainKeyword,
-            step2Data,
+            {
+              currentStep: 2,
+              step2Data,
+            },
             pageIndex
           );
-          console.log('[Step2] History updated with synonym check results');
+          console.log('[Step2] Step2 data saved');
         } catch (error) {
-          console.error('[Step2] Failed to update history with synonym results:', error);
+          console.error('[Step2] Failed to save step2 data:', error);
         }
       }
     } catch (e) {
@@ -708,16 +712,17 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
         };
         
         try {
-          await HistoryService.updateHistoryWithStep2Data(
+          await HistoryService.saveCompleteProductNameOptimize(
             currentUser.email,
+            currentUser.uid,
             mainKeyword,
-            step2Data,
+            {
+              currentStep: 2,
+              step2Data,
+            },
             pageIndex
           );
-          console.log('[Step2] History updated with combination check results');
-        } catch (error) {
-          console.error('[Step2] Failed to update history with combination results:', error);
-        }
+        } catch {}
       }
     }catch(e){
       console.error('조합형 검사 오류',e);

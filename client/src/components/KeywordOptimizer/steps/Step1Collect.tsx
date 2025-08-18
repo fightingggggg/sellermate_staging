@@ -236,21 +236,20 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         if (currentUser?.email && latestQueryRef.current) {
           // 분석 데이터에서 실제 사용된 페이지 번호 추출
           const actualPageIndex = data._pageIndex || 1;
-          console.log('[Complete Optimizer] Saving history for:', currentUser.email, latestQueryRef.current, 'page:', actualPageIndex);
-          HistoryService.saveHistory(
+          console.log('[Complete Optimizer] Saving step1 data for:', currentUser.email, latestQueryRef.current);
+          HistoryService.saveCompleteProductNameOptimize(
             currentUser.email,
+            currentUser.uid,
             latestQueryRef.current,
-            'complete-optimizer',
-            data,
+            {
+              currentStep: 1,
+              step1Data: data
+            },
             actualPageIndex
-          ).then(docId => {
-            console.log('[Complete Optimizer] History saved successfully:', docId);
+          ).then(() => {
+            console.log('[Complete Optimizer] Step1 data saved');
           }).catch(error => {
-            console.error('[Complete Optimizer] Failed to save history:', error);
-            // 히스토리 저장 실패 시 조용히 처리 (분석 결과는 정상적으로 표시)
-            if (error.message && error.message.includes('히스토리 저장 제한')) {
-              console.log('[Complete Optimizer] History limit reached, but analysis completed successfully');
-            }
+            console.error('[Complete Optimizer] Failed to save step1 data:', error);
           });
         } else {
           console.log('[Complete Optimizer] Not saving history - user email:', currentUser?.email, 'keyword:', latestQueryRef.current);

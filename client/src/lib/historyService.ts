@@ -778,8 +778,9 @@ export class HistoryService {
     console.log('🔍 [키워드 경쟁률 분석] 저장 시도:', { userEmail, keyword, pageIndex });
     
     try {
-      const docId = this.generateDocumentId(userEmail, keyword, 'keyword-analysis', pageIndex);
-      const docRef = doc(db, KEYWORD_ANALYSIS_COLLECTION, docId);
+      const monthId = this.getMonthId();
+      const entryId = this.generateDocumentId(userEmail, keyword, 'keyword-analysis', pageIndex);
+      const docRef = doc(db, KEYWORD_ANALYSIS_COLLECTION, monthId, uid, entryId);
       
       const analysisItem = {
         uid,
@@ -796,8 +797,8 @@ export class HistoryService {
 
       await setDoc(docRef, analysisItem);
       
-      console.log('✅ [키워드 경쟁률 분석] 저장 성공:', docId);
-      return docId;
+      console.log('✅ [키워드 경쟁률 분석] 저장 성공:', docRef.id);
+      return docRef.id;
       
     } catch (error) {
       console.error('❌ [키워드 경쟁률 분석] 저장 실패:', error);
@@ -806,8 +807,9 @@ export class HistoryService {
   }
 
   // ===== 공용: 날짜 기반 문서 ID 생성 =====
-  private static generateDateDocumentId(): string {
-    return new Date().toISOString().replace(/[:.]/g, '-'); // 예: 2024-08-18T12-34-56-789Z
+  // YYYY-MM 형태로 월 식별자 반환
+  private static getMonthId(): string {
+    return new Date().toISOString().slice(0, 7); // "2024-08"
   }
 
   // ===== 빠른 상품명 최적화 저장 =====
@@ -827,8 +829,9 @@ export class HistoryService {
     console.log('📝 [빠른 상품명] 저장 시도:', { userEmail, keyword, pageIndex });
 
     try {
-      const docId = this.generateDateDocumentId();
-      const docRef = doc(db, QUICK_PRODUCT_OPTIMIZE_COLLECTION, docId);
+      const monthId = this.getMonthId();
+      const entryId = this.generateDocumentId(userEmail, keyword, 'quick-optimizer', pageIndex);
+      const docRef = doc(db, QUICK_PRODUCT_OPTIMIZE_COLLECTION, monthId, uid, entryId);
 
       const item = {
         uid,
@@ -845,8 +848,8 @@ export class HistoryService {
       };
 
       await setDoc(docRef, item);
-      console.log('✅ [빠른 상품명] 저장 성공:', docId);
-      return docId;
+      console.log('✅ [빠른 상품명] 저장 성공:', docRef.id);
+      return docRef.id;
 
     } catch (error) {
       console.error('❌ [빠른 상품명] 저장 실패:', error);
@@ -865,8 +868,9 @@ export class HistoryService {
     console.log('📝 [완벽한 상품명] 저장 시도:', { userEmail, keyword });
 
     try {
-      const docId = this.generateDateDocumentId();
-      const docRef = doc(db, COMPLETE_PRODUCT_OPTIMIZE_COLLECTION, docId);
+      const monthId = this.getMonthId();
+      const entryId = this.generateDocumentId(userEmail, keyword, 'complete-optimizer', pageIndex);
+      const docRef = doc(db, COMPLETE_PRODUCT_OPTIMIZE_COLLECTION, monthId, uid, entryId);
 
       const item = {
         uid,
@@ -881,9 +885,21 @@ export class HistoryService {
         updatedAt: serverTimestamp()
       };
 
+      const existingSnap = await getDoc(docRef);
+      if (existingSnap.exists()) {
+        // 기존 문서 덮어쓰기(override)
+        await setDoc(docRef, {
+          ...item,
+          updatedAt: serverTimestamp()
+        }, { merge: false });
+        console.log('✅ [완벽한 상품명] 기존 문서 덮어쓰기 완료:', docRef.id);
+        return docRef.id;
+      }
+
+      // 없으면 새 문서 생성
       await setDoc(docRef, item);
-      console.log('✅ [완벽한 상품명] 저장 성공:', docId);
-      return docId;
+      console.log('✅ [완벽한 상품명] 새 문서 저장 성공:', docRef.id);
+      return docRef.id;
 
     } catch (error) {
       console.error('❌ [완벽한 상품명] 저장 실패:', error);
