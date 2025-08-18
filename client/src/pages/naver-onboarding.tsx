@@ -405,6 +405,22 @@ export default function NaverOnboarding() {
     }
   };
 
+  // Google Ads 전환 추적 함수
+  const gtag_report_conversion = (url?: string) => {
+    const callback = function () {
+      if (typeof(url) != 'undefined') {
+        window.location.href = url;
+      }
+    };
+    if ((window as any).gtag) {
+      (window as any).gtag('event', 'conversion', {
+        'send_to': 'AW-16880363187/0DH0CIeliv0aELPNl_E-',
+        'event_callback': callback
+      });
+    }
+    return false;
+  };
+
   if (step === "signin") {
     // 로딩 화면을 숨기고 현재 화면 유지
     return null;
@@ -566,7 +582,8 @@ export default function NaverOnboarding() {
                       description: "이메일 계정이 소셜 계정과 성공적으로 병합되었습니다.",
                     });
 
-                    // 구독 페이지로 리다이렉트 (계정 병합 완료 플래그와 함께)
+                    // Google Ads 전환 추적 후 구독 페이지로 리다이렉트
+                    gtag_report_conversion("/subscription?mergeComplete=true");
                     navigate("/subscription?mergeComplete=true");
                     return;
                   }
@@ -622,6 +639,9 @@ export default function NaverOnboarding() {
               profileData.createdAt = serverTimestamp();
 
               await setDoc(doc(db, "usersInfo", auth.currentUser!.uid), profileData, { merge: true });
+              
+              // Google Ads 전환 추적 후 홈으로 이동
+              gtag_report_conversion("/");
               navigate("/");
             }catch(err){
               console.error(err);

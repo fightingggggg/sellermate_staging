@@ -69,6 +69,22 @@ export default function LoginPage({
   // 이메일 회원가입용 인증 타이머 (초)
   const [timer, setTimer] = useState(0);
 
+  // Google Ads 전환 추적 함수
+  const gtag_report_conversion = (url?: string) => {
+    const callback = function () {
+      if (typeof(url) != 'undefined') {
+        window.location.href = url;
+      }
+    };
+    if ((window as any).gtag) {
+      (window as any).gtag('event', 'conversion', {
+        'send_to': 'AW-16880363187/0DH0CIeliv0aELPNl_E-',
+        'event_callback': callback
+      });
+    }
+    return false;
+  };
+
   // 페이지 진입 시(마운트 시) 로딩 상태 초기화 및 에러 메시지 확인
   useEffect(() => {
     setNaverLoginLoading(false);
@@ -304,7 +320,12 @@ export default function LoginPage({
     try {
       await signUp(email, password, fullName, number, birthDate);
       if (!isModal) {
+        // Google Ads 전환 추적 후 로그인 페이지로 이동
+        gtag_report_conversion("/login");
         navigate("/login");
+      } else {
+        // 모달에서 회원가입 완료 시에도 전환 추적
+        gtag_report_conversion();
       }
       setAlertMessage({
         message: "회원가입 성공! 이메일 인증을 완료해주세요.",
