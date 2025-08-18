@@ -194,21 +194,17 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         if (currentUser?.email && latestQueryRef.current) {
           // 분석 데이터에서 실제 사용된 페이지 번호 추출
           const actualPageIndex = data._pageIndex || 1;
-          console.log('[Quick Optimizer] Saving history for:', currentUser.email, latestQueryRef.current, 'page:', actualPageIndex);
-          HistoryService.saveHistory(
+          console.log('[Quick Optimizer] Saving product optimization data for:', currentUser.email, latestQueryRef.current, 'page:', actualPageIndex);
+          HistoryService.saveProductNameOptimize(
             currentUser.email,
+            currentUser.uid,
             latestQueryRef.current,
-            'quick-optimizer',
             data,
             actualPageIndex
           ).then(docId => {
-            console.log('[Quick Optimizer] History saved successfully:', docId);
+            console.log('[Quick Optimizer] Product optimization data saved successfully:', docId);
           }).catch(error => {
-            console.error('[Quick Optimizer] Failed to save history:', error);
-            // 히스토리 저장 실패 시 조용히 처리 (분석 결과는 정상적으로 표시)
-            if (error.message && error.message.includes('히스토리 저장 제한')) {
-              console.log('[Quick Optimizer] History limit reached, but analysis completed successfully');
-            }
+            console.error('[Quick Optimizer] Failed to save product optimization data:', error);
           });
         } else {
           console.log('[Quick Optimizer] Not saving history - user email:', currentUser?.email, 'keyword:', latestQueryRef.current);

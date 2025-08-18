@@ -362,10 +362,10 @@ export default function KeywordCompetitionAnalysisPage() {
     if (currentUser?.email && keyword.trim()) {
       console.log('[Keyword Analysis] Saving history for:', currentUser.email, keyword.trim());
       try {
-        await HistoryService.saveHistory(
+        await HistoryService.saveKeywordAnalysis(
           currentUser.email,
+          currentUser.uid,
           keyword.trim(),
-          'keyword-analysis',
           dataToSave
         );
       } catch (error: any) {
