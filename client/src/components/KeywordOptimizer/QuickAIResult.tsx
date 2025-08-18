@@ -16,7 +16,7 @@ interface QuickAIResultProps {
 }
 
 export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
-  const { analysisData, mainKeyword, aiResult, setAiResult } = useOptimizer();
+  const { analysisData, mainKeyword, aiResult, setAiResult, selectedCategoryIndex } = useOptimizer();
   const { currentUser } = useAuth();
   const pageIndex = (analysisData as any)?._pageIndex ?? 1;
   const [loading, setLoading] = useState(false);
@@ -83,26 +83,28 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     console.log("[QuickAIResult] hasMultipleCategories:", hasMultipleCategories);
     
     if (hasMultipleCategories) {
-      // 카테고리가 2개 이상인 경우: 첫 번째 카테고리의 키워드 사용
-      const firstCategory = analysisData.categoriesDetailed[0];
-      console.log("[QuickAIResult] 첫 번째 카테고리 데이터:", firstCategory);
-      console.log("[QuickAIResult] 첫 번째 카테고리의 keywords:", firstCategory?.keywords);
-      console.log("[QuickAIResult] keywords 타입:", typeof firstCategory?.keywords);
-      console.log("[QuickAIResult] keywords 배열 여부:", Array.isArray(firstCategory?.keywords));
+      // 카테고리가 2개 이상인 경우: 현재 선택된 카테고리의 키워드 사용
+      const currentCategoryIndex = selectedCategoryIndex || 0;
+      const selectedCategory = analysisData.categoriesDetailed[currentCategoryIndex];
+      console.log("[QuickAIResult] 현재 선택된 카테고리 인덱스:", currentCategoryIndex);
+      console.log("[QuickAIResult] 선택된 카테고리 데이터:", selectedCategory);
+      console.log("[QuickAIResult] 선택된 카테고리의 keywords:", selectedCategory?.keywords);
+      console.log("[QuickAIResult] keywords 타입:", typeof selectedCategory?.keywords);
+      console.log("[QuickAIResult] keywords 배열 여부:", Array.isArray(selectedCategory?.keywords));
       
-      if (firstCategory && Array.isArray(firstCategory.keywords)) {
-        keywordsArr = firstCategory.keywords;
-        console.log("[QuickAIResult] ✅ 첫 번째 카테고리의 키워드 사용:", keywordsArr.length, "개");
+      if (selectedCategory && Array.isArray(selectedCategory.keywords)) {
+        keywordsArr = selectedCategory.keywords;
+        console.log("[QuickAIResult] ✅ 선택된 카테고리의 키워드 사용:", keywordsArr.length, "개");
         console.log("[QuickAIResult] 사용된 키워드들:", keywordsArr);
-      } else if (firstCategory && firstCategory.keywords && typeof firstCategory.keywords === 'object') {
+      } else if (selectedCategory && selectedCategory.keywords && typeof selectedCategory.keywords === 'object') {
         // 키워드가 객체 형태인 경우 배열로 변환
-        keywordsArr = Object.entries(firstCategory.keywords).map(([key, value]) => ({ key, value }));
-        console.log("[QuickAIResult] ✅ 첫 번째 카테고리의 키워드 사용 (객체→배열):", keywordsArr.length, "개");
+        keywordsArr = Object.entries(selectedCategory.keywords).map(([key, value]) => ({ key, value }));
+        console.log("[QuickAIResult] ✅ 선택된 카테고리의 키워드 사용 (객체→배열):", keywordsArr.length, "개");
         console.log("[QuickAIResult] 사용된 키워드들:", keywordsArr);
       } else {
         // fallback: 전체 키워드 사용
         keywordsArr = Array.isArray(analysisData.keywords) ? analysisData.keywords : [];
-        console.log("[QuickAIResult] ⚠️ fallback: 전체 키워드 사용 (첫 번째 카테고리에 키워드 없음)");
+        console.log("[QuickAIResult] ⚠️ fallback: 전체 키워드 사용 (선택된 카테고리에 키워드 없음)");
         console.log("[QuickAIResult] 전체 키워드:", keywordsArr.length, "개");
       }
     } else {
@@ -134,25 +136,42 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     // ===== 키워드 개수(상품명 어절 수) 우선순위 =====
     let keywordCount = 10; // 기본값
 
-    // 1) keywordCounts 형태(Array | Obj) 우선
-    const kcSrc = analysisData.keywordCounts;
+    // 1) 현재 선택된 카테고리의 keywordCounts 우선 사용
     let kcArr: { key: string; value: number }[] = [];
-    if (Array.isArray(kcSrc) && kcSrc.length > 0) {
-      kcArr = kcSrc as any;
-    } else if (kcSrc && typeof kcSrc === 'object' && Object.keys(kcSrc).length > 0) {
-      kcArr = Object.entries(kcSrc as Record<string, number>).map(([k,v])=>({ key:k, value:Number(v) }));
-    } else if (Array.isArray(analysisData.categoriesDetailed)) {
-      // 2) 카테고리별 keywordCounts 합산 (fallback)
-      const agg: Record<string, number> = {};
-      analysisData.categoriesDetailed.forEach((cat: any) => {
-        const obj = cat.keywordCounts;
-        if (obj && typeof obj === 'object') {
-          for (const [k,v] of Object.entries(obj as Record<string, number>)) {
-            agg[k] = (agg[k]||0)+Number(v);
+    
+    // 카테고리가 선택되어 있고 keywordCounts가 있는 경우
+    if (hasMultipleCategories && analysisData.categoriesDetailed) {
+      const currentCategoryIndex = selectedCategoryIndex || 0;
+      const selectedCategory = analysisData.categoriesDetailed[currentCategoryIndex];
+      if (selectedCategory && selectedCategory.keywordCounts && typeof selectedCategory.keywordCounts === 'object') {
+        kcArr = Object.entries(selectedCategory.keywordCounts as Record<string, number>).map(([k,v])=>({ key:k, value:Number(v) }));
+        console.log("[QuickAIResult] ✅ 선택된 카테고리의 keywordCounts 사용:", kcArr.length, "개");
+      }
+    }
+    
+    // 2) 전체 keywordCounts 사용 (fallback)
+    if (kcArr.length === 0) {
+      const kcSrc = analysisData.keywordCounts;
+      if (Array.isArray(kcSrc) && kcSrc.length > 0) {
+        kcArr = kcSrc as any;
+        console.log("[QuickAIResult] ✅ 전체 keywordCounts (배열) 사용:", kcArr.length, "개");
+      } else if (kcSrc && typeof kcSrc === 'object' && Object.keys(kcSrc).length > 0) {
+        kcArr = Object.entries(kcSrc as Record<string, number>).map(([k,v])=>({ key:k, value:Number(v) }));
+        console.log("[QuickAIResult] ✅ 전체 keywordCounts (객체) 사용:", kcArr.length, "개");
+      } else if (Array.isArray(analysisData.categoriesDetailed)) {
+        // 3) 카테고리별 keywordCounts 합산 (마지막 fallback)
+        const agg: Record<string, number> = {};
+        analysisData.categoriesDetailed.forEach((cat: any) => {
+          const obj = cat.keywordCounts;
+          if (obj && typeof obj === 'object') {
+            for (const [k,v] of Object.entries(obj as Record<string, number>)) {
+              agg[k] = (agg[k]||0)+Number(v);
+            }
           }
-        }
-      });
-      kcArr = Object.entries(agg).map(([k,v])=>({key:k, value:Number(v)}));
+        });
+        kcArr = Object.entries(agg).map(([k,v])=>({key:k, value:Number(v)}));
+        console.log("[QuickAIResult] ✅ 카테고리별 keywordCounts 합산 사용:", kcArr.length, "개");
+      }
     }
 
     if (kcArr.length > 0) {
@@ -196,24 +215,26 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       console.log("[QuickAIResult-Tags] hasMultipleCategories:", hasMultipleCategories);
       
       if (hasMultipleCategories) {
-        // 카테고리가 2개 이상인 경우: 첫 번째 카테고리의 태그 사용
-        const firstCategory = analysis.categoriesDetailed[0];
-        console.log("[QuickAIResult-Tags] 첫 번째 카테고리 데이터:", firstCategory);
-        console.log("[QuickAIResult-Tags] 첫 번째 카테고리의 tags:", firstCategory?.tags);
-        console.log("[QuickAIResult-Tags] tags 타입:", typeof firstCategory?.tags);
-        console.log("[QuickAIResult-Tags] tags 배열 여부:", Array.isArray(firstCategory?.tags));
+        // 카테고리가 2개 이상인 경우: 현재 선택된 카테고리의 태그 사용
+        const currentCategoryIndex = selectedCategoryIndex || 0;
+        const selectedCategory = analysis.categoriesDetailed[currentCategoryIndex];
+        console.log("[QuickAIResult-Tags] 현재 선택된 카테고리 인덱스:", currentCategoryIndex);
+        console.log("[QuickAIResult-Tags] 선택된 카테고리 데이터:", selectedCategory);
+        console.log("[QuickAIResult-Tags] 선택된 카테고리의 tags:", selectedCategory?.tags);
+        console.log("[QuickAIResult-Tags] tags 타입:", typeof selectedCategory?.tags);
+        console.log("[QuickAIResult-Tags] tags 배열 여부:", Array.isArray(selectedCategory?.tags));
         
-        if (firstCategory && Array.isArray(firstCategory.tags)) {
-          tagsRaw = firstCategory.tags;
-          console.log("[QuickAIResult-Tags] ✅ 첫 번째 카테고리의 태그 사용 (배열):", tagsRaw.length, "개");
-        } else if (firstCategory && firstCategory.tags && typeof firstCategory.tags === 'object') {
+        if (selectedCategory && Array.isArray(selectedCategory.tags)) {
+          tagsRaw = selectedCategory.tags;
+          console.log("[QuickAIResult-Tags] ✅ 선택된 카테고리의 태그 사용 (배열):", tagsRaw.length, "개");
+        } else if (selectedCategory && selectedCategory.tags && typeof selectedCategory.tags === 'object') {
           // 태그가 객체 형태인 경우 배열로 변환
-          tagsRaw = Object.entries(firstCategory.tags).map(([key, value]) => ({ key, value }));
-          console.log("[QuickAIResult-Tags] ✅ 첫 번째 카테고리의 태그 사용 (객체→배열):", tagsRaw.length, "개");
+          tagsRaw = Object.entries(selectedCategory.tags).map(([key, value]) => ({ key, value }));
+          console.log("[QuickAIResult-Tags] ✅ 선택된 카테고리의 태그 사용 (객체→배열):", tagsRaw.length, "개");
         } else {
           // fallback: 전체 태그 사용
           tagsRaw = Array.isArray(analysis.tags) ? analysis.tags : [];
-          console.log("[QuickAIResult-Tags] ⚠️ fallback: 전체 태그 사용 (첫 번째 카테고리에 태그 없음)");
+          console.log("[QuickAIResult-Tags] ⚠️ fallback: 전체 태그 사용 (선택된 카테고리에 태그 없음)");
         }
       } else {
         // 카테고리가 1개이거나 없는 경우: 전체 태그 사용
@@ -380,26 +401,28 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       console.log("[QuickAIResult-regenerate] hasMultipleCategories:", hasMultipleCategories);
       
       if (hasMultipleCategories) {
-        // 카테고리가 2개 이상인 경우: 첫 번째 카테고리의 키워드 사용
-        const firstCategory = analysisData.categoriesDetailed[0];
-        console.log("[QuickAIResult-regenerate] 첫 번째 카테고리 데이터:", firstCategory);
-        console.log("[QuickAIResult-regenerate] 첫 번째 카테고리의 keywords:", firstCategory?.keywords);
-        console.log("[QuickAIResult-regenerate] keywords 타입:", typeof firstCategory?.keywords);
-        console.log("[QuickAIResult-regenerate] keywords 배열 여부:", Array.isArray(firstCategory?.keywords));
+        // 카테고리가 2개 이상인 경우: 현재 선택된 카테고리의 키워드 사용
+        const currentCategoryIndex = selectedCategoryIndex || 0;
+        const selectedCategory = analysisData.categoriesDetailed[currentCategoryIndex];
+        console.log("[QuickAIResult-regenerate] 현재 선택된 카테고리 인덱스:", currentCategoryIndex);
+        console.log("[QuickAIResult-regenerate] 선택된 카테고리 데이터:", selectedCategory);
+        console.log("[QuickAIResult-regenerate] 선택된 카테고리의 keywords:", selectedCategory?.keywords);
+        console.log("[QuickAIResult-regenerate] keywords 타입:", typeof selectedCategory?.keywords);
+        console.log("[QuickAIResult-regenerate] keywords 배열 여부:", Array.isArray(selectedCategory?.keywords));
         
-        if (firstCategory && Array.isArray(firstCategory.keywords)) {
-          keywordsArr = firstCategory.keywords;
-          console.log("[QuickAIResult-regenerate] ✅ 첫 번째 카테고리의 키워드 사용:", keywordsArr.length, "개");
+        if (selectedCategory && Array.isArray(selectedCategory.keywords)) {
+          keywordsArr = selectedCategory.keywords;
+          console.log("[QuickAIResult-regenerate] ✅ 선택된 카테고리의 키워드 사용:", keywordsArr.length, "개");
           console.log("[QuickAIResult-regenerate] 사용된 키워드들:", keywordsArr);
-        } else if (firstCategory && firstCategory.keywords && typeof firstCategory.keywords === 'object') {
+        } else if (selectedCategory && selectedCategory.keywords && typeof selectedCategory.keywords === 'object') {
           // 키워드가 객체 형태인 경우 배열로 변환
-          keywordsArr = Object.entries(firstCategory.keywords).map(([key, value]) => ({ key, value }));
-          console.log("[QuickAIResult-regenerate] ✅ 첫 번째 카테고리의 키워드 사용 (객체→배열):", keywordsArr.length, "개");
+          keywordsArr = Object.entries(selectedCategory.keywords).map(([key, value]) => ({ key, value }));
+          console.log("[QuickAIResult-regenerate] ✅ 선택된 카테고리의 키워드 사용 (객체→배열):", keywordsArr.length, "개");
           console.log("[QuickAIResult-regenerate] 사용된 키워드들:", keywordsArr);
         } else {
           // fallback: 전체 키워드 사용
           keywordsArr = Array.isArray(analysisData.keywords) ? analysisData.keywords : [];
-          console.log("[QuickAIResult-regenerate] ⚠️ fallback: 전체 키워드 사용 (첫 번째 카테고리에 키워드 없음)");
+          console.log("[QuickAIResult-regenerate] ⚠️ fallback: 전체 키워드 사용 (선택된 카테고리에 키워드 없음)");
           console.log("[QuickAIResult-regenerate] 전체 키워드:", keywordsArr.length, "개");
         }
       } else {
@@ -496,24 +519,26 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
         console.log("[QuickAIResult-regenerate-Tags] hasMultipleCategories:", hasMultipleCategories);
         
         if (hasMultipleCategories) {
-          // 카테고리가 2개 이상인 경우: 첫 번째 카테고리의 태그 사용
-          const firstCategory = analysisData.categoriesDetailed[0];
-          console.log("[QuickAIResult-regenerate-Tags] 첫 번째 카테고리 데이터:", firstCategory);
-          console.log("[QuickAIResult-regenerate-Tags] 첫 번째 카테고리의 tags:", firstCategory?.tags);
-          console.log("[QuickAIResult-regenerate-Tags] tags 타입:", typeof firstCategory?.tags);
-          console.log("[QuickAIResult-regenerate-Tags] tags 배열 여부:", Array.isArray(firstCategory?.tags));
+          // 카테고리가 2개 이상인 경우: 현재 선택된 카테고리의 태그 사용
+          const currentCategoryIndex = selectedCategoryIndex || 0;
+          const selectedCategory = analysisData.categoriesDetailed[currentCategoryIndex];
+          console.log("[QuickAIResult-regenerate-Tags] 현재 선택된 카테고리 인덱스:", currentCategoryIndex);
+          console.log("[QuickAIResult-regenerate-Tags] 선택된 카테고리 데이터:", selectedCategory);
+          console.log("[QuickAIResult-regenerate-Tags] 선택된 카테고리의 tags:", selectedCategory?.tags);
+          console.log("[QuickAIResult-regenerate-Tags] tags 타입:", typeof selectedCategory?.tags);
+          console.log("[QuickAIResult-regenerate-Tags] tags 배열 여부:", Array.isArray(selectedCategory?.tags));
           
-          if (firstCategory && Array.isArray(firstCategory.tags)) {
-            tagsRaw = firstCategory.tags;
-            console.log("[QuickAIResult-regenerate-Tags] ✅ 첫 번째 카테고리의 태그 사용 (배열):", tagsRaw.length, "개");
-          } else if (firstCategory && firstCategory.tags && typeof firstCategory.tags === 'object') {
+          if (selectedCategory && Array.isArray(selectedCategory.tags)) {
+            tagsRaw = selectedCategory.tags;
+            console.log("[QuickAIResult-regenerate-Tags] ✅ 선택된 카테고리의 태그 사용 (배열):", tagsRaw.length, "개");
+          } else if (selectedCategory && selectedCategory.tags && typeof selectedCategory.tags === 'object') {
             // 태그가 객체 형태인 경우 배열로 변환
-            tagsRaw = Object.entries(firstCategory.tags).map(([key, value]) => ({ key, value }));
-            console.log("[QuickAIResult-regenerate-Tags] ✅ 첫 번째 카테고리의 태그 사용 (객체→배열):", tagsRaw.length, "개");
+            tagsRaw = Object.entries(selectedCategory.tags).map(([key, value]) => ({ key, value }));
+            console.log("[QuickAIResult-regenerate-Tags] ✅ 선택된 카테고리의 태그 사용 (객체→배열):", tagsRaw.length, "개");
           } else {
             // fallback: 전체 태그 사용
             tagsRaw = Array.isArray(analysisData?.tags) ? analysisData.tags : [];
-            console.log("[QuickAIResult-regenerate-Tags] ⚠️ fallback: 전체 태그 사용 (첫 번째 카테고리에 태그 없음)");
+            console.log("[QuickAIResult-regenerate-Tags] ⚠️ fallback: 전체 태그 사용 (선택된 카테고리에 태그 없음)");
           }
         } else {
           // 카테고리가 1개이거나 없는 경우: 전체 태그 사용
