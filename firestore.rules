@@ -81,28 +81,19 @@ service cloud.firestore {
       }
     }
 
-    // 키워드 경쟁률 분석 컬렉션 (최상위)
-    match /keywordAnalysis/{analysisId} {
-      allow read, write: if request.auth != null && 
-        request.auth.uid == resource.data.uid;
-      allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.uid;
+    // 키워드 경쟁률 분석 컬렉션 (월→uid→entry)
+    match /keywordAnalysis/{month}/{uid}/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
     
-    // 빠른 상품명 최적화 컬렉션 (최상위)
-    match /productNameOptimizeQuick/{docId} {
-      allow read, write: if request.auth != null && 
-        request.auth.uid == resource.data.uid;
-      allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.uid;
+    // 빠른 상품명 최적화 컬렉션 (월→uid→entry)
+    match /productNameOptimizeQuick/{month}/{uid}/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // 완벽한 상품명 최적화 컬렉션 (최상위)
-    match /productNameOptimizeComplete/{docId} {
-      allow read, write: if request.auth != null && 
-        request.auth.uid == resource.data.uid;
-      allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.uid;
+    // 완벽한 상품명 최적화 컬렉션 (월→uid→entry)
+    match /productNameOptimizeComplete/{month}/{uid}/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
 

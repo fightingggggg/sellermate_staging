@@ -812,6 +812,18 @@ export class HistoryService {
     return new Date().toISOString().slice(0, 7); // "2024-08"
   }
 
+  // 키워드+type+pageIndex 기반으로 항상 동일한 해시 ID 반환 (타임스탬프 없음)
+  private static generateStableEntryId(keyword: string, type: string, pageIndex?: number): string {
+    const baseString = `${keyword}_${type}_${pageIndex || 0}`;
+    let hash = 0;
+    for (let i = 0; i < baseString.length; i++) {
+      const char = baseString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash |= 0; // 32bit
+    }
+    return Math.abs(hash).toString(36);
+  }
+
   // ===== 빠른 상품명 최적화 저장 =====
   static async saveQuickProductNameOptimize(
     userEmail: string,
@@ -869,7 +881,7 @@ export class HistoryService {
 
     try {
       const monthId = this.getMonthId();
-      const entryId = this.generateDocumentId(userEmail, keyword, 'complete-optimizer', pageIndex);
+      const entryId = this.generateStableEntryId(keyword, 'complete-optimizer', pageIndex);
       const docRef = doc(db, COMPLETE_PRODUCT_OPTIMIZE_COLLECTION, monthId, uid, entryId);
 
       const item = {
