@@ -192,20 +192,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
 
         // 히스토리에 저장 (로그인된 사용자만)
         if (currentUser?.email && latestQueryRef.current) {
-          // 분석 데이터에서 실제 사용된 페이지 번호 추출
-          const actualPageIndex = data._pageIndex || 1;
-          console.log('[Quick Optimizer] Saving product optimization data for:', currentUser.email, latestQueryRef.current, 'page:', actualPageIndex);
-          HistoryService.saveProductNameOptimize(
-            currentUser.email,
-            currentUser.uid,
-            latestQueryRef.current,
-            data,
-            actualPageIndex
-          ).then(docId => {
-            console.log('[Quick Optimizer] Product optimization data saved successfully:', docId);
-          }).catch(error => {
-            console.error('[Quick Optimizer] Failed to save product optimization data:', error);
-          });
+          // (빠른 상품명은 AI 결과까지 포함해야 하므로 저장을 나중에 수행합니다)
         } else {
           console.log('[Quick Optimizer] Not saving history - user email:', currentUser?.email, 'keyword:', latestQueryRef.current);
         }
@@ -227,11 +214,12 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         aiResult.keyword === analysisKeyword && aiResult.pageIndex === (analysisData._pageIndex || 1)) {
       // 분석 데이터에서 실제 사용된 페이지 번호 추출
       const actualPageIndex = analysisData._pageIndex || 1;
-      console.log('[Quick Optimizer] Updating history with AI result for:', currentUser.email, analysisKeyword, 'page:', actualPageIndex);
-      HistoryService.updateHistoryWithAIResult(
+      console.log('[Quick Optimizer] Saving quick product optimization data (with AI result) for:', currentUser.email, analysisKeyword, 'page:', actualPageIndex);
+      HistoryService.saveQuickProductNameOptimize(
         currentUser.email,
+        currentUser.uid,
         analysisKeyword,
-        'quick-optimizer',
+        analysisData,
         {
           productName: aiResult.productName,
           reason: aiResult.reason,
@@ -240,9 +228,9 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         },
         actualPageIndex
       ).then(() => {
-        console.log('[Quick Optimizer] History updated with AI result successfully');
+        console.log('[Quick Optimizer] Quick product optimization data saved successfully');
       }).catch(error => {
-        console.error('[Quick Optimizer] Failed to update history with AI result:', error);
+        console.error('[Quick Optimizer] Failed to save quick product optimization data:', error);
       });
     }
   }, [currentUser?.email, analysisKeyword, analysisData, aiResult]);

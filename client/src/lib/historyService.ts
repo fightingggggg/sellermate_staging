@@ -30,7 +30,8 @@ const HISTORY_SUBCOLLECTION = 'history';
 const STATS_COLLECTION = 'user_stats';
 // 새로운 최상위 컬렉션들
 const KEYWORD_ANALYSIS_COLLECTION = 'keywordAnalysis';
-const PRODUCT_NAME_OPTIMIZE_COLLECTION = 'productNameOptimize';
+const QUICK_PRODUCT_OPTIMIZE_COLLECTION = 'productNameOptimizeQuick';
+const COMPLETE_PRODUCT_OPTIMIZE_COLLECTION = 'productNameOptimizeComplete';
 const MAX_HISTORY_ITEMS = 50; // 사용자당 최대 히스토리 증가
 const LOCAL_CACHE_KEY = 'keyword_history_cache';
 const LOCAL_CACHE_DURATION = 5 * 60 * 1000; // 5분으로 증가
@@ -804,25 +805,74 @@ export class HistoryService {
     }
   }
 
-  // 상품명 최적화 저장
-  static async saveProductNameOptimize(
+  // ===== 공용: 날짜 기반 문서 ID 생성 =====
+  private static generateDateDocumentId(): string {
+    return new Date().toISOString().replace(/[:.]/g, '-'); // 예: 2024-08-18T12-34-56-789Z
+  }
+
+  // ===== 빠른 상품명 최적화 저장 =====
+  static async saveQuickProductNameOptimize(
+    userEmail: string,
+    uid: string,
+    keyword: string,
+    data: any,
+    aiResult: {
+      productName: string;
+      reason: string;
+      recommendedTags: string[];
+      recommendedCategories: string[];
+    },
+    pageIndex?: number
+  ): Promise<string> {
+    console.log('📝 [빠른 상품명] 저장 시도:', { userEmail, keyword, pageIndex });
+
+    try {
+      const docId = this.generateDateDocumentId();
+      const docRef = doc(db, QUICK_PRODUCT_OPTIMIZE_COLLECTION, docId);
+
+      const item = {
+        uid,
+        userEmail,
+        keyword: keyword.trim(),
+        type: 'quick-optimizer',
+        data,
+        aiResult,
+        timestamp: serverTimestamp(),
+        pageIndex: pageIndex || null,
+        keywordLower: keyword.trim().toLowerCase(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      await setDoc(docRef, item);
+      console.log('✅ [빠른 상품명] 저장 성공:', docId);
+      return docId;
+
+    } catch (error) {
+      console.error('❌ [빠른 상품명] 저장 실패:', error);
+      throw error;
+    }
+  }
+
+  // ===== 완벽한 상품명 최적화 저장 =====
+  static async saveCompleteProductNameOptimize(
     userEmail: string,
     uid: string,
     keyword: string,
     data: any,
     pageIndex?: number
   ): Promise<string> {
-    console.log('📝 [상품명 최적화] 저장 시도:', { userEmail, keyword, pageIndex });
-    
+    console.log('📝 [완벽한 상품명] 저장 시도:', { userEmail, keyword });
+
     try {
-      const docId = this.generateDocumentId(userEmail, keyword, 'product-optimize', pageIndex);
-      const docRef = doc(db, PRODUCT_NAME_OPTIMIZE_COLLECTION, docId);
-      
-      const optimizeItem = {
+      const docId = this.generateDateDocumentId();
+      const docRef = doc(db, COMPLETE_PRODUCT_OPTIMIZE_COLLECTION, docId);
+
+      const item = {
         uid,
         userEmail,
         keyword: keyword.trim(),
-        type: 'product-optimize',
+        type: 'complete-optimizer',
         data,
         timestamp: serverTimestamp(),
         pageIndex: pageIndex || null,
@@ -831,13 +881,12 @@ export class HistoryService {
         updatedAt: serverTimestamp()
       };
 
-      await setDoc(docRef, optimizeItem);
-      
-      console.log('✅ [상품명 최적화] 저장 성공:', docId);
+      await setDoc(docRef, item);
+      console.log('✅ [완벽한 상품명] 저장 성공:', docId);
       return docId;
-      
+
     } catch (error) {
-      console.error('❌ [상품명 최적화] 저장 실패:', error);
+      console.error('❌ [완벽한 상품명] 저장 실패:', error);
       throw error;
     }
   }

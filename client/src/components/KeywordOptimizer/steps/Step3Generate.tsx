@@ -1019,15 +1019,19 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         };
         
         try {
-          await HistoryService.updateHistoryWithStep3Data(
+          await HistoryService.saveCompleteProductNameOptimize(
             currentUser.email,
+            currentUser.uid,
             ctxMainKeyword,
-            step3Data,
+            {
+              currentStep: 3,
+              step3Data,
+            },
             pageIndex
           );
-          console.log('[Step3] History updated with AI generation results');
+          console.log('[Step3] Complete product optimization data saved');
         } catch (error) {
-          console.error('[Step3] Failed to update history with AI results:', error);
+          console.error('[Step3] Failed to save complete product optimization data:', error);
         }
       }
     } catch (e: any) {

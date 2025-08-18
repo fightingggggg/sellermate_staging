@@ -28,9 +28,13 @@ Firestore Database
 │   ├── {analysisId1}
 │   ├── {analysisId2}
 │   └── ...
-└── productNameOptimize/
-    ├── {optimizeId1}
-    ├── {optimizeId2}
+├── productNameOptimizeQuick/
+│   ├── {docId1}
+│   ├── {docId2}
+│   └── ...
+└── productNameOptimizeComplete/
+    ├── {docId1}
+    ├── {docId2}
     └── ...
 
 ```
