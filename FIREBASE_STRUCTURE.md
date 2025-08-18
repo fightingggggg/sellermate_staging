@@ -24,6 +24,14 @@ Firestore Database
 │       ├── lastActivity: timestamp
 │       ├── migrationCompleted: boolean
 │       └── ...
+├── keywordAnalysis/
+│   ├── {analysisId1}
+│   ├── {analysisId2}
+│   └── ...
+└── productNameOptimize/
+    ├── {optimizeId1}
+    ├── {optimizeId2}
+    └── ...
 
 ```
 
