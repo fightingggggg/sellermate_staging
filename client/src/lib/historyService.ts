@@ -28,6 +28,9 @@ if (process.env.NODE_ENV === 'development') {
 const USERS_COLLECTION = 'users';
 const HISTORY_SUBCOLLECTION = 'history';
 const STATS_COLLECTION = 'user_stats';
+// 새로운 최상위 컬렉션들
+const KEYWORD_ANALYSIS_COLLECTION = 'keywordAnalysis';
+const PRODUCT_NAME_OPTIMIZE_COLLECTION = 'productNameOptimize';
 const MAX_HISTORY_ITEMS = 50; // 사용자당 최대 히스토리 증가
 const LOCAL_CACHE_KEY = 'keyword_history_cache';
 const LOCAL_CACHE_DURATION = 5 * 60 * 1000; // 5분으로 증가
@@ -760,4 +763,84 @@ export class HistoryService {
       throw error;
     }
   }
+
+  // ===== 새로운 컬렉션 메서드들 =====
+
+  // 키워드 경쟁률 분석 저장
+  static async saveKeywordAnalysis(
+    userEmail: string,
+    uid: string,
+    keyword: string,
+    data: any,
+    pageIndex?: number
+  ): Promise<string> {
+    console.log('🔍 [키워드 경쟁률 분석] 저장 시도:', { userEmail, keyword, pageIndex });
+    
+    try {
+      const docId = this.generateDocumentId(userEmail, keyword, 'keyword-analysis', pageIndex);
+      const docRef = doc(db, KEYWORD_ANALYSIS_COLLECTION, docId);
+      
+      const analysisItem = {
+        uid,
+        userEmail,
+        keyword: keyword.trim(),
+        type: 'keyword-analysis',
+        data,
+        timestamp: serverTimestamp(),
+        pageIndex: pageIndex || null,
+        keywordLower: keyword.trim().toLowerCase(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      await setDoc(docRef, analysisItem);
+      
+      console.log('✅ [키워드 경쟁률 분석] 저장 성공:', docId);
+      return docId;
+      
+    } catch (error) {
+      console.error('❌ [키워드 경쟁률 분석] 저장 실패:', error);
+      throw error;
+    }
+  }
+
+  // 상품명 최적화 저장
+  static async saveProductNameOptimize(
+    userEmail: string,
+    uid: string,
+    keyword: string,
+    data: any,
+    pageIndex?: number
+  ): Promise<string> {
+    console.log('📝 [상품명 최적화] 저장 시도:', { userEmail, keyword, pageIndex });
+    
+    try {
+      const docId = this.generateDocumentId(userEmail, keyword, 'product-optimize', pageIndex);
+      const docRef = doc(db, PRODUCT_NAME_OPTIMIZE_COLLECTION, docId);
+      
+      const optimizeItem = {
+        uid,
+        userEmail,
+        keyword: keyword.trim(),
+        type: 'product-optimize',
+        data,
+        timestamp: serverTimestamp(),
+        pageIndex: pageIndex || null,
+        keywordLower: keyword.trim().toLowerCase(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      await setDoc(docRef, optimizeItem);
+      
+      console.log('✅ [상품명 최적화] 저장 성공:', docId);
+      return docId;
+      
+    } catch (error) {
+      console.error('❌ [상품명 최적화] 저장 실패:', error);
+      throw error;
+    }
+  }
+
+
 } 

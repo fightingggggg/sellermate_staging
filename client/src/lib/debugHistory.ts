@@ -50,6 +50,8 @@ export class DebugHistory {
     console.log('📁 Generated path:', path);
     console.log('📁 Safe email:', safeEmail);
   }
+
+
 }
 
 // 개발 환경에서만 전역으로 노출
