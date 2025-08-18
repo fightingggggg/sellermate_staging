@@ -493,6 +493,15 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
         };
         
         try {
+          // 기존 히스토리 컬렉션 업데이트 (레거시)
+          await HistoryService.updateHistoryWithStep2Data(
+            currentUser.email,
+            mainKeyword,
+            step2Data,
+            pageIndex
+          );
+
+          // 월→uid 구조 저장/업데이트
           await HistoryService.saveCompleteProductNameOptimize(
             currentUser.email,
             currentUser.uid,

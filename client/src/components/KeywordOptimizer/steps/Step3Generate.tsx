@@ -1018,21 +1018,26 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
           categories: recommendedCategories.filter(Boolean)
         };
         
-        try {
-          await HistoryService.saveCompleteProductNameOptimize(
-            currentUser.email,
-            currentUser.uid,
-            ctxMainKeyword,
-            {
-              currentStep: 3,
-              step3Data,
-            },
-            pageIndex
-          );
-          console.log('[Step3] Complete product optimization data saved');
-        } catch (error) {
-          console.error('[Step3] Failed to save complete product optimization data:', error);
-        }
+        // 기존 히스토리 컬렉션 업데이트 (레거시)
+        await HistoryService.updateHistoryWithStep3Data(
+          currentUser.email,
+          ctxMainKeyword,
+          step3Data,
+          pageIndex
+        );
+
+        // 월→uid 구조 저장/업데이트
+        await HistoryService.saveCompleteProductNameOptimize(
+          currentUser.email,
+          currentUser.uid,
+          ctxMainKeyword,
+          {
+            currentStep: 3,
+            step3Data,
+          },
+          pageIndex
+        );
+        console.log('[Step3] Complete product optimization data saved');
       }
     } catch (e: any) {
       alert('상품명 생성 실패');

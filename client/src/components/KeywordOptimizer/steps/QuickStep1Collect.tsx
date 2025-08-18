@@ -232,6 +232,20 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
       }).catch(error => {
         console.error('[Quick Optimizer] Failed to save quick product optimization data:', error);
       });
+
+      // 기존 히스토리 컬렉션도 업데이트 (레거시)
+      HistoryService.updateHistoryWithAIResult(
+        currentUser.email,
+        analysisKeyword,
+        'quick-optimizer',
+        {
+          productName: aiResult.productName,
+          reason: aiResult.reason,
+          recommendedTags: aiResult.recommendedTags,
+          recommendedCategories: aiResult.recommendedCategories
+        },
+        actualPageIndex
+      ).catch(()=>{});
     }
   }, [currentUser?.email, analysisKeyword, analysisData, aiResult]);
 

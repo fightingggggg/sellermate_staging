@@ -237,6 +237,16 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
           // 분석 데이터에서 실제 사용된 페이지 번호 추출
           const actualPageIndex = data._pageIndex || 1;
           console.log('[Complete Optimizer] Saving step1 data for:', currentUser.email, latestQueryRef.current);
+          // 기존 히스토리 컬렉션 저장 (레거시)
+          HistoryService.saveHistory(
+            currentUser.email,
+            latestQueryRef.current,
+            'complete-optimizer',
+            data,
+            actualPageIndex
+          ).catch(()=>{});
+
+          // 새로운 월→uid 구조 저장
           HistoryService.saveCompleteProductNameOptimize(
             currentUser.email,
             currentUser.uid,

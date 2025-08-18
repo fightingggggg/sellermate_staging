@@ -779,7 +779,7 @@ export class HistoryService {
     
     try {
       const monthId = this.getMonthId();
-      const entryId = this.generateDocumentId(userEmail, keyword, 'keyword-analysis', pageIndex);
+      const entryId = this.makeEntryId(keyword, pageIndex);
       const docRef = doc(db, KEYWORD_ANALYSIS_COLLECTION, monthId, uid, entryId);
       
       const analysisItem = {
@@ -812,16 +812,10 @@ export class HistoryService {
     return new Date().toISOString().slice(0, 7); // "2024-08"
   }
 
-  // 키워드+type+pageIndex 기반으로 항상 동일한 해시 ID 반환 (타임스탬프 없음)
-  private static generateStableEntryId(keyword: string, type: string, pageIndex?: number): string {
-    const baseString = `${keyword}_${type}_${pageIndex || 0}`;
-    let hash = 0;
-    for (let i = 0; i < baseString.length; i++) {
-      const char = baseString.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash |= 0; // 32bit
-    }
-    return Math.abs(hash).toString(36);
+  // 키워드와 pageIndex를 이용해 고정 entryId 반환 (공백 등 제거)
+  private static makeEntryId(keyword: string, pageIndex?: number): string {
+    const safeKeyword = keyword.trim().toLowerCase().replace(/[^a-z0-9가-힣]+/gi, '_');
+    return `${safeKeyword}_${pageIndex || 0}`;
   }
 
   // ===== 빠른 상품명 최적화 저장 =====
@@ -842,7 +836,7 @@ export class HistoryService {
 
     try {
       const monthId = this.getMonthId();
-      const entryId = this.generateDocumentId(userEmail, keyword, 'quick-optimizer', pageIndex);
+      const entryId = this.makeEntryId(keyword, pageIndex);
       const docRef = doc(db, QUICK_PRODUCT_OPTIMIZE_COLLECTION, monthId, uid, entryId);
 
       const item = {
@@ -881,7 +875,7 @@ export class HistoryService {
 
     try {
       const monthId = this.getMonthId();
-      const entryId = this.generateStableEntryId(keyword, 'complete-optimizer', pageIndex);
+      const entryId = this.makeEntryId(keyword, pageIndex);
       const docRef = doc(db, COMPLETE_PRODUCT_OPTIMIZE_COLLECTION, monthId, uid, entryId);
 
       const item = {
@@ -890,6 +884,7 @@ export class HistoryService {
         keyword: keyword.trim(),
         type: 'complete-optimizer',
         data,
+        currentStep: (data as any).currentStep ?? 1,
         timestamp: serverTimestamp(),
         pageIndex: pageIndex || null,
         keywordLower: keyword.trim().toLowerCase(),
@@ -899,12 +894,17 @@ export class HistoryService {
 
       const existingSnap = await getDoc(docRef);
       if (existingSnap.exists()) {
-        // 기존 문서 덮어쓰기(override)
+        // 기존 데이터 병합 업데이트 (단계별 데이터 축적)
+        const prev = existingSnap.data() as any;
         await setDoc(docRef, {
-          ...item,
+          currentStep: item.currentStep,
+          data: {
+            ...(prev.data || {}),
+            ...(item.data || {})
+          },
           updatedAt: serverTimestamp()
-        }, { merge: false });
-        console.log('✅ [완벽한 상품명] 기존 문서 덮어쓰기 완료:', docRef.id);
+        }, { merge: true });
+        console.log('✅ [완벽한 상품명] 기존 문서 업데이트 완료:', docRef.id);
         return docRef.id;
       }
 
