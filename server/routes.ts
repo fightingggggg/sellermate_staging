@@ -457,31 +457,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     inFlightGenerateName.set(reqKey, taskPromise);
 
-    try {
-      const result = await taskPromise;
-      return res.json(result);
-    } catch (err) {
-      console.error('[generate-name] Claude API error detail', err);
-      const error: any = err as any;
-      if (error?.status === 401) {
+          try {
+        const result = await taskPromise;
+        
+        // 상품명 최적화 데이터 저장 (관리자용)
+        try {
+          // 사용자 인증 확인
+          let userUid: string | null = null;
+          const authHeader: string = req.headers?.authorization || '';
+          if (authHeader.startsWith('Bearer ')) {
+            try {
+              const token = authHeader.slice(7);
+              const decoded = await admin.auth().verifyIdToken(token);
+              userUid = decoded.uid;
+            } catch (authError) {
+              console.warn('[generate-name] 사용자 인증 실패, 데이터 저장 생략');
+            }
+          }
+
+          if (userUid && result.productName) {
+            const db = admin.firestore();
+            const logId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            const optimizationData = {
+              uid: userUid,
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              requestInfo: {
+                userAgent: req.headers['user-agent'] || '',
+                ip: req.ip || '',
+                referer: req.headers['referer'] || ''
+              },
+              inputData: {
+                query: query,
+                keyword: keyword,
+                keywordCount: keywordCountNum
+              },
+              outputData: {
+                productName: result.productName,
+                reason: result.reason
+              },
+              success: true
+            };
+
+            await db.collection('productNameOptimize').doc(userUid).collection('logs').doc(logId).set(optimizationData);
+            console.log('[generate-name] 최적화 데이터 저장 완료:', { userUid, query, keyword, logId });
+          }
+        } catch (saveError) {
+          console.error('[generate-name] 데이터 저장 실패:', saveError);
+          // 저장 실패해도 API 응답은 정상적으로 반환
+        }
+
+        return res.json(result);
+      } catch (err) {
+        console.error('[generate-name] Claude API error detail', err);
+        const error: any = err as any;
+        
+        // 상품명 최적화 실패 데이터도 저장 (관리자용)
+        try {
+          let userUid: string | null = null;
+          const authHeader: string = req.headers?.authorization || '';
+          if (authHeader.startsWith('Bearer ')) {
+            try {
+              const token = authHeader.slice(7);
+              const decoded = await admin.auth().verifyIdToken(token);
+              userUid = decoded.uid;
+            } catch (authError) {
+              // 인증 실패 시 저장하지 않음
+            }
+          }
+
+          if (userUid) {
+            const db = admin.firestore();
+            const logId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            const failureData = {
+              uid: userUid,
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              requestInfo: {
+                userAgent: req.headers['user-agent'] || '',
+                ip: req.ip || '',
+                referer: req.headers['referer'] || ''
+              },
+              inputData: {
+                query: query,
+                keyword: keyword,
+                keywordCount: keywordCountNum
+              },
+              error: {
+                status: error?.status || 'unknown',
+                message: error?.message || '알 수 없는 오류'
+              },
+              success: false
+            };
+
+            await db.collection('productNameOptimize').doc(userUid).collection('logs').doc(logId).set(failureData);
+            console.log('[generate-name] 실패 데이터 저장 완료:', { userUid, query, keyword, logId });
+          }
+        } catch (saveError) {
+          console.error('[generate-name] 실패 데이터 저장 실패:', saveError);
+        }
+
+        if (error?.status === 401) {
+          return res.status(500).json({ 
+            error: 'Claude API 인증 실패', 
+            detail: 'API 키가 유효하지 않습니다. 새로운 API 키가 필요합니다.' 
+          });
+        } else if (error?.status === 429 || error?.status === 529 || (error?.message || '').includes('overloaded')) {
+          res.set('Retry-After', '2');
+          return res.status(529).json({ error: 'Claude API 과부하 상태입니다. 잠시 후 다시 시도해주세요.' });
+        } else if ((error?.status ?? 0) >= 500) {
+          res.set('Retry-After', '2');
+          return res.status(529).json({ error: '서버 오류' });
+        }
         return res.status(500).json({ 
-          error: 'Claude API 인증 실패', 
-          detail: 'API 키가 유효하지 않습니다. 새로운 API 키가 필요합니다.' 
+          error: '상품명 생성 실패', 
+          detail: error?.message || '알 수 없는 오류'
         });
-      } else if (error?.status === 429 || error?.status === 529 || (error?.message || '').includes('overloaded')) {
-        res.set('Retry-After', '2');
-        return res.status(529).json({ error: 'Claude API 과부하 상태입니다. 잠시 후 다시 시도해주세요.' });
-      } else if ((error?.status ?? 0) >= 500) {
-        res.set('Retry-After', '2');
-        return res.status(529).json({ error: '서버 오류' });
+      } finally {
+        inFlightGenerateName.delete(reqKey);
       }
-      return res.status(500).json({ 
-        error: '상품명 생성 실패', 
-        detail: error?.message || '알 수 없는 오류'
-      });
-    } finally {
-      inFlightGenerateName.delete(reqKey);
-    }
   });
 
   // 이메일 인증 메일 전송
@@ -519,6 +613,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!keyword) {
       console.error('[keyword-competition] Missing keyword parameter');
       return res.status(400).json({ error: 'Missing query parameter keyword' });
+    }
+
+    // 사용자 인증 확인 (데이터 저장을 위해)
+    let userUid: string | null = null;
+    try {
+      const authHeader: string = req.headers?.authorization || '';
+      if (authHeader.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        const decoded = await admin.auth().verifyIdToken(token);
+        userUid = decoded.uid;
+      }
+    } catch (e) {
+      // 인증 실패 시에도 API 호출은 계속 진행 (로그만 남기고 저장하지 않음)
+      console.warn('[keyword-competition] 사용자 인증 실패, 데이터 저장 생략');
     }
 
     const apiKey = process.env.NAVER_AD_API_KEY; // 액세스 라이선스 ID
@@ -611,6 +719,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dataKeys: data ? Object.keys(data) : [],
         fullResponse: JSON.stringify(data, null, 2)
       });
+
+      // 키워드 경쟁률 분석 데이터 저장 (관리자용)
+      if (userUid && data && resp.ok) {
+        try {
+          const db = admin.firestore();
+          const logId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          
+          const analysisData = {
+            uid: userUid,
+            keyword: keyword,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            requestInfo: {
+              userAgent: req.headers['user-agent'] || '',
+              ip: req.ip || '',
+              referer: req.headers['referer'] || ''
+            },
+            apiResponse: {
+              status: resp.status,
+              statusText: resp.statusText,
+              keywordListCount: data?.keywordList?.length || 0,
+              hasData: !!data
+            },
+            keywordList: data?.keywordList || [],
+            rawResponse: data
+          };
+
+          await db.collection('keywordAnalysis').doc(userUid).collection('logs').doc(logId).set(analysisData);
+          console.log('[keyword-competition] 분석 데이터 저장 완료:', { userUid, keyword, logId });
+        } catch (saveError) {
+          console.error('[keyword-competition] 데이터 저장 실패:', saveError);
+          // 저장 실패해도 API 응답은 정상적으로 반환
+        }
+      }
       
       console.log('[keyword-competition] API 호출 성공 완료');
       res.json(data);
