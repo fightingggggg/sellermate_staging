@@ -362,29 +362,28 @@ export default function KeywordCompetitionAnalysisPage() {
     if (currentUser?.email && keyword.trim()) {
       console.log('[Keyword Analysis] Saving history for:', currentUser.email, keyword.trim());
       try {
-        // 기존 히스토리 컬렉션 저장 (레거시)
+        // 1) 레거시 히스토리 – 한도 초과 시 실패할 수 있음
         await HistoryService.saveHistory(
           currentUser.email,
           keyword.trim(),
           'keyword-analysis',
           dataToSave
         );
-
-        // 월→uid 구조 저장 (신규)
-        await HistoryService.saveKeywordAnalysis(
-          currentUser.email,
-          currentUser.uid,
-          keyword.trim(),
-          dataToSave
-        );
       } catch (error: any) {
-        console.warn('[Keyword Analysis] Failed to save history:', error.message);
-        // 히스토리 저장 실패 시 사용자에게 알림 (선택사항)
-        if (error.message.includes('히스토리 저장 제한')) {
-          // 제한 도달 시 조용히 처리 (분석 결과는 정상적으로 표시)
-          console.log('[Keyword Analysis] History limit reached, but analysis completed successfully');
+        if (error?.message?.includes('히스토리 저장 제한')) {
+          console.log('[Keyword Analysis] History limit reached – skip user history');
+        } else {
+          console.warn('[Keyword Analysis] Legacy history save failed:', error?.message);
         }
       }
+
+      // 2) 관리자용 컬렉션 – 제한 없이 항상 저장
+      await HistoryService.saveKeywordAnalysis(
+        currentUser.email,
+        currentUser.uid,
+        keyword.trim(),
+        dataToSave
+      );
     } else {
       console.log('[Keyword Analysis] Not saving history - user email:', currentUser?.email, 'keyword:', keyword.trim());
     }
