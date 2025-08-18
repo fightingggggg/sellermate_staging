@@ -641,6 +641,7 @@ export class HistoryService {
       const snapshot = await getDocs(historyQuery);
       
       if (!snapshot.empty) {
+        console.log('Found history documents:', snapshot.size);
         // 클라이언트 사이드에서 페이지 번호로 필터링
         const filteredDocs = snapshot.docs.filter(doc => {
           const docData = doc.data();
@@ -653,6 +654,8 @@ export class HistoryService {
           }
         });
         
+        console.log('Filtered documents by pageIndex:', filteredDocs.length, 'pageIndex:', pageIndex);
+        
         if (filteredDocs.length > 0) {
           // 가장 최근 항목 업데이트
           const sortedDocs = filteredDocs.sort((a, b) => {
@@ -663,6 +666,8 @@ export class HistoryService {
           
           const docRef = sortedDocs[0].ref;
           const currentData = sortedDocs[0].data();
+          
+          console.log('Updating document with step2Data:', step2Data);
           
           await updateDoc(docRef, {
             completeOptimizerData: {
@@ -683,7 +688,7 @@ export class HistoryService {
           console.warn('No matching history found to update with Step2 data for pageIndex:', pageIndex);
         }
       } else {
-        console.warn('No history found to update with Step2 data');
+        console.warn('No complete-optimizer history documents found for keyword:', keyword);
       }
     } catch (error) {
       console.error('Error updating history with Step2 data:', error);
