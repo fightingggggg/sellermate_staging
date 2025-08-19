@@ -187,7 +187,7 @@ export default function Home() {
                     onClick={handleAnalyzeClick}
                   >
                     <Search className="w-4 h-4 mr-0.5" />
-                    <span className="pr-1">로그인하고 무료 이용하기</span>
+                    <span className="pr-1">로그인하고 무료로 분석하기</span>
                   </Button>
                 </div>
               </div>
