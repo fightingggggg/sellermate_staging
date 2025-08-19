@@ -145,13 +145,12 @@ export default function Home() {
           <div className="flex flex-col items-center justify-center text-center">
             <div className="max-w-4xl mb-8">
               <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                <div className="mb-3 md:mb-4">네이버 스마트스토어</div>
-                <div className="mb-3 md:mb-4"><span className="text-[#1a73e8]">상위노출 최적화</span><span className="text-black">를 위한</span></div>
-                {/* 모바일: 줄바꿈, PC: 한 줄 */}
+                <div className="mb-4 md:mb-6"><span className="text-[#1a73e8]">광고 없이 상위 노출</span>하는</div>
+                <div className="mb-4 md:mb-6">스마트스토어 <span className="text-[#1a73e8]">상품명 키워드</span><span className="block md:inline"> 태그 조합 최적화</span></div>
                 <div className="mb-3 md:mb-4">
-                                      <span className="block md:inline">완벽한 솔루션, </span>
+                 
                   <span className="block md:inline">
-                    <img src="/logo.png" alt="스토어부스터" className="mobile-logo-home inline-block align-top h-[1.5em] mt-2 md:mt-[-0.4em]" />
+                    <img src="/logo.png" alt="스토어부스터" className="mobile-logo-home inline-block align-top h-[1.5em] mt-2 md:mt-[-0.2em]" />
                   </span>
                 </div>
               </h2>
@@ -188,7 +187,7 @@ export default function Home() {
                     onClick={handleAnalyzeClick}
                   >
                     <Search className="w-4 h-4 mr-0.5" />
-                    <span className="pr-1">분석</span>
+                    <span className="pr-1">로그인하고 무료 이용하기</span>
                   </Button>
                 </div>
               </div>
@@ -207,7 +206,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">이미 <span className="font-bold text-[#1a73e8]">1천+</span>명의 셀러가 사용 중</p>
+                <p className="text-base md:text-lg font-medium text-gray-600">실제 이용자 중 <span className="font-bold text-[#1a73e8]">55%</span>가 <span className="text-[#1a73e8]">무료 이용으로 상품명만 바꿔서</span> <span className="font-bold text-[#1a73e8]">순위 상승을 경험</span>!</p>
               </div>
             </div>
           </div>

@@ -99,7 +99,8 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
   const [showAllCatKeywordCounts, setShowAllCatKeywordCounts] = useState(false);
   const [showAllCatTags, setShowAllCatTags] = useState(false);
   // 페이지 번호 입력 (문자열로 관리, 빈값 허용)
-  const [pageIndex, setPageIndex] = useState<string>("");
+  // 비로그인 사용자일 때 예시 데이터를 보여주기 위해 기본값 1 설정
+  const [pageIndex, setPageIndex] = useState<string>(currentUser ? "" : "1");
   const [pageError, setPageError] = useState<boolean>(false);
   
   // 모달 상태

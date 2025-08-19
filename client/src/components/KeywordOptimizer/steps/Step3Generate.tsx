@@ -77,7 +77,8 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
   const latestQueryRef = useRef<string>(ctxMainKeyword ?? "");
   const latestPageIndexRef = useRef<number>(1);
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [pageIndex, setPageIndex] = useState<string>("1");
+  // 비로그인 사용자일 때 예시 데이터를 보여주기 위해 기본값 1 설정
+  const [pageIndex, setPageIndex] = useState<string>(currentUser ? "1" : "1");
   const [pageError, setPageError] = useState<boolean>(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showExtensionModal, setShowExtensionModal] = useState(false);
