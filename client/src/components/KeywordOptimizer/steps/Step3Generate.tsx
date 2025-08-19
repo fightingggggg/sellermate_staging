@@ -289,6 +289,10 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
     latestQueryRef.current = productName.trim();
     latestPageIndexRef.current = pageNum;
+    
+    // 새로운 분석 시작 전 기존 데이터 초기화
+    setAnalysisData(null);
+    
     setIsOptimizing(true);
     trackEvent("ProductOptimizer", "optimize", "ProductName");
 
