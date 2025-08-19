@@ -287,12 +287,18 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       return;
     }
 
+    // 새로운 분석을 시작하기 전에 기존 2/3단계 결과를 초기화하여 이전 분석 정보가 표시되지 않도록 한다.
+    setSynonymGroups([]);
+    setCombResult({});
+    setGeneratedProductNames([]);
+    setGeneratedReason('');
+    setGeneratedTags([]);
+    setGeneratedCategories([]);
+    // 선택된 메인, 카테고리 등도 초기화 (필요 최소한)
+    setSelectedMain('');
+
     latestQueryRef.current = productName.trim();
     latestPageIndexRef.current = pageNum;
-    
-    // 새로운 분석 시작 전 기존 데이터 초기화
-    setAnalysisData(null);
-    
     setIsOptimizing(true);
     trackEvent("ProductOptimizer", "optimize", "ProductName");
 
