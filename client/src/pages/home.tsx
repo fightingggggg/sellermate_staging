@@ -10,7 +10,7 @@ import FooterSection from "../components/FooterSection";
 import FaqSection from "../components/FaqSection";
 import DashboardLayout from "@/components/DashboardLayout";
 import ReviewSection from "../components/ReviewSection";
-import UpgradeNoticeModal from "@/components/UpgradeNoticeModal";
+
 
 import { trackEvent, trackTimeSpent } from "@/lib/analytics";
 import { useEffect, useState, lazy, Suspense } from "react";
@@ -31,8 +31,7 @@ export default function Home() {
   const [showPcOnlyModal, setShowPcOnlyModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   
-  // 업그레이드 안내 팝업
-  const [showUpgradeNotice, setShowUpgradeNotice] = useState(false);
+
 
   const handleAnalyzeClick = () => {
     // 모바일 체크 - PC 전용 기능
@@ -47,12 +46,12 @@ export default function Home() {
     }
 
     if (!currentUser) {
-      // 비로그인 사용자는 로그인 페이지로 이동
+      // 비로그인 사용자는 로그인 모달 표시
       trackEvent('Home', 'click', 'keywordSearch', { 
         user_status: 'not_logged_in',
         keyword: keyword.trim() || 'empty'
       });
-      navigate("/login");
+      setShowLoginModal(true);
       return;
     }
     
@@ -101,33 +100,7 @@ export default function Home() {
   //   };
   // }, []);
 
-  // 업그레이드 안내 팝업 표시 여부 확인
-  useEffect(() => {
-    // 직접 화면 크기를 체크하여 모바일인지 확인 (768px 미만이면 모바일)
-    const checkIsMobile = () => window.innerWidth < 768;
-    
-    // 모바일에서는 업그레이드 모달을 표시하지 않음
-    if (checkIsMobile()) {
-      return;
-    }
 
-    const isUpgradeNoticeDismissed = localStorage.getItem("upgrade-notice-dismissed");
-    if (!isUpgradeNoticeDismissed) {
-      setShowUpgradeNotice(true);
-    }
-
-    // 개발자용 키보드 단축키: Ctrl+Shift+U로 업그레이드 팝업 리셋
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'U') {
-        localStorage.removeItem("upgrade-notice-dismissed");
-        setShowUpgradeNotice(true);
-        console.log("업그레이드 안내 팝업 리셋됨");
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   if (loading) {
     return (
@@ -165,6 +138,7 @@ export default function Home() {
               <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
                 <div className="mb-6 text-center">
                   <h3 className="text-base md:text-xl text-gray-800 mb-2">상위 노출 경쟁률을 분석하고, 최적화된 상품명과 태그를 제안해요</h3>
+                  
                   {/* <p className="text-gray-600">상위 노출 경쟁률을 분석하고, 최적화된 상품명, 태그를 제공합니다.</p> */}
                   
                 </div>
@@ -193,21 +167,26 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="flex items-center justify-center mt-8">
-              <div className="flex -space-x-2">
-                <div className="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center">
-                  <span className="text-xs font-bold">KH</span>
+            <div className="flex flex-col items-center justify-center mt-8">
+              <div className="flex items-center">
+                <div className="flex -space-x-2">
+                  <div className="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center">
+                    <span className="text-xs font-bold">KH</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-full border-2 border-white bg-gray-300 flex items-center justify-center">
+                    <span className="text-xs font-bold">SJ</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-full border-2 border-white bg-gray-400 flex items-center justify-center">
+                    <span className="text-xs font-bold">YM</span>
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-full border-2 border-white bg-gray-300 flex items-center justify-center">
-                  <span className="text-xs font-bold">SJ</span>
-                </div>
-                <div className="w-10 h-10 rounded-full border-2 border-white bg-gray-400 flex items-center justify-center">
-                  <span className="text-xs font-bold">YM</span>
+                <div className="ml-4">
+                  <p className="text-base md:text-lg font-medium text-gray-600">실제 이용자 중 <span className="font-bold text-[#1a73e8]">55%</span>가 <span className="text-[#1a73e8]">무료 이용으로 상품명만 바꿔서</span> <span className="font-bold text-[#1a73e8]">순위 상승을 경험</span>!</p>
                 </div>
               </div>
-              <div className="ml-4">
-                <p className="text-base md:text-lg font-medium text-gray-600">실제 이용자 중 <span className="font-bold text-[#1a73e8]">55%</span>가 <span className="text-[#1a73e8]">무료 이용으로 상품명만 바꿔서</span> <span className="font-bold text-[#1a73e8]">순위 상승을 경험</span>!</p>
-              </div>
+              {/* <div className="mt-2">
+                <p className="text-sm md:text-base font-medium text-gray-600 text-center">네이버 검색 알고리즘을 준수한 상품명 최적화는 순위 상승과 광고비 절감을 동시에 보장합니다.</p>
+              </div> */}
             </div>
           </div>
         </div>
@@ -455,11 +434,7 @@ export default function Home() {
           </Suspense>
         </DialogContent>
       </Dialog>
-      {/* 업그레이드 안내 팝업 */}
-      <UpgradeNoticeModal 
-        open={showUpgradeNotice} 
-        onOpenChange={setShowUpgradeNotice} 
-      />
+
       </div>
     </DashboardLayout>
   );

@@ -1863,13 +1863,13 @@ export default function KeywordCompetitionAnalysisPage() {
               <span className="sr-only">닫기</span>
             </button>
             <DialogHeader>
-              <DialogTitle className="text-center text-xl font-bold text-gray-800 mb-2">확장프로그램 설치 필요</DialogTitle>
+              <DialogTitle className="text-center text-xl font-bold text-gray-800 mb-2">확장 프로그램만 설치하면 바로 분석 시작!</DialogTitle>
             </DialogHeader>
             <div className="text-center space-y-4 p-4">
               <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
                 <Download className="w-8 h-8 text-blue-600" />
               </div>
-              <p className="text-gray-600">상품 분석을 위해 Chrome 확장프로그램을 설치하고,<br />새로고침 해주세요.</p>
+              <p className="text-gray-600">상품 분석을 위해 확장프로그램 설치가 필요해요.<br />설치 후 새로고침만 하면 바로 사용가능해요</p>
               <Button
                 onClick={() => {
                   trackEvent('Extension', 'install_click', 'Modal');
@@ -1878,7 +1878,7 @@ export default function KeywordCompetitionAnalysisPage() {
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3"
               >
                 <Download className="mr-2 h-4 w-4" />
-                설치하기
+                설치하기 (클릭 한 번 3초면 끝!)
               </Button>
             </div>
           </DialogContent>
