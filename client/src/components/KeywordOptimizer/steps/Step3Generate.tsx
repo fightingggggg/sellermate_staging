@@ -752,7 +752,10 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       }
 
       // combResult에 직접 정보가 없더라도, 공백 없이 메인키워드가 포함되어 있으면 일체형으로 간주
-      if (!queryKind && normalizedSelectedMain && normalizedQuery !== normalizedSelectedMain && normalizedQuery.includes(normalizedSelectedMain)) {
+      // 여기서 메인키워드는 combMainMap에서 찾은 실제 매핑된 메인키워드를 우선 사용
+      const mappedMainForQuery = combMainMap[ctxMainKeyword] || selectedMain || ctxMainKeyword;
+      const normalizedMappedMain = mappedMainForQuery?.replace(/\s+/g, '');
+      if (!queryKind && normalizedMappedMain && normalizedQuery !== normalizedMappedMain && normalizedQuery.includes(normalizedMappedMain)) {
         queryKind = '일체형';
       }
 
@@ -913,37 +916,55 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     }
 
       // ----- [FIX] 추가 분리 로직: 메인 키워드가 붙어있는 잔여 토큰 분리 -----
-      if (selectedMain) {
-        const mainTrim = selectedMain.replace(/\s+/g, "");
-        const refinedParts: string[] = [];
-        const clean = (t:string)=> t.replace(/,+$/,'').replace(/^,+/,'').trim();
-        query.split(' ').forEach((rawTok) => {
-          const tok = clean(rawTok);
-          if (
-            tok &&
-            tok !== mainTrim &&
-            tok.endsWith(mainTrim) &&
-            tok.length > mainTrim.length
-          ) {
-            const prefix = tok.slice(0, tok.length - mainTrim.length);
-            // combResult 에서 prefix 가 조합형으로 판정된 경우 또는
-            // combResult 의 조합형 키 중 괄호/공백을 제거한 형태가 prefix 와 일치하는 경우에 분리
-            const isCombPrefix =
-              combResult[prefix] === '조합형' ||
-              Object.entries(combResult).some(
-                ([kw, kind]) =>
-                  kind === '조합형' &&
-                  kw.replace(/\(.*?\)/g, '').replace(/\s+/g, '') === prefix
-              );
-            if (isCombPrefix) {
-              refinedParts.push(clean(prefix), mainTrim);
-              return;
-            }
+      // 각 키워드별로 실제 매핑된 메인키워드를 찾아서 사용
+      const getMainKeywordForToken = (token: string): string => {
+        // 1) combMainMap에서 해당 토큰의 메인키워드 찾기
+        if (combMainMap[token]) return combMainMap[token];
+        
+        // 2) 조합형 결과에서 해당 토큰이 포함된 키워드의 메인키워드 찾기
+        for (const [combKw, kind] of Object.entries(combResult)) {
+          if (kind === '조합형' && combKw.includes(token) && combMainMap[combKw]) {
+            return combMainMap[combKw];
           }
-          if(tok) refinedParts.push(tok);
-        });
-        query = refinedParts.filter(Boolean).join(', ').replace(/\s*,\s*/g, ', ').replace(/,{2,}/g, ',').replace(/\s{2,}/g,' ').trim();
-      }
+        }
+        
+        // 3) fallback: selectedMain 또는 ctxMainKeyword
+        return selectedMain || ctxMainKeyword;
+      };
+      
+      const refinedParts: string[] = [];
+      const clean = (t:string)=> t.replace(/,+$/,'').replace(/^,+/,'').trim();
+      query.split(' ').forEach((rawTok) => {
+        const tok = clean(rawTok);
+        if (!tok) return;
+        
+        // 토큰에 대한 실제 매핑된 메인키워드 찾기
+        const mainForTok = getMainKeywordForToken(tok);
+        const mainTrim = mainForTok.replace(/\s+/g, "");
+        
+        if (
+          tok !== mainTrim &&
+          tok.endsWith(mainTrim) &&
+          tok.length > mainTrim.length
+        ) {
+          const prefix = tok.slice(0, tok.length - mainTrim.length);
+          // combResult 에서 prefix 가 조합형으로 판정된 경우 또는
+          // combResult 의 조합형 키 중 괄호/공백을 제거한 형태가 prefix 와 일치하는 경우에 분리
+          const isCombPrefix =
+            combResult[prefix] === '조합형' ||
+            Object.entries(combResult).some(
+              ([kw, kind]) =>
+                kind === '조합형' &&
+                kw.replace(/\(.*?\)/g, '').replace(/\s+/g, '') === prefix
+            );
+          if (isCombPrefix) {
+            refinedParts.push(clean(prefix), mainTrim);
+            return;
+          }
+        }
+        refinedParts.push(tok);
+      });
+      query = refinedParts.filter(Boolean).join(', ').replace(/\s*,\s*/g, ', ').replace(/,{2,}/g, ',').replace(/\s{2,}/g,' ').trim();
 
       // 12위와 동점인 키워드까지 모두 포함하도록 길이를 계산합니다.
       const keyword = displayKeywordsCurrent
@@ -1192,9 +1213,32 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     const skipSet = new Set<string>();
     const mergedKeywordsSet = new Set<string>(); // 동의어이자 조합형 키워드에 합산된 키워드들을 추적
 
-    // 메인키워드(기본)
-    const actualMainKeyword = selectedMain || ctxMainKeyword;
-    
+    // 키워드별 실제 매핑된 메인키워드를 찾는 헬퍼 함수
+    const getMainKeywordFor = (keyword: string): string => {
+      // 1) combMainMap에서 직접 매핑 확인
+      if (combMainMap[keyword]) return combMainMap[keyword];
+      
+      // 2) 동의어 그룹에서 해당 키워드가 포함된 그룹의 대표 키워드의 메인키워드 확인
+      const group = keywordToGroup[keyword];
+      if (group && group.keywords && group.keywords.length > 0) {
+        const representative = group.keywords[0];
+        if (combMainMap[representative]) return combMainMap[representative];
+      }
+      
+      // 3) 조합형 결과에서 해당 키워드가 포함된 키워드의 메인키워드 확인
+      for (const [combKw, kind] of Object.entries(combResult)) {
+        if ((kind === '조합형' || kind === '일체형') && combKw.includes(keyword) && combMainMap[combKw]) {
+          return combMainMap[combKw];
+        }
+      }
+      
+      // 4) fallback: selectedMain 또는 ctxMainKeyword
+      return selectedMain || ctxMainKeyword || "";
+    };
+
+    // 메인키워드(기본) - 전역적으로 사용되는 기본 메인키워드 (fallback용)
+    const defaultMainKeyword = selectedMain || ctxMainKeyword;
+
     // 조합형/일체형 키워드와 일반 키워드 매핑 생성
     const combMappings: Record<string, { baseKeyword: string; fullKeyword: string; type: 'comb' | 'indep' }> = {};
     
@@ -1203,7 +1247,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     allMergedGroups.forEach((g) => {
       if (g.merged && !mainSynonymGroups.includes(g)) {
         const rep = g.keywords[0];
-        const baseFromRep = rep.replace(actualMainKeyword, '').trim();
+        const baseFromRep = rep.replace(defaultMainKeyword, '').trim();
         
         // 조합형 여부 확인
         let hasComb = false;
@@ -1229,7 +1273,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
           synonymCombBaseKeywords.add(baseFromRep);
           // 동의어 그룹 내의 모든 키워드에서 base 키워드 찾기
           g.keywords.forEach(groupKw => {
-            const baseFromGroupKw = groupKw.replace(actualMainKeyword, '').trim();
+            const baseFromGroupKw = groupKw.replace(defaultMainKeyword, '').trim();
             if (baseFromGroupKw && valueMap[baseFromGroupKw]) {
               synonymCombBaseKeywords.add(baseFromGroupKw);
             }
@@ -1296,7 +1340,8 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     allMergedGroups.forEach((g) => {
       if (g.merged && !mainSynonymGroups.includes(g)) {
         const rep = g.keywords[0];
-        const baseFromRep = rep.replace(actualMainKeyword, '').trim();
+        const mainKeywordForRep = getMainKeywordFor(rep);
+        const baseFromRep = rep.replace(mainKeywordForRep, '').trim();
         
         // 조합형 여부 확인
         let hasComb = false;
@@ -1320,8 +1365,8 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         // 동의어+조합형이고 base 키워드가 있다면 미리 skipSet에 추가
         if (hasComb && baseFromRep && valueMap[baseFromRep]) {
           skipSet.add(baseFromRep);
-          const baseWithMain = `${baseFromRep}${actualMainKeyword}`;
-          const mainWithBase = `${actualMainKeyword}${baseFromRep}`;
+          const baseWithMain = `${baseFromRep}${mainKeywordForRep}`;
+          const mainWithBase = `${mainKeywordForRep}${baseFromRep}`;
           skipSet.add(baseWithMain);
           skipSet.add(mainWithBase);
         }
@@ -1379,7 +1424,8 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         contributors = foundGrp ? [...foundGrp.keywords] : [kw];
         
         // 조합형 여부 확인: 대표 키워드에서 메인/동일 키워드 제거한 base가 combSet 에 존재하는지 확인
-        const baseFromRep = rep.replace(actualMainKeyword, '').trim();
+        const repMainKeyword = getMainKeywordFor(rep);
+        const baseFromRep = rep.replace(repMainKeyword, '').trim();
         // combSet 체크: (1) base 형태, (2) 그룹 내 다른 키워드가 combSet 에 포함되는지
         let hasComb = false;
         const combKeysArr = Array.from(combSet);
@@ -1407,47 +1453,69 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
           typesSet.add('comb');
           
           // 동의어+조합형 키워드의 base 키워드들을 찾아서 빈도 합산 및 제거
-          const baseKeywordsToAdd: string[] = [];
+          const keywordsToAdd: string[] = [];
           
           // 1) 대표 키워드에서 base 키워드 찾기
           if (baseFromRep && valueMap[baseFromRep]) {
-            baseKeywordsToAdd.push(baseFromRep);
+            keywordsToAdd.push(baseFromRep);
           }
           
-          // 2) 동의어 그룹 내의 모든 키워드에서 base 키워드 찾기
+          // 2) 동의어 그룹 내의 모든 키워드에서 base 키워드와 조합 키워드 찾기
           if (foundGrp) {
             foundGrp.keywords.forEach(groupKw => {
-              const baseFromGroupKw = groupKw.replace(actualMainKeyword, '').trim();
-              if (baseFromGroupKw && valueMap[baseFromGroupKw] && !baseKeywordsToAdd.includes(baseFromGroupKw)) {
-                baseKeywordsToAdd.push(baseFromGroupKw);
+              const kwMainKeyword = getMainKeywordFor(groupKw);
+              const baseFromGroupKw = groupKw.replace(kwMainKeyword, '').trim();
+              
+              // 2-1) base 키워드 추가
+              if (baseFromGroupKw && valueMap[baseFromGroupKw] && !keywordsToAdd.includes(baseFromGroupKw)) {
+                keywordsToAdd.push(baseFromGroupKw);
+              }
+              
+              // 2-2) 각 동의어와 메인키워드의 조합 형태도 찾아서 추가
+              // 예: "국내산"과 메인키워드 "새우" → "국내산새우" 형태 확인
+              const combinationWithMain = `${baseFromGroupKw}${kwMainKeyword}`;
+              const mainWithCombination = `${kwMainKeyword}${baseFromGroupKw}`;
+              
+              if (baseFromGroupKw) {
+                // 앞쪽 조합: "국내산새우"
+                if (valueMap[combinationWithMain] && !keywordsToAdd.includes(combinationWithMain)) {
+                  keywordsToAdd.push(combinationWithMain);
+                }
+                // 뒤쪽 조합: "새우국내산" (드문 경우지만 확인)
+                if (valueMap[mainWithCombination] && !keywordsToAdd.includes(mainWithCombination)) {
+                  keywordsToAdd.push(mainWithCombination);
+                }
               }
             });
           }
           
-          // 3) 찾은 base 키워드들의 빈도를 합산(중복 제외)하고 즉시 skipSet에 추가
+          // 3) 찾은 키워드들의 빈도를 합산(중복 제외)하고 즉시 skipSet에 추가
           const alreadyInGroup = new Set(foundGrp ? foundGrp.keywords : []);
-          baseKeywordsToAdd.forEach(baseKw => {
-            if (alreadyInGroup.has(baseKw)) return; // 동의어 그룹에 이미 포함 → 중복 합산 방지
+          keywordsToAdd.forEach(kwToAdd => {
+            if (alreadyInGroup.has(kwToAdd)) return; // 동의어 그룹에 이미 포함 → 중복 합산 방지
 
-            count += valueMap[baseKw];
-            pushContrib(contributors, baseKw);
+            count += valueMap[kwToAdd];
+            pushContrib(contributors, kwToAdd);
             
             // 즉시 skipSet에 추가하여 키워드 섹션에서 제외
-            skipSet.add(baseKw);
-            mergedKeywordsSet.add(baseKw); // 합산된 키워드 추적
-            console.log(`[Step3] "${baseKw}"가 mergedKeywordsSet에 추가됨`);
+            skipSet.add(kwToAdd);
+            mergedKeywordsSet.add(kwToAdd); // 합산된 키워드 추적
+            console.log(`[Step3] "${kwToAdd}"가 mergedKeywordsSet에 추가됨`);
             
-            // 동일한 base 키워드의 다른 변형들도 skipSet에 추가
-            // 메인키워드와 합친 형태들도 제거
-            const baseWithMain = `${baseKw}${actualMainKeyword}`;
-            const mainWithBase = `${actualMainKeyword}${baseKw}`;
-            skipSet.add(baseWithMain);
-            skipSet.add(mainWithBase);
-            mergedKeywordsSet.add(baseWithMain);
-            mergedKeywordsSet.add(mainWithBase);
+            // 조합 키워드의 경우 역방향 조합도 skipSet에 추가
+            const kwMainForAdded = getMainKeywordFor(kwToAdd);
+            const baseFromAdded = kwToAdd.replace(kwMainForAdded, '').trim();
+            if (baseFromAdded) {
+              const reverseCombo1 = `${baseFromAdded}${kwMainForAdded}`;
+              const reverseCombo2 = `${kwMainForAdded}${baseFromAdded}`;
+              skipSet.add(reverseCombo1);
+              skipSet.add(reverseCombo2);
+              mergedKeywordsSet.add(reverseCombo1);
+              mergedKeywordsSet.add(reverseCombo2);
+            }
             
-            // 디버깅: 합산된 base 키워드 로그
-            console.log(`[Step3] 동의어+조합형 키워드 "${label}"에 "${baseKw}" 합산됨 (빈도: ${valueMap[baseKw]})`);
+            // 디버깅: 합산된 키워드 로그
+            console.log(`[Step3] 동의어+조합형 키워드 "${label}"에 "${kwToAdd}" 합산됨 (빈도: ${valueMap[kwToAdd]})`);
           });
         }
 
@@ -1472,6 +1540,13 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
           console.log(`[Step3] "꿀"이 combMappings 경로로 처리됨`);
           console.log(`[Step3] mapping:`, mapping);
           console.log(`[Step3] mergedKeywordsSet.has('꿀'):`, mergedKeywordsSet.has('꿀'));
+        }
+        
+        // 동의어 그룹에 이미 속한 키워드는 스킵 (중복 처리 방지)
+        if (keywordToRep[kw]) {
+          console.log(`[Step3] "${kw}"는 이미 동의어 그룹에 속해 있으므로 combMappings 처리를 스킵합니다.`);
+          skipSet.add(kw);
+          continue;
         }
         
         // baseKeyword가 이미 동의어 그룹에 포함되어 있을 경우(=이미 표시되었음) 중복 표시를 방지하기 위해 스킵
@@ -1556,14 +1631,22 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         
         type = 'indep';
         const stripped = stripParen(kw);
-        if (stripped.includes(actualMainKeyword)) {
+        const kwMainKeyword = getMainKeywordFor(kw);
+        if (stripped.includes(kwMainKeyword)) {
           label = stripped; // 이미 메인키워드 포함
         } else {
-          label = `${stripped}${actualMainKeyword}`;
+          label = `${stripped}${kwMainKeyword}`;
         }
       }
       // 조합형 키워드 직접 처리  
       else if (combSet.has(kw)) {
+        // 동의어 그룹에 이미 속한 키워드는 스킵 (중복 처리 방지)
+        if (keywordToRep[kw]) {
+          console.log(`[Step3] "${kw}"는 이미 동의어 그룹에 속해 있으므로 조합형 직접 처리를 스킵합니다.`);
+          skipSet.add(kw);
+          continue;
+        }
+        
         // 합산된 키워드인 경우 스킵
         if (mergedKeywordsSet.has(kw)) {
           console.log(`[Step3] 조합형 키워드 "${kw}"가 합산되어 스킵됨`);
@@ -1579,12 +1662,20 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         }
         
         type = 'comb';
-        const stripped = kw.replace(actualMainKeyword, '').trim();
+        const kwMainKeyword = getMainKeywordFor(kw);
+        const stripped = kw.replace(kwMainKeyword, '').trim();
         label = stripped || kw;
       }
 
       // 최종 집계에 추가 (combMappings 경로는 이미 집계했으므로 제외)
       if (!combMappings[kw]) {
+        // 동의어 그룹에 이미 속한 키워드는 스킵 (중복 처리 방지)
+        if (keywordToRep[kw]) {
+          console.log(`[Step3] "${kw}"는 이미 동의어 그룹에 속해 있으므로 일반 키워드 처리를 스킵합니다.`);
+          skipSet.add(kw);
+          continue;
+        }
+        
         // 합산된 키워드인 경우 스킵
         if (mergedKeywordsSet.has(kw)) {
           console.log(`[Step3] 일반 키워드 "${kw}"가 합산되어 스킵됨`);
@@ -1630,14 +1721,26 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       let displayLabel = item.label;
       const isSynAndComb = item.types?.has && item.types.has('synonym') && item.types.has('comb');
       if (isSynAndComb) {
-        const removeSet = new Set<string>([
-          (selectedMain || ctxMainKeyword) ?? '',
-          ...excludedSame
-        ]);
-        removeSet.forEach((kw)=>{
-          if(!kw) return;
+        // 해당 키워드 그룹에 속한 키워드들의 실제 매핑된 메인키워드들을 수집
+        const mainKeywordsToRemove = new Set<string>();
+        
+        // 1) 기본 메인키워드들 추가
+        mainKeywordsToRemove.add(selectedMain || ctxMainKeyword || "");
+        excludedSame.forEach(kw => mainKeywordsToRemove.add(kw));
+        
+        // 2) contributors에서 각 키워드의 실제 매핑된 메인키워드 찾아서 추가
+        item.contributors.forEach(contributorKw => {
+          const actualMainForKeyword = getMainKeywordFor(contributorKw);
+          if (actualMainForKeyword) {
+            mainKeywordsToRemove.add(actualMainForKeyword);
+          }
+        });
+        
+        // 3) 수집된 메인키워드들을 제거
+        Array.from(mainKeywordsToRemove).forEach((mainKw)=>{
+          if(!mainKw) return;
           // 모든 공백을 제거한 형태와 원본 두 가지 모두 시도하여 치환 정확도 향상
-          const patterns = [kw, kw.replace(/\s+/g, '')];
+          const patterns = [mainKw, mainKw.replace(/\s+/g, '')];
           patterns.forEach((pat)=>{
             if(pat){
               const reg = new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');

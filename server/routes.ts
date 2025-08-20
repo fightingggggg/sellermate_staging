@@ -356,11 +356,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       ## 상품명 생성 규칙 (매우 중요)
         - **입력값에 제공된 단어만 사용할 것 (새로운 단어 생성 금지)**
-        - **필수 키워드 각각 단어 모두 원본 형태 그대로 반드시 단독 개별 사용 (키워드 변형 금지)**
-        - 필수 키워드는 비연속 배치
-        - 정확히 ${keywordCount}개의 단어만 사용 
         - **입력값의 단어, 띄어쓰기 등 원본 그대로 사용(어떠한 형태도 변경 금지)**
-        - 동일 단어 반복 금지 (단,필수 키워드와 동일 상위 키워드는 반복 가능)
+        - **필수 키워드의 모든 단어는 반드시 원본 형태 그대로 각각 사용**
+        - 정확히 ${keywordCount}개의 단어만 사용 
+        - 동일 단어 반복 금지 (예외, 필수 키워드와 동일 상위 키워드는 반복 가능)
+        - 동일 단어는 비연속 배치
         - 상위 키워드 배열 순서가 중요도 순서
         - 지역은 하나만 사용
 
@@ -386,7 +386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         model: 'claude-3-5-haiku-20241022',
         temperature: 0.2,
         top_p: 0.3,
-        max_tokens: 500,
+        max_tokens: 100,
         system: '너는 규칙을 준수하는 네이버 스마트스토어 SEO 전문가.',
         messages: [
           { role: 'user', content: [{ type: 'text', text: prompt }] },
