@@ -789,15 +789,19 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
           const before = ctxMainKeyword.slice(0, splitIdx).trim();
           const after  = ctxMainKeyword.slice(splitIdx + mainForQuery.length).trim();
 
+          // 원본 메인키워드(selectedMain)도 함께 포함
+          const originalMain = selectedMain || ctxMainKeyword;
+          const shouldIncludeOriginalMain = originalMain && originalMain !== mainForQuery && originalMain !== ctxMainKeyword;
+
           if (before) {
             // comb키워드가 앞에 올 때
-            query = `${before}, ${mainForQuery}`;
+            query = shouldIncludeOriginalMain ? `${before}, ${mainForQuery}, ${originalMain}` : `${before}, ${mainForQuery}`;
           } else if (after) {
             // comb키워드가 뒤에 올 때 (드문 케이스)
-            query = `${mainForQuery}, ${after}`;
+            query = shouldIncludeOriginalMain ? `${mainForQuery}, ${after}, ${originalMain}` : `${mainForQuery}, ${after}`;
           } else {
             // 예외: 분리 실패 시 기존 로직 유지(공백 없음)
-            query = `${mainForQuery}`;
+            query = shouldIncludeOriginalMain ? `${mainForQuery}, ${originalMain}` : `${mainForQuery}`;
           }
         }
       } else {
