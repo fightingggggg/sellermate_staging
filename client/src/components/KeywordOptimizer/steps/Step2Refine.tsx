@@ -75,12 +75,23 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
       .sort((a:any,b:any)=> (b.value||0) - (a.value||0));
   }, [keywordsArray, mainKeyword]);
 
-  // 상위 12위 + 동점 키워드(빈도 3회 이상)만 포함 – Step1 기본 표시와 동일 기준
+  // ===== Helper: 최소 N개 보장 + 동점 포함 =====
+  const getTopWithTieMinimum = <T,>(sortedArr: T[], limit: number, getValue: (item: T) => number): T[] => {
+    if (sortedArr.length <= limit) return sortedArr;
+    
+    // 먼저 상위 limit개를 확실히 가져온다
+    const topItems = sortedArr.slice(0, limit);
+    
+    // limit번째 아이템의 값과 동일한 값을 가진 추가 아이템들을 찾는다
+    const thresholdValue = getValue(sortedArr[limit - 1]);
+    const additionalTiedItems = sortedArr.slice(limit).filter((item) => getValue(item) === thresholdValue);
+    
+    return [...topItems, ...additionalTiedItems];
+  };
+
+  // 상위 12위 + 동점 키워드 포함 (최소 12개 보장)
   const topKeywords: string[] = React.useMemo(() => {
-    const filtered = sortedKeywords.filter((it: any) => (it.value || 0) >= 3);
-    if (filtered.length <= 12) return filtered.map((it: any) => it.key);
-    const threshold = filtered[11].value || 0;
-    return filtered.filter((it: any) => (it.value || 0) >= threshold).map((it: any) => it.key);
+    return getTopWithTieMinimum(sortedKeywords, 12, (it: any) => it.value || 0).map((it: any) => it.key);
   }, [sortedKeywords]);
 
   const thresholdCount = sortedKeywords.length >= 12 ? (sortedKeywords[11].value || 0) : 0;
@@ -600,11 +611,7 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
         const kw = kwObj.key;
         const val = kwObj.value || 0;
         
-        // 빈도가 3 미만인 키워드를 만나면 더 이상 추가할 키워드가 없으므로 종료
-        if (val < 3) {
-          console.log('[Step2] 빈도 3 미만으로 키워드 추가 종료:', kw, '(빈도:', val + ')');
-          break;
-        }
+        // 빈도 제한 없이 키워드 추가
         
         // 이미 포함된 키워드 또는 동의어 그룹에 포함된 키워드는 건너뛰기
         if (includedKeywords.has(kw) || groupedKeywords.has(kw)) {

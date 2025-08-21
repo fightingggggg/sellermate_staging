@@ -459,14 +459,13 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     window.scrollTo({ top: scrollTop, behavior: 'auto' });
   }, [genName, generatedProductNames.length]);
 
-  // --- placeholder: 키워드 배열(빈도≥3) — handleGenerate 등에서 사용
+  // --- placeholder: 키워드 배열 — handleGenerate 등에서 사용
   let displayKeywordsCurrent: { label: string; type: string; count: number }[] = [];
   
   // 새로운 분석 결과일 때는 Step1 스타일 키워드 사용
   const step1StyleKeywords = useMemo(() => {
     if (!analysisData?.keywords) return [];
     return analysisData.keywords
-      .filter((k: any) => k.value >= 3)
       .sort((a: any, b: any) => b.value === a.value ? a.key.localeCompare(b.key) : b.value - a.value)
       .map((k: any) => ({ label: k.key, type: 'normal', count: k.value }));
   }, [analysisData?.keywords]);
@@ -609,6 +608,20 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     return sortedArr.filter((item) => getValue(item) >= threshold);
   };
 
+  // ===== Helper: 최소 N개 보장 + 동점 포함 =====
+  const getTopWithTieMinimum = <T,>(sortedArr: T[], limit: number, getValue: (item: T) => number): T[] => {
+    if (sortedArr.length <= limit) return sortedArr;
+    
+    // 먼저 상위 limit개를 확실히 가져온다
+    const topItems = sortedArr.slice(0, limit);
+    
+    // limit번째 아이템의 값과 동일한 값을 가진 추가 아이템들을 찾는다
+    const thresholdValue = getValue(sortedArr[limit - 1]);
+    const additionalTiedItems = sortedArr.slice(limit).filter((item) => getValue(item) === thresholdValue);
+    
+    return [...topItems, ...additionalTiedItems];
+  };
+
 
 
   // ===== Step1 스타일 키워드/태그 정렬 로직 =====
@@ -621,9 +634,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
   const topKeywordsWithTies = useMemo(
     () =>
-      getTopWithTie(sortedKeywords, 12, (k: any) => k.value).filter(
-        (k: any) => k.value >= 3
-      ),
+      getTopWithTieMinimum(sortedKeywords, 12, (k: any) => k.value),
     [sortedKeywords]
   );
 
@@ -636,9 +647,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
   const topTagsWithTies = useMemo(
     () =>
-      getTopWithTie(sortedTagsAll, 12, (t: any) => t.value).filter(
-        (t: any) => t.value >= 3
-      ),
+      getTopWithTieMinimum(sortedTagsAll, 12, (t: any) => t.value),
     [sortedTagsAll]
   );
 
@@ -664,9 +673,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
   const topCatTagsWithTies = useMemo(
     () =>
-      getTopWithTie(sortedCatTags, 12, (it) => it[1] as number).filter(
-        (it) => (it[1] as number) >= 3
-      ),
+      getTopWithTieMinimum(sortedCatTags, 12, (it) => it[1] as number),
     [sortedCatTags]
   );
 
@@ -679,9 +686,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
   const topCatKeywordsWithTies = useMemo(
     () =>
-      getTopWithTie(sortedCatKeywords, 12, (it) => it[1] as number).filter(
-        (it) => (it[1] as number) >= 3
-      ),
+      getTopWithTieMinimum(sortedCatKeywords, 12, (it) => it[1] as number),
     [sortedCatKeywords]
   );
 
@@ -789,19 +794,15 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
           const before = ctxMainKeyword.slice(0, splitIdx).trim();
           const after  = ctxMainKeyword.slice(splitIdx + mainForQuery.length).trim();
 
-          // 원본 메인키워드(selectedMain)도 함께 포함
-          const originalMain = selectedMain || ctxMainKeyword;
-          const shouldIncludeOriginalMain = originalMain && originalMain !== mainForQuery && originalMain !== ctxMainKeyword;
-
           if (before) {
             // comb키워드가 앞에 올 때
-            query = shouldIncludeOriginalMain ? `${before}, ${mainForQuery}, ${originalMain}` : `${before}, ${mainForQuery}`;
+            query = `${before}, ${mainForQuery}`;
           } else if (after) {
             // comb키워드가 뒤에 올 때 (드문 케이스)
-            query = shouldIncludeOriginalMain ? `${mainForQuery}, ${after}, ${originalMain}` : `${mainForQuery}, ${after}`;
+            query = `${mainForQuery}, ${after}`;
           } else {
             // 예외: 분리 실패 시 기존 로직 유지(공백 없음)
-            query = shouldIncludeOriginalMain ? `${mainForQuery}, ${originalMain}` : `${mainForQuery}`;
+            query = `${mainForQuery}`;
           }
         }
       } else {
@@ -1007,7 +1008,6 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       
       // 추천 태그 생성 (상위 태그 중 빈도 2회 이상)
       const recommendedTags = tagsArray
-        .filter((tag: any) => (tag.value || 0) >= 3)
         .sort((a: any, b: any) => (b.value || 0) - (a.value || 0))
         .slice(0, 12)
         .map((tag: any) => tag.key);
@@ -1779,9 +1779,9 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     [displayKeywordsInfo]
   );
 
-  // 2) 기본 표시용(빈도 ≥3) 필터
+  // 2) 기본 표시용 필터 (빈도 제한 없음)
   const sortedKeywordsFiltered = useMemo(
-    () => sortedKeywordsAll.filter((it) => it.count >= 3),
+    () => sortedKeywordsAll,
     [sortedKeywordsAll]
   );
 
@@ -1804,7 +1804,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     () => [...tagsArray].sort((a: any, b: any) => b.value - a.value),
     [tagsArray]
   );
-  const visibleTags = useMemo(() => allTagsOriginal.filter(t => t.value >= 3), [allTagsOriginal]);
+  const visibleTags = useMemo(() => allTagsOriginal, [allTagsOriginal]);
 
   const tagThreshold =
     visibleTags.length >= 12

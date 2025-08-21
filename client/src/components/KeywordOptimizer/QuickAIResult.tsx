@@ -137,8 +137,8 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       topKeywordsWithTies = sortedKeywords.filter((k) => (k.value || 0) >= thresholdValue);
     }
 
-    // 빈도 3 이상만 전달 (동점 12위까지 포함한 목록에서 다시 필터링)
-    const filteredKeywords = topKeywordsWithTies.filter((k) => (k.value || 0) >= 3);
+    // 키워드 전달
+    const filteredKeywords = topKeywordsWithTies;
     keywordsRef.current = filteredKeywords.map((k) => k.key);
 
     // ===== 키워드 개수(상품명 어절 수) 우선순위 =====
@@ -261,9 +261,9 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
         .sort((a, b) => b.value - a.value)
         .slice(0, 12);
 
-      // 1) 상위 태그 12개 중 빈도 3회 이상만 추가
+      // 1) 상위 태그 12개 추가
       const set = new Set<string>();
-      topTags.filter((t) => t.value >= 3).forEach((t) => set.add(t.key));
+      topTags.forEach((t) => set.add(t.key));
 
       const nameLower = productName.toLowerCase();
       displayKeywords.slice(0, 12).forEach((kw) => {
@@ -452,7 +452,7 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
         const thresholdValue = topKeywordsWithTies[topKeywordsWithTies.length - 1].value || 0;
         topKeywordsWithTies = sortedKeywords.filter((k) => (k.value || 0) >= thresholdValue);
       }
-      const filteredKeywords = topKeywordsWithTies.filter((k) => (k.value || 0) >= 3);
+      const filteredKeywords = topKeywordsWithTies;
       keywordsRef.current = filteredKeywords.map((k) => k.key);
 
       // 2) 키워드수 계산 로직 재사용
@@ -580,7 +580,6 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
           .filter((t) => t.key)
           .sort((a, b) => b.value - a.value)
           .slice(0, 12)
-          .filter((t) => t.value >= 3)
           .map((t) => t.key);
 
         const nameLower = json.productName.toLowerCase();

@@ -546,6 +546,20 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
     return sortedArr.filter((item) => getValue(item) >= threshold);
   };
 
+  // ===== Helper: 최소 N개 보장 + 동점 포함 =====
+  const getTopWithTieMinimum = <T,>(sortedArr: T[], limit: number, getValue: (item: T) => number): T[] => {
+    if (sortedArr.length <= limit) return sortedArr;
+    
+    // 먼저 상위 limit개를 확실히 가져온다
+    const topItems = sortedArr.slice(0, limit);
+    
+    // limit번째 아이템의 값과 동일한 값을 가진 추가 아이템들을 찾는다
+    const thresholdValue = getValue(sortedArr[limit - 1]);
+    const additionalTiedItems = sortedArr.slice(limit).filter((item) => getValue(item) === thresholdValue);
+    
+    return [...topItems, ...additionalTiedItems];
+  };
+
   // ===== 전체(카테고리 없을 때) 키워드 / 태그 상위 12위 + 동점 =====
   const sortedKeywords = useMemo(() => {
     if (!analysisData?.keywords) return [] as any[];
@@ -554,12 +568,10 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
     );
   }, [analysisData?.keywords]);
 
-  // 키워드는 최소 3회 이상 등장해야 12위 안에 포함
+  // 키워드는 빈도 제한 없이 최소 12개 보장
   const topKeywordsWithTies = useMemo(
     () =>
-      getTopWithTie(sortedKeywords, 12, (k: any) => k.value).filter(
-        (k: any) => k.value >= 3
-      ),
+      getTopWithTieMinimum(sortedKeywords, 12, (k: any) => k.value),
     [sortedKeywords]
   );
 
@@ -570,12 +582,10 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
     );
   }, [analysisData?.tags]);
 
-  // 태그는 최소 3회 이상 등장해야 12위 안에 포함
+  // 태그는 빈도 제한 없이 최소 12개 보장
   const topTagsWithTies = useMemo(
     () =>
-      getTopWithTie(sortedTagsAll, 12, (t: any) => t.value).filter(
-        (t: any) => t.value >= 3
-      ),
+      getTopWithTieMinimum(sortedTagsAll, 12, (t: any) => t.value),
     [sortedTagsAll]
   );
 
@@ -600,11 +610,9 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
     );
   }, [currentCategory]);
 
-  // 카테고리별 태그 – 전체 카테고리(첫 슬라이드)면 3회 이상, 그 외 2회 이상
+  // 카테고리별 태그는 빈도 제한 없이 최소 12개 보장
   const topCatTagsWithTies = useMemo(() => {
-    const base = getTopWithTie(sortedCatTags, 12, (it) => it[1] as number);
-    const minFreq = 3; // 모든 카테고리에서 태그는 3회 이상일 때만 기본 표시
-    return base.filter((it) => (it[1] as number) >= minFreq);
+    return getTopWithTieMinimum(sortedCatTags, 12, (it) => it[1] as number);
   }, [sortedCatTags, currentCategory]);
 
   const sortedCatKeywords = useMemo(() => {
@@ -614,12 +622,10 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
     );
   }, [currentCategory]);
 
-  // 카테고리별 키워드에도 최소 3회 이상 조건 적용
+  // 카테고리별 키워드는 빈도 제한 없이 최소 12개 보장
   const topCatKeywordsWithTies = useMemo(
     () =>
-      getTopWithTie(sortedCatKeywords, 12, (it) => it[1] as number).filter(
-        (it) => (it[1] as number) >= 3
-      ),
+      getTopWithTieMinimum(sortedCatKeywords, 12, (it) => it[1] as number),
     [sortedCatKeywords]
   );
 
