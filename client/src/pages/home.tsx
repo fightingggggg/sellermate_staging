@@ -168,8 +168,8 @@ export default function Home() {
             </div>
             
             <div className="flex flex-col items-center justify-center mt-8">
-              <div className="flex items-center">
-                <div className="flex -space-x-2">
+              <div className="flex flex-col md:flex-row items-center">
+                <div className="hidden md:flex -space-x-2 mb-4 md:mb-0">
                   <div className="w-10 h-10 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center">
                     <span className="text-xs font-bold">KH</span>
                   </div>
@@ -180,8 +180,11 @@ export default function Home() {
                     <span className="text-xs font-bold">YM</span>
                   </div>
                 </div>
-                <div className="ml-4">
-                  <p className="text-base md:text-lg font-medium text-gray-600">실제 이용자 중 <span className="font-bold text-[#1a73e8]">55%</span>가 <span className="text-[#1a73e8]">무료 이용으로 상품명만 바꿔서</span> <span className="font-bold text-[#1a73e8]">순위 상승을 경험</span>!</p>
+                <div className="md:ml-4 text-center md:text-left">
+                  <p className="text-base md:text-lg font-medium text-gray-600">
+                    <span className="block md:inline">실제 이용자 중 <span className="font-bold text-[#1a73e8]">55%</span>가 무료 이용으로 </span>
+                    <span className="block md:inline"><span className="text-[#1a73e8]">상품명만 바꿔서</span> <span className="font-bold text-[#1a73e8]">순위 상승을 경험</span>!</span>
+                  </p>
                 </div>
               </div>
               {/* <div className="mt-2">
