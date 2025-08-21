@@ -385,7 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const request = {
         model: 'claude-3-5-haiku-20241022',
         temperature: 0.2,
-        top_p: 0.3,
+        top_p: 0.2,
         max_tokens: 500,
         system: '너는 규칙을 준수하는 네이버 스마트스토어 SEO 전문가.',
         messages: [

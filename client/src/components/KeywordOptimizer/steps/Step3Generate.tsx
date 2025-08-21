@@ -1006,7 +1006,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
         keywords: keyword,
       });
       
-      // 추천 태그 생성 (상위 태그 중 빈도 2회 이상)
+      // 추천 태그 생성 (상위 태그)
       const recommendedTags = tagsArray
         .sort((a: any, b: any) => (b.value || 0) - (a.value || 0))
         .slice(0, 12)
@@ -1135,7 +1135,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
       ? allKeywordCounts.length
       : allKeywordCounts.findIndex((it) => it.value < keywordCntThreshold);
 
-  // ===== 키워드(3회 이상) / 태그(2회 이상) 필터 =====
+  // ===== 키워드 / 태그 필터 =====
   const displayKeywordsInfo: DisplayKeywordInfo[] = useMemo(() => {
     // map for quick count lookup
     const valueMap: Record<string, number> = {};
@@ -1838,10 +1838,9 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     const topTagArr: string[] = [];
     const extraKeywordArr: string[] = [];
 
-    // 1) 상위 태그(12위+동점) 중 빈도 2 이상 → topTagArr
+    // 1) 상위 태그(12위+동점) → topTagArr
     allTags
       .slice(0, collapsedTagLen)
-      .filter((t: any) => t.value >= 3)
       .forEach((t: any) => {
         if(!topTagArr.includes(t.key)) topTagArr.push(t.key);
       });
