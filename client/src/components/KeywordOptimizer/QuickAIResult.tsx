@@ -50,14 +50,14 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     lastCallKeyRef.current = null;
     keywordsRef.current = [];
     keywordCountRef.current = 0;
-  }, [mainKeyword]);
+  }, [mainKeyword, selectedCategoryIndex]);
 
   useEffect(() => {
     if (isSample) return; // 예시 데이터면 AI 호출하지 않음
     if (!analysisData || !mainKeyword) return;
 
-    // 현재 호출을 식별하기 위한 키 (키워드-페이지 조합)
-    const currentKey = `${mainKeyword}-${pageIndex}`;
+    // 카테고리 인덱스를 포함해 카테고리 변경 시에도 별도 호출이 이뤄지도록 키 생성
+    const currentKey = `${mainKeyword}-${pageIndex}-${selectedCategoryIndex}`;
 
     // 다른 키(키워드·페이지)로 변경된 경우, 중복 호출 방지 플래그를 초기화합니다.
     if (lastCallKeyRef.current !== currentKey) {
@@ -368,7 +368,7 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     };
 
     generate();
-  }, [analysisData, mainKeyword, pageIndex, setAiResult]);
+  }, [analysisData, mainKeyword, pageIndex, selectedCategoryIndex, setAiResult]);
 
   // ----- 수동 재생성 핸들러 -----
   const handleRegenerate = async () => {
