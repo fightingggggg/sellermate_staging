@@ -275,13 +275,16 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
     };
 
     const calcRecommendedCategories = (analysis: any) => {
+      // 선택된 카테고리가 있으면 이를 사용하고, 없으면 최빈 카테고리를 사용
       if (Array.isArray(analysis.categoriesDetailed) && analysis.categoriesDetailed.length > 0) {
-        const first = analysis.categoriesDetailed[0];
-        return [first.categoryName || first.categoryPath || first.name || ""];
+        const idx = typeof selectedCategoryIndex === 'number' ? selectedCategoryIndex : 0;
+        const cat = analysis.categoriesDetailed[idx] || analysis.categoriesDetailed[0];
+        return [cat.categoryName || cat.categoryPath || cat.name || ""];
       }
       if (Array.isArray(analysis.categories) && analysis.categories.length > 0) {
-        const first = analysis.categories[0];
-        return [first.key || first.categoryPath || first.name || ""];
+        const idx = typeof selectedCategoryIndex === 'number' ? selectedCategoryIndex : 0;
+        const cat = analysis.categories[idx] || analysis.categories[0];
+        return [cat.key || cat.categoryPath || cat.name || ""];
       }
       return [];
     };
@@ -310,6 +313,7 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
           const json = await resp.json();
           const topKeywords = keywordsRef.current;
           const tags = calcRecommendedTags(json.productName, analysisData, topKeywords);
+          console.log("[QuickAIResult] 추천 태그:", tags);
           const cats = calcRecommendedCategories(analysisData);
           
           // Context에 AI 결과 저장
@@ -589,15 +593,18 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
 
         return Array.from(new Set(topTags));
       })();
+      console.log("[QuickAIResult-regenerate] 추천 태그:", tags);
 
       const cats = (() => {
         if (Array.isArray(analysisData?.categoriesDetailed) && analysisData.categoriesDetailed.length > 0) {
-          const first = analysisData.categoriesDetailed[0];
-          return [first.categoryName || first.categoryPath || first.name || ""];
+          const idx = typeof selectedCategoryIndex === 'number' ? selectedCategoryIndex : 0;
+          const cat = analysisData.categoriesDetailed[idx] || analysisData.categoriesDetailed[0];
+          return [cat.categoryName || cat.categoryPath || cat.name || ""];
         }
         if (Array.isArray(analysisData?.categories) && analysisData.categories.length > 0) {
-          const first = analysisData.categories[0];
-          return [first.key || first.categoryPath || first.name || ""];
+          const idx = typeof selectedCategoryIndex === 'number' ? selectedCategoryIndex : 0;
+          const cat = analysisData.categories[idx] || analysisData.categories[0];
+          return [cat.key || cat.categoryPath || cat.name || ""];
         }
         return [];
       })();

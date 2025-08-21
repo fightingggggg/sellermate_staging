@@ -640,9 +640,11 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
   const sortedTagsAll = useMemo(() => {
     if (!analysisData?.tags) return [] as any[];
-    return [...analysisData.tags].sort((a: any, b: any) =>
-      b.value === a.value ? Number(b.key) - Number(a.key) : b.value - a.value
-    );
+    // 빈도수가 같으면 원본 배열 순서 유지 (안정 정렬)
+    return [...analysisData.tags].sort((a: any, b: any) => {
+      if (b.value !== a.value) return b.value - a.value;
+      return 0;
+    });
   }, [analysisData?.tags]);
 
   const topTagsWithTies = useMemo(
@@ -666,9 +668,11 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
 
   const sortedCatTags = useMemo(() => {
     if (!currentCategory) return [] as [string, number][];
-    return [...Object.entries(currentCategory.tags || {})].sort((a: any, b: any) =>
-      (b[1] as number) === (a[1] as number) ? (b[0] as string).localeCompare(a[0] as string) : (b[1] as number) - (a[1] as number)
-    );
+    // 빈도수가 같으면 원본 순서 유지
+    return [...Object.entries(currentCategory.tags || {})].sort((a: any, b: any) => {
+      if ((b[1] as number) !== (a[1] as number)) return (b[1] as number) - (a[1] as number);
+      return 0;
+    });
   }, [currentCategory]);
 
   const topCatTagsWithTies = useMemo(
@@ -1838,9 +1842,9 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
     const topTagArr: string[] = [];
     const extraKeywordArr: string[] = [];
 
-    // 1) 상위 태그(12위+동점) → topTagArr
+    // 1) 상위 태그 12개 → topTagArr (동점 제외하고 정확히 12개만)
     allTags
-      .slice(0, collapsedTagLen)
+      .slice(0, 12)
       .forEach((t: any) => {
         if(!topTagArr.includes(t.key)) topTagArr.push(t.key);
       });

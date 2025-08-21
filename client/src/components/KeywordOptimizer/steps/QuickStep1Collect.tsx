@@ -577,9 +577,11 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
 
   const sortedTagsAll = useMemo(() => {
     if (!analysisData?.tags) return [] as any[];
-    return [...analysisData.tags].sort((a: any, b: any) =>
-      b.value === a.value ? Number(b.key) - Number(a.key) : b.value - a.value
-    );
+    // 빈도수가 같을 때는 원본 배열 순서를 유지(안정 정렬)
+    return [...analysisData.tags].sort((a: any, b: any) => {
+      if (b.value !== a.value) return b.value - a.value;
+      return 0; // 동일 빈도: 원본 순서 유지
+    });
   }, [analysisData?.tags]);
 
   // 태그는 빈도 제한 없이 최소 12개 보장
@@ -605,9 +607,11 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
 
   const sortedCatTags = useMemo(() => {
     if (!currentCategory) return [] as [string, number][];
-    return [...Object.entries(currentCategory.tags || {})].sort((a: any, b: any) =>
-      (b[1] as number) === (a[1] as number) ? (b[0] as string).localeCompare(a[0] as string) : (b[1] as number) - (a[1] as number)
-    );
+    // 객체를 entries로 가져올 때 순서가 정의되지 않으므로, 동률 처리 시 알파벳 순이 아닌 그대로 유지하도록 0 반환
+    return [...Object.entries(currentCategory.tags || {})].sort((a: any, b: any) => {
+      if ((b[1] as number) !== (a[1] as number)) return (b[1] as number) - (a[1] as number);
+      return 0;
+    });
   }, [currentCategory]);
 
   // 카테고리별 태그는 빈도 제한 없이 최소 12개 보장
