@@ -265,8 +265,11 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
       const set = new Set<string>();
       topTags.forEach((t) => set.add(t.key));
 
+      // 상품명 소문자 버전 캐싱
       const nameLower = productName.toLowerCase();
-      displayKeywords.slice(0, 12).forEach((kw) => {
+
+      // displayKeywords 는 이미 12위(+동점)까지의 키워드를 포함하므로 추가 슬라이싱 없이 전체를 사용
+      displayKeywords.forEach((kw) => {
         const kwStr = kw.trim();
         if (!kwStr) return;
         if (!nameLower.includes(kwStr.toLowerCase())) set.add(kwStr);
@@ -587,7 +590,8 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
           .map((t) => t.key);
 
         const nameLower = json.productName.toLowerCase();
-        keywordsRef.current.slice(0, 12).forEach((kw) => {
+        // keywordsRef.current 는 12위(+동점)까지의 키워드를 담고 있으므로 그대로 사용
+        keywordsRef.current.forEach((kw) => {
           if (!nameLower.includes(kw.toLowerCase())) topTags.push(kw);
         });
 
