@@ -177,15 +177,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     멤버십
                   </Link>
 
-                  {/* 모바일(PC에서는 숨김)에서만 보이는 빠른 상품명 최적화 버튼 */}
+                  {/* 모바일(PC에서는 숨김)에서만 보이는 스토어 부스터란? 버튼 */}
                   <Button
                     onClick={() => {
-                      trackEvent('Navigation', 'mobile_quick_optimizer');
-                      navigate('/product-optimizer/quick');
+                      trackEvent('Navigation', 'mobile_store_booster_info');
+                      const bannerElement = document.getElementById('banner');
+                      if (bannerElement) {
+                        const offset = 80; // 상단 네비게이션 바 높이만큼 여유 공간
+                        const elementPosition = bannerElement.offsetTop - offset;
+                        window.scrollTo({
+                          top: elementPosition,
+                          behavior: 'smooth'
+                        });
+                      }
                     }}
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 sm:hidden"
                   >
-                    빠른 상품명 최적화
+                    스토어 부스터란?
                   </Button>
 
                   {/* 로그인 버튼은 PC에서만 보이게 */}

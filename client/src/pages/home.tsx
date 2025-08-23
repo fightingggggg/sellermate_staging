@@ -394,6 +394,156 @@ export default function Home() {
 </motion.section>
 
 
+{/* 배너 섹션 */}
+<motion.section
+  id="banner"
+  className="py-12 px-4 bg-gradient-to-r from-blue-600 to-purple-600 relative overflow-hidden"
+  initial={{ opacity: 0, y: 50 }}
+  whileInView={{ opacity: 1, y: 0 }}
+  viewport={{ once: true }}
+  transition={{ duration: 0.6 }}
+>
+  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600"></div>
+  <div className="absolute inset-0" style={{
+    backgroundImage: `repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 2px, transparent 2px, transparent 8px)`,
+    backgroundSize: 'auto'
+  }}></div>
+  <div className="max-w-4xl mx-auto text-center relative z-10">
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 0.2 }}
+      viewport={{ once: true }}
+    >
+      <h2 className="text-2xl md:text-5xl font-bold text-white leading-relaxed">
+        <span className="block">광고비를 줄이고 자연스러운 클릭을 높이는</span>
+        <span className="block mt-3 md:mt-6">노출 최적화로 수익을 높이세요</span>
+      </h2>
+    </motion.div>
+  </div>
+</motion.section>
+
+{/* 차별점 섹션 */}
+<motion.section
+  className="py-20 px-4 bg-gradient-to-br from-cyan-50 to-blue-100"
+  initial={{ opacity: 0, y: 50 }}
+  whileInView={{ opacity: 1, y: 0 }}
+  viewport={{ once: true }}
+  transition={{ duration: 0.6 }}
+>
+  <div className="max-w-4xl mx-auto">
+    <motion.div 
+      className="text-center mb-16"
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 0.2 }}
+      viewport={{ once: true }}
+    >
+      <div className="inline-block px-4 py-2 bg-cyan-100 text-cyan-800 rounded-full text-sm md:text-base font-semibold mb-6">
+        다른 키워드 분석과 뭐가 다를까요?
+      </div>
+      <h2 className="text-2xl md:text-4xl font-bold text-gray-900 leading-relaxed max-w-4xl mx-auto">
+        <span className="block md:inline">스토어 부스터는 </span>
+        <span className="block md:inline">키워드 분석 서비스가 아닙니다</span>
+        <div className="hidden md:block md:my-6"></div>
+        <span className="block mt-2 md:mt-0 md:inline">상위노출을 위한 실전형 최적화 전략</span>
+        <span className="block md:inline">을 제공합니다</span>
+      </h2>
+
+    </motion.div>
+
+    <div className="space-y-8">
+      {/* 카드 1: 데이터를 넘어선 실전형 키워드 최적화 */}
+      <motion.div
+        className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-blue-200"
+        initial={{ opacity: 0, y: 50 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.3 }}
+        viewport={{ once: true }}
+      >
+        <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-8">
+          <div className="flex-1">
+            <h3 className="text-xl md:text-2xl font-bold text-gray-900 text-left">
+              데이터를 넘어선<br />
+              실전형 키워드 최적화
+            </h3>
+          </div>
+          <div className="flex-1">
+            <p className="text-base md:text-lg text-gray-600 leading-relaxed mb-4 text-left">
+              단순히 숫자 데이터만 보여주지 않습니다.
+            </p>
+            <ul className="space-y-2 text-base md:text-lg text-gray-600 mb-4 text-left">
+              <li>• 어떤 키워드가 자연적인 상위노출에 유리한지</li>
+              <li>• 어떤 상품명, 태그, 상품 주요 정보가 효과적인지</li>
+            </ul>
+            <p className="text-base md:text-lg text-gray-600 font-medium text-left">
+              즉시 적용 가능한 전략을 바로 확인할 수 있습니다
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* 카드 2: 실질적 효과 검증 */}
+      <motion.div
+        className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-blue-200"
+        initial={{ opacity: 0, y: 50 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.4 }}
+        viewport={{ once: true }}
+      >
+        <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-8">
+          <div className="flex-1">
+            <h3 className="text-xl md:text-2xl font-bold text-gray-900 text-left">
+              실질적 효과 검증
+            </h3>
+          </div>
+          <div className="flex-1">
+            <p className="text-base md:text-lg text-gray-600 leading-relaxed mb-4 text-left">
+              스토어 부스터는 네이버 공식 SEO 가이드와 검색 알고리즘을 반영합니다.
+            </p>
+            <p className="text-base md:text-lg text-gray-600 leading-relaxed mb-4 text-left">
+              이를 학습한 AI가 상품명, 카테고리, 태그, 주요 정보를 최적화합니다.
+            </p>
+            <p className="text-base md:text-lg text-gray-600 leading-relaxed text-left">
+              동의어, 조합형, 일체형 키워드 까지 구분해 상품명의 효율을 극대화합니다.
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* 카드 3: 광고에 의존하지 않는 성장 선순환 */}
+      <motion.div
+        className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-blue-200"
+        initial={{ opacity: 0, y: 50 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.5 }}
+        viewport={{ once: true }}
+      >
+        <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-8">
+          <div className="flex-1">
+            <h3 className="text-xl md:text-2xl font-bold text-gray-900 text-left">
+              광고에 의존하지 않는<br />
+              성장 선순환
+            </h3>
+          </div>
+          <div className="flex-1">
+            <p className="text-base md:text-lg text-gray-600 leading-relaxed mb-4 text-left">
+              광고를 끊으면 매출이 떨어지는 구조는 셀러의 이익을 낮춥니다.
+            </p>
+            <p className="text-base md:text-lg text-gray-600 leading-relaxed mb-4 text-left">
+              스토어 부스터는 상품 등록 정보 최적화를 통해<br />
+              <span className="font-medium">노출 증가 → 클릭 증가 → 판매 증가 → 매출 증가</span>의 선순환을 만듭니다.
+            </p>
+            <p className="text-base md:text-lg text-gray-600 leading-relaxed font-medium text-left">
+              광고비는 줄이고, 매출과 이익은 높이는 건강한 스토어 운영을 실현하세요
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  </div>
+</motion.section>
+
       
 
       <motion.div
