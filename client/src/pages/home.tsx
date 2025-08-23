@@ -112,7 +112,7 @@ export default function Home() {
 
   return (
     <DashboardLayout>
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col relative z-0">
       <section id="hero" className="pt-16 pb-20 bg-gradient-to-br from-sky-50 to-blue-50">
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center justify-center text-center">
@@ -397,7 +397,7 @@ export default function Home() {
 {/* 배너 섹션 */}
 <motion.section
   id="banner"
-  className="py-12 px-4 bg-gradient-to-r from-blue-600 to-purple-600 relative overflow-hidden"
+  className="py-12 px-4 bg-gradient-to-r from-blue-600 to-purple-600 relative overflow-hidden z-0"
   initial={{ opacity: 0, y: 50 }}
   whileInView={{ opacity: 1, y: 0 }}
   viewport={{ once: true }}
