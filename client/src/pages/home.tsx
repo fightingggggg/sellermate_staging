@@ -416,7 +416,8 @@ export default function Home() {
       viewport={{ once: true }}
     >
       <h2 className="text-2xl md:text-5xl font-bold text-white leading-relaxed">
-        <span className="block">광고비를 줄이고 자연스러운 클릭을 높이는</span>
+        <span className="block md:inline">광고비를 줄이고 </span>
+        <span className="block md:inline">자연스러운 클릭을 높이는</span>
         <span className="block mt-3 md:mt-6">노출 최적화로 수익을 높이세요</span>
       </h2>
     </motion.div>
