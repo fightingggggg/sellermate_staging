@@ -1,6 +1,7 @@
 import ScrollToLink from "@/components/ui/scroll-to-link";
 import { useState } from "react";
 import { FeedbackDialog } from "@/components/ui/feedback-dialog";
+import { Instagram, Youtube } from "lucide-react";
 
 const FooterSection = () => {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -42,6 +43,28 @@ const FooterSection = () => {
                 스토어 부스터의 기능은 상위 노출 최적화를 위한 참고용이며, 상위 노출을 완전히 보장하거나 이에 대해 책임지지 않습니다.
               </span>
             </p>
+            
+            {/* SNS Icons Section */}
+            <div className="mt-4 flex justify-center space-x-4">
+              <a
+                href="https://www.threads.com/@official.storebooster?hl=ko"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-white transition-colors"
+                aria-label="스레드"
+              >
+                <Instagram size={20} />
+              </a>
+              <a
+                href="https://www.youtube.com/@%EC%8A%A4%EB%A7%88%ED%8A%B8%EC%8A%A4%ED%86%A0%EC%96%B4SEO"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-white transition-colors"
+                aria-label="유튜브"
+              >
+                <Youtube size={20} />
+              </a>
+            </div>
           </div>
         </div>
       </div>

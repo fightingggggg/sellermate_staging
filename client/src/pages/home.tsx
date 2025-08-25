@@ -419,7 +419,7 @@ export default function Home() {
         <span className="block md:inline">광고보다 노출 전략이 먼저입니다</span>
         <div className="hidden md:block md:my-8"></div>
         <span className="block mt-3 md:mt-0 md:inline text-xl md:text-4xl">광고에 의존하지 않아도 되는 </span>
-        <span className="block md:inline text-xl md:text-4xl">노출 최적화로 순 이익을 높이세요</span>
+        <span className="block md:inline text-xl md:text-4xl">노출 최적화로 순이익을 높이세요</span>
       </h2>
     </motion.div>
   </div>
