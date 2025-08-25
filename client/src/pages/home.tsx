@@ -408,7 +408,7 @@ export default function Home() {
     backgroundImage: `repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 2px, transparent 2px, transparent 8px)`,
     backgroundSize: 'auto'
   }}></div>
-  <div className="max-w-4xl mx-auto text-center relative z-10">
+  <div className="max-w-4xl md:max-w-none mx-auto text-center relative z-10 px-4 md:px-16">
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -416,9 +416,10 @@ export default function Home() {
       viewport={{ once: true }}
     >
       <h2 className="text-2xl md:text-5xl font-bold text-white leading-relaxed">
-        <span className="block md:inline">광고비를 줄이고 </span>
-        <span className="block md:inline">자연스러운 클릭을 높이는</span>
-        <span className="block mt-3 md:mt-6">노출 최적화로 수익을 높이세요</span>
+        <span className="block md:inline">광고보다 노출 전략이 먼저입니다</span>
+        <div className="hidden md:block md:my-8"></div>
+        <span className="block mt-3 md:mt-0 md:inline text-xl md:text-4xl">광고에 의존하지 않아도 되는 </span>
+        <span className="block md:inline text-xl md:text-4xl">노출 최적화로 순 이익을 높이세요</span>
       </h2>
     </motion.div>
   </div>

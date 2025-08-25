@@ -183,7 +183,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       trackEvent('Navigation', 'mobile_store_booster_info');
                       const bannerElement = document.getElementById('banner');
                       if (bannerElement) {
-                        const offset = 80; // 상단 네비게이션 바 높이만큼 여유 공간
+                        const offset = 10; // 상단 네비게이션 바 높이에 맞춤
                         const elementPosition = bannerElement.offsetTop - offset;
                         window.scrollTo({
                           top: elementPosition,

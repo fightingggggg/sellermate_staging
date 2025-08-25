@@ -95,6 +95,12 @@ export default function MembershipPage() {
     }
   };
 
+  const handleBasicPlanClick = () => {
+    if (!currentUser) {
+      setShowLoginModal(true);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="max-w-5xl mx-auto py-16 px-4">
@@ -189,9 +195,13 @@ export default function MembershipPage() {
                   현재 이용 중
                 </div>
               ) : (
-                <div className="w-full py-2 px-4 text-center text-blue-600 font-semibold border border-blue-300 rounded-md bg-blue-50 mt-auto">
+                <Button
+                  onClick={handleBasicPlanClick}
+                  className="w-full py-2 px-4 text-center text-blue-600 font-semibold border border-blue-300 rounded-md bg-blue-50 hover:bg-blue-100 mt-auto"
+                  variant="outline"
+                >
                   평생 무료로 이용하기
-                </div>
+                </Button>
               )}
             </CardContent>
           </Card>
