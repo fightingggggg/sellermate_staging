@@ -216,14 +216,13 @@ export class HistoryService {
         }
       }
       
-      // 새로운 구조 시도
-      try {
-        return await this.saveHistoryNewStructure(userEmail, keyword, type, cleanedData, pageIndex);
-      } catch (newError) {
-        console.warn('New structure failed, trying legacy:', newError);
-        // 새로운 구조 실패 시 레거시 방식으로 fallback
-        return await this.saveHistoryLegacy(userEmail, keyword, type, cleanedData, pageIndex);
-      }
+      // 사용자 통계 카운트는 히스토리 저장 성공 여부와 무관하게 선증가
+      this.incrementUserStats(userEmail, type).catch(err => {
+        console.warn('[HistoryService] Failed to update user_stats:', err);
+      });
+
+      // 히스토리 저장 (새 구조)
+      return await this.saveHistoryNewStructure(userEmail, keyword, type, cleanedData, pageIndex);
     } catch (error) {
       console.error('Error saving history:', error);
       throw error;
@@ -287,22 +286,18 @@ export class HistoryService {
     // 배치 실행 (히스토리 저장만 이루어짐)
     await batch.commit();
 
-    // 배치가 완료된 후 통계 문서를 바로 업데이트한다.
-    //  • fire-and-forget 대신 await 로 보장하여, 일부 사용자의 통계가 누락되는 문제를 방지한다.
-    //  • 실패해도 히스토리 저장은 이미 완료됐으므로 에러만 로깅한다.
-    try {
-      await setDoc(
-        statsRef,
-        {
+    // 배치가 완료된 후 통계 문서를 별도로 업데이트 – 실패하더라도 히스토리 저장은 유지
+    (async () => {
+      try {
+        await setDoc(statsRef, {
           [`${type}Count`]: increment(1),
           lastActivity: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-    } catch (statsErr) {
-      console.warn('[HistoryService] Failed to update user_stats (ignored):', statsErr);
-    }
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (statsErr) {
+        console.warn('[HistoryService] Failed to update user_stats (ignored):', statsErr);
+      }
+    })();
     
     console.log('History saved with new structure, ID:', docId);
     
@@ -928,5 +923,26 @@ export class HistoryService {
     }
   }
 
+  // 사용자 통계 카운트 증가 (비동기)
+  private static async incrementUserStats(userEmail: string, type: KeywordHistory['type']): Promise<void> {
+    try {
+      const safeEmail = userEmail
+        .replace(/\./g, '_dot_')
+        .replace(/@/g, '_at_')
+        .replace(/-/g, '_dash_')
+        .replace(/\+/g, '_plus_');
+      const statsRef = doc(db, STATS_COLLECTION, safeEmail);
+
+      await updateDoc(statsRef, {
+        [`${type}Count`]: increment(1),
+        lastActivity: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      console.log(`User stats incremented for ${userEmail}, type: ${type}`);
+    } catch (error) {
+      console.error('Error incrementing user stats:', error);
+      throw error;
+    }
+  }
 
 } 
