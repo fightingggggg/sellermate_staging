@@ -189,7 +189,8 @@ export class HistoryService {
     keyword: string,
     type: KeywordHistory['type'],
     data: any,
-    pageIndex?: number
+    pageIndex?: number,
+    uid?: string
   ): Promise<string> {
     try {
       // Firebase에서는 undefined 필드를 허용하지 않으므로, undefined 값을 모두 제거
@@ -218,7 +219,7 @@ export class HistoryService {
       
       // 새로운 구조 시도
       try {
-        return await this.saveHistoryNewStructure(userEmail, keyword, type, cleanedData, pageIndex);
+        return await this.saveHistoryNewStructure(userEmail, keyword, type, cleanedData, pageIndex, uid);
       } catch (newError) {
         console.warn('New structure failed, trying legacy:', newError);
         // 새로운 구조 실패 시 레거시 방식으로 fallback
@@ -236,7 +237,8 @@ export class HistoryService {
     keyword: string,
     type: KeywordHistory['type'],
     data: any,
-    pageIndex?: number
+    pageIndex?: number,
+    uid?: string
   ): Promise<string> {
     const batch = writeBatch(db);
     const historyPath = this.getUserHistoryPath(userEmail);
@@ -277,12 +279,12 @@ export class HistoryService {
     
     // 🔄 사용자 통계 업데이트는 별도 요청으로 분리
     //   – user_stats 컬렉션에 쓰기 권한이 없는 경우 전체 배치가 실패하는 문제를 방지합니다.
-    const safeEmailForStats = userEmail
+    const docIdForStats = uid || userEmail
       .replace(/\./g, '_dot_')
       .replace(/@/g, '_at_')
       .replace(/-/g, '_dash_')
       .replace(/\+/g, '_plus_');
-    const statsRef = doc(db, STATS_COLLECTION, safeEmailForStats);
+    const statsRef = doc(db, STATS_COLLECTION, docIdForStats);
 
     // 배치 실행 (히스토리 저장만 이루어짐)
     await batch.commit();
