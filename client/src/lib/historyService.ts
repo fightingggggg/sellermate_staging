@@ -189,8 +189,7 @@ export class HistoryService {
     keyword: string,
     type: KeywordHistory['type'],
     data: any,
-    pageIndex?: number,
-    uid?: string
+    pageIndex?: number
   ): Promise<string> {
     try {
       // Firebase에서는 undefined 필드를 허용하지 않으므로, undefined 값을 모두 제거
@@ -219,7 +218,7 @@ export class HistoryService {
       
       // 새로운 구조 시도
       try {
-        return await this.saveHistoryNewStructure(userEmail, keyword, type, cleanedData, pageIndex, uid);
+        return await this.saveHistoryNewStructure(userEmail, keyword, type, cleanedData, pageIndex);
       } catch (newError) {
         console.warn('New structure failed, trying legacy:', newError);
         // 새로운 구조 실패 시 레거시 방식으로 fallback
@@ -237,8 +236,7 @@ export class HistoryService {
     keyword: string,
     type: KeywordHistory['type'],
     data: any,
-    pageIndex?: number,
-    uid?: string
+    pageIndex?: number
   ): Promise<string> {
     const batch = writeBatch(db);
     const historyPath = this.getUserHistoryPath(userEmail);
@@ -279,28 +277,32 @@ export class HistoryService {
     
     // 🔄 사용자 통계 업데이트는 별도 요청으로 분리
     //   – user_stats 컬렉션에 쓰기 권한이 없는 경우 전체 배치가 실패하는 문제를 방지합니다.
-    const docIdForStats = uid || userEmail
+    const safeEmailForStats = userEmail
       .replace(/\./g, '_dot_')
       .replace(/@/g, '_at_')
       .replace(/-/g, '_dash_')
       .replace(/\+/g, '_plus_');
-    const statsRef = doc(db, STATS_COLLECTION, docIdForStats);
+    const statsRef = doc(db, STATS_COLLECTION, safeEmailForStats);
 
     // 배치 실행 (히스토리 저장만 이루어짐)
     await batch.commit();
 
-    // 배치가 완료된 후 통계 문서를 별도로 업데이트 – 실패하더라도 히스토리 저장은 유지
-    (async () => {
-      try {
-        await setDoc(statsRef, {
+    // 배치가 완료된 후 통계 문서를 바로 업데이트한다.
+    //  • fire-and-forget 대신 await 로 보장하여, 일부 사용자의 통계가 누락되는 문제를 방지한다.
+    //  • 실패해도 히스토리 저장은 이미 완료됐으므로 에러만 로깅한다.
+    try {
+      await setDoc(
+        statsRef,
+        {
           [`${type}Count`]: increment(1),
           lastActivity: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      } catch (statsErr) {
-        console.warn('[HistoryService] Failed to update user_stats (ignored):', statsErr);
-      }
-    })();
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch (statsErr) {
+      console.warn('[HistoryService] Failed to update user_stats (ignored):', statsErr);
+    }
     
     console.log('History saved with new structure, ID:', docId);
     
