@@ -19,6 +19,7 @@ import {
   BookCheck,
   X,
   Download,
+  ArrowDown,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import dynamic from "next/dynamic";
@@ -820,6 +821,64 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
     )
   );
 
+  // 스크롤 유도 상태 추가
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const nextStepButtonRef = useRef<HTMLDivElement>(null);
+
+  // 분석 데이터가 업데이트될 때 스크롤 힌트 바로 표시
+  useEffect(() => {
+    if (analysisData && productName.trim() === analysisKeyword) {
+      setShowScrollHint(true);
+    } else {
+      setShowScrollHint(false);
+    }
+  }, [analysisData, productName, analysisKeyword]);
+
+  // 다음 단계 버튼이 화면에 보일 때 힌트 숨김 (Intersection Observer 사용)
+  useEffect(() => {
+    if (!nextStepButtonRef.current || !showScrollHint) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setShowScrollHint(false);
+          }
+        });
+      },
+      {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1, // 10% 보이면 감지
+      }
+    );
+
+    observer.observe(nextStepButtonRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [showScrollHint]);
+
+  // 스크롤 유도 컴포넌트
+  const ScrollHintComponent = () => (
+    <div className={`fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-500 ${
+      showScrollHint ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+    }`}>
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-full shadow-xl border-2 border-blue-400 backdrop-blur-sm">
+        <div className="flex items-center space-x-3">
+          <div className="animate-bounce">
+            <ArrowDown className="h-5 w-5" />
+          </div>
+          <span className="text-sm font-semibold">📊 분석완료! 아래에 다음단계 버튼을 클릭하세요!</span>
+          <div className="animate-bounce">
+            <ArrowDown className="h-5 w-5" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="w-full max-w-none px-0 space-y-10">
       {/* 단계 설명 */}
@@ -1041,6 +1100,9 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
             <h2 className="text-2xl font-bold text-center text-gray-800 mb-4">
               분석 결과
             </h2>
+
+            {/* 스크롤 유도 힌트 추가 */}
+            <ScrollHintComponent />
 
             {/* 카테고리 캐러셀 */}
             {extendedCategoriesDetailed.length > 0 && (
@@ -1703,7 +1765,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
               )}
 
               {/* 다음 단계 버튼 */}
-              <div className="flex flex-col items-center mt-8">
+              <div ref={nextStepButtonRef} className="flex flex-col items-center mt-8">
                 <Button className="px-6" onClick={handleNext} disabled={isSample}>
                   다음 단계로
                 </Button>
