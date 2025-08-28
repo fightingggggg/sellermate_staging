@@ -23,6 +23,7 @@ import NaverOnboarding from "@/pages/naver-onboarding";
 import { useEffect, useRef } from "react";
 import { initAnalytics, trackPageView, trackTimeSpent } from "@/lib/analytics";
 import { useLocation } from "wouter";
+import OriginalProductOptimizerPage from "@/pages/original-product-optimizer";
 
 function Router() {
   return (
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/product-optimizer/complete" component={CompleteProductOptimizerPage} />
       <Route path="/product-optimizer/quick" component={QuickProductOptimizerPage} />
+      <Route path="/product-optimizer/original" component={OriginalProductOptimizerPage} />
       <Route path="/keyword-competition-analysis" component={KeywordCompetitionAnalysisPage} />
       <Route path="/profile" component={Profile} />
       <Route path="/naver-onboarding" component={NaverOnboarding} />
@@ -55,6 +57,7 @@ function computePageTitle(pathname: string, search: string): string {
   if (pathname.startsWith("/naver-onboarding")) return `네이버 온보딩 - ${base}`;
   if (pathname.startsWith("/product-optimizer/complete")) return `완벽한 상품명 최적화 - ${base}`;
   if (pathname.startsWith("/product-optimizer/quick")) return `빠른 상품명 최적화 - ${base}`;
+  if (pathname.startsWith("/product-optimizer/original")) return `상품명 그대로 최적화 - ${base}`;
   if (pathname.startsWith("/keyword-competition-analysis")) {
     try {
       const params = new URLSearchParams(search || "");

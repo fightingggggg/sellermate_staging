@@ -161,8 +161,12 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         // 카테고리 정렬 및 데이터 설정
         const data = event.data.data;
         if (Array.isArray(data.categoriesDetailed) && data.categoriesDetailed.length > 0) {
+          // 카테고리를 상품 수 기준으로 정렬 (가장 많은 카테고리가 첫 번째가 되도록)
           const sorted = [...data.categoriesDetailed].sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
           setCategoriesDetailed(sorted);
+          // analysisData에도 정렬된 카테고리 적용 (QuickAIResult에서 사용)
+          data.categoriesDetailed = sorted;
+          console.log('[Quick Optimizer] 카테고리 정렬 완료 - 가장 많은 카테고리:', sorted[0]?.categoryPath, '상품 수:', sorted[0]?.count);
         } else {
           setCategoriesDetailed([]);
         }
@@ -175,7 +179,9 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         // 새 결과가 도착하면, 해당 결과를 생성한 키워드로 동기화
         setAnalysisKeyword(latestQueryRef.current);
         setProductName(latestQueryRef.current); // productName도 동기화
+        // 대표 카테고리(첫 번째)를 선택하도록 설정
         setSelectedCategoryIndex(0);
+        console.log('[Quick Optimizer] 대표 카테고리 선택 완료 - selectedCategoryIndex: 0');
         setIsOptimizing(false);
         optimizationInProgressRef.current = false;
 

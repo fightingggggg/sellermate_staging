@@ -3,6 +3,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { PrefillProvider } from "@/components/KeywordOptimizer/KeywordOptimizerWizard";
 import QuickStep1Collect from "@/components/KeywordOptimizer/steps/QuickStep1Collect";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -54,10 +55,10 @@ export default function QuickProductOptimizerPage() {
         </h2>
 
         {/* 상단 메뉴 카드 */}
-        <div className="grid md:grid-cols-3 gap-4 mb-6 max-w-2xl mx-auto">
+        <div className="grid md:grid-cols-4 gap-4 mb-6 max-w-3xl mx-auto">
           {/* 메인 키워드 경쟁률 분석 카드 */}
           <Link href="/keyword-competition-analysis" onClick={(e: any) => handleTopMenuNavigate(e, "/keyword-competition-analysis")}>
-            <Card className="border hover:border-green-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100">
+            <Card className="border hover:border-green-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
               <CardHeader className="py-2">
                 <CardTitle className="text-base font-bold">키워드 경쟁률 분석</CardTitle>
               </CardHeader>
@@ -71,7 +72,7 @@ export default function QuickProductOptimizerPage() {
 
           {/* 완벽 카드 */}
           <Link href="/product-optimizer/complete" onClick={(e: any) => handleTopMenuNavigate(e, "/product-optimizer/complete")}>
-            <Card className="border hover:border-blue-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100">
+            <Card className="border hover:border-blue-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
               <CardHeader className="py-2">
                 <CardTitle className="text-base font-bold">완벽한 상품명 최적화</CardTitle>
               </CardHeader>
@@ -85,13 +86,28 @@ export default function QuickProductOptimizerPage() {
 
           {/* 빠른 카드 (현재 페이지) */}
           <Link href="/product-optimizer/quick" onClick={(e: any) => handleTopMenuNavigate(e, "/product-optimizer/quick")}>
-            <Card className="border-2 border-sky-500 shadow-sm hover:shadow-md transition">
+            <Card className="border-2 border-sky-500 shadow-sm hover:shadow-md transition h-full flex flex-col">
               <CardHeader className="py-2">
                 <CardTitle className="text-base font-bold">빠른 상품명 최적화</CardTitle>
               </CardHeader>
               <CardContent className="pt-0 pb-2">
                 <CardDescription className="text-xs text-gray-600">
                   실제 상위 키워드, 네이버 SEO를 고려한 상품명
+                </CardDescription>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* 상품명 그대로 최적화 카드 */}
+          <Link href="/product-optimizer/original" onClick={(e: any)=>handleTopMenuNavigate(e, "/product-optimizer/original") }>
+            <Card className="border hover:border-purple-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col relative">
+              <Badge variant="secondary" className="absolute -top-2 -right-2 bg-purple-100 text-purple-700 text-xs px-2 py-0.5 z-10">Beta</Badge>
+              <CardHeader className="py-2">
+                <CardTitle className="text-base font-bold">상품명 그대로 최적화</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 pb-2">
+                <CardDescription className="text-xs text-gray-600">
+                  기존 상품명을 SEO 맞게 재배열
                 </CardDescription>
               </CardContent>
             </Card>

@@ -425,9 +425,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             throw new Error('Failed to parse product name');
           }
 
-          const reason = `(판매 상품에 맞는 브랜드, 용량, 수량, 시리즈 등을 검색하거나 변경해 활용하세요)\n` +
+          let reason = `(판매 상품에 맞는 브랜드, 용량, 수량, 시리즈 등을 검색하거나 변경해 활용하세요)\n` +
             `* 네이버 상품명 SEO 규칙 준수 \"브랜드/제조사-시리즈-모델명-상품 유형-색상-소재-패키지 수량-사이즈-성별 나이 표현-속성-판매옵션\" 순서로 조합.\n` +
             reasonDetails;
+          // 숫자. 패턴(1. 2. 등)을 기준으로 줄바꿈 삽입
+          reason = reason.replace(/(\d+\.)/g, '\n$1').replace(/^\n/, '').trim();
 
           return { productName, reason };
         } catch (err: any) {
@@ -4089,6 +4091,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allowed: false, 
         message: 'Internal server error' 
       });
+    }
+  });
+
+  // POST /api/optimize-original-name { productName }
+  app.post('/api/optimize-original-name', generateNameLimiter, async (req, res) => {
+    const { productName } = req.body || {};
+    if (!productName || typeof productName !== 'string' || !productName.trim()) {
+      return res.status(400).json({ error: 'Missing productName' });
+    }
+
+    const apiKey = process.env.CLAUDE_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Claude API key not configured' });
+    }
+
+    const reqKey = `original:${productName}`;
+    // cache
+    const cached = generateNameCache.get(reqKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.json(cached.value);
+    }
+
+    // in-flight merge
+    const existing = inFlightGenerateName.get(reqKey);
+    if (existing) {
+      try {
+        const merged = await existing;
+        return res.json(merged);
+      } catch {}
+    }
+
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey, maxRetries: 2 });
+
+    const prompt = `## 목표
+    기존 상품명을 네이버 스마트스토어 상위노출 최적화 상품명으로 재배열
+    
+    ## 입력값
+    기존 상품명 : ${productName}
+    
+    ## 상품명 생성 규칙 (반드시 이 순서대로 배치)
+    1.브랜드/제조사
+    2.시리즈
+    3.모델명
+    4.상품 유형
+    5.색상
+    6.소재
+    7.수량/용량
+    8.사이즈
+    9.성별/나이
+    10.속성
+    
+    ## 중요사항
+    - 최적화 이유에서 설명한 순서와 실제 상품명의 키워드 순서가 정확히 일치해야 함
+    - 순서 번호대로 키워드를 배치하여 상품명 생성
+    - 순서에 해당하는 것이 없으면 생략, 새로운 단어 추가 금지
+    - 순서에 해당하는 것이 여러개면 모두 배열, 단어 생략 및 삭제 금지
+    
+    ## 출력 형식:
+    상품명: [순서대로 정확히 배치된 상품명]
+    
+    ## 최적화 이유
+    [순서별로 어떤 키워드가 어디에 배치되었는지 설명]`;
+    
+
+    const call = async () => {
+      const response = await (client as any).messages.create({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 400,
+        temperature: 0.2,
+        top_p: 0.2,
+        system: '',
+        messages: [
+          { role: 'user', content: prompt }
+        ],
+      });
+      let textRaw: any = (response as any).content ?? (response as any).choices?.[0]?.message?.content;
+      if (Array.isArray(textRaw)) {
+        textRaw = textRaw.map((c: any) => (typeof c === 'string' ? c : c.text || '')).join('');
+      }
+      const text = typeof textRaw === 'string' ? textRaw : String(textRaw || '');
+      
+      // 디버깅 로그 추가
+      console.log('=== Claude API 원본 응답 ===');
+      console.log('응답 텍스트:', text);
+      console.log('응답 텍스트 길이:', text.length);
+      console.log('========================');
+      
+      return text.trim();
+    };
+
+    const promise = (async () => {
+      const release = await generateNameSemaphore.acquire();
+      try {
+        const raw = await call();
+        
+        console.log('=== 파싱 과정 디버깅 ===');
+        console.log('원본 응답:', raw);
+        
+        // 단순 파싱: 마지막 "상품명:" 에서 상품명 추출
+        const nameMatch = raw.match(/상품명:\s*(.+?)(?:\n|$)/g);
+        const productNameRes = nameMatch ? nameMatch[nameMatch.length - 1].replace('상품명:', '').trim().replace(/^\[|\]$/g, '') : '';
+        
+        // 단순 파싱: "## 최적화 이유" 또는 "### 최적화 이유"부터 끝까지 추출
+        const reasonMatch = raw.match(/##+ 최적화 이유([\s\S]*)$/);
+        let reasonRes = reasonMatch ? reasonMatch[1] : '';
+        
+        // 마지막에 있는 "상품명:" 라인 제거
+        reasonRes = reasonRes.replace(/\n상품명:.*$/, '').trim();
+        
+        console.log('추출된 상품명:', productNameRes);
+        console.log('추출된 이유:', reasonRes);
+        
+        const formattedReason = reasonRes;
+        
+        console.log('최종 포맷된 이유:', formattedReason);
+        
+        const value = { productName: productNameRes, reason: formattedReason };
+        console.log('최종 반환값:', value);
+        console.log('===================');
+        
+        generateNameCache.set(reqKey, { value, expiresAt: Date.now()+GENERATE_NAME_CACHE_TTL_MS});
+        return value;
+      } finally { release(); }
+    })();
+
+    inFlightGenerateName.set(reqKey, promise);
+    try {
+      const result = await promise;
+      res.json(result);
+    } catch (e:any) {
+      console.error('[optimize-original-name] error', e);
+      res.status(500).json({ error:'failed to generate' });
+    } finally {
+      inFlightGenerateName.delete(reqKey);
     }
   });
 
