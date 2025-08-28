@@ -19,6 +19,13 @@ export default function OriginalProductOptimizerPage() {
       alert("상품명을 입력해주세요.");
       return;
     }
+
+    // 1. 최적화 버튼 클릭 추적 - 입력한 상품명과 함께
+    trackEvent('Analyze', 'original_optimize_start', null, {
+      originalProductName: productName.trim(),
+      optimizeType: 'original'
+    });
+
     setLoading(true);
     setShowResult(false);
     setResult(null);
@@ -41,6 +48,15 @@ export default function OriginalProductOptimizerPage() {
       console.log("=====================================");
       
       setResult(data);
+
+      // 2. 최적화 완료 추적 - 입력 상품명, 생성된 상품명, 최적화 이유 함께
+      trackEvent('GenerateName', 'original_optimize_success', null, {
+        originalProductName: productName.trim(),
+        optimizedProductName: data.productName,
+        optimizationReason: data.reason,
+        optimizeType: 'original',
+        reasonLength: data.reason?.length || 0
+      });
       
       // 결과를 먼저 설정하고 약간의 지연 후 showResult를 true로 설정
       setTimeout(() => {
@@ -51,6 +67,14 @@ export default function OriginalProductOptimizerPage() {
       }, 300);
     } catch (e) {
       console.error("최적화 API 오류:", e);
+      
+      // 최적화 실패 추적
+      trackEvent('Error', 'original_optimize_error', null, {
+        originalProductName: productName.trim(),
+        optimizeType: 'original',
+        errorMessage: e instanceof Error ? e.message : 'unknown_error'
+      });
+      
       alert("최적화 중 오류가 발생했습니다.");
       setLoading(false);
     }
@@ -60,8 +84,12 @@ export default function OriginalProductOptimizerPage() {
 
   const handleTopMenuNavigate = (e: React.MouseEvent, path: string) => {
     e.preventDefault();
-    trackEvent('CardMenu', 'menu_click', null, { from_page: '상품명_그대로_최적화', to: path });
-    navigate(path);
+    trackEvent('CardMenu', 'menu_product_optimizer_original', null, { from_page: '상품명_그대로_최적화', to: path });
+    
+    // 현재 페이지가 아닌 경우에만 navigate
+    if (path !== '/product-optimizer/original') {
+      navigate(path);
+    }
   };
 
   return (
