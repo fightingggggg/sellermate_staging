@@ -825,14 +825,14 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
   const [showScrollHint, setShowScrollHint] = useState(false);
   const nextStepButtonRef = useRef<HTMLDivElement>(null);
 
-  // 분석 데이터가 업데이트될 때 스크롤 힌트 바로 표시
+  // 분석 데이터가 업데이트될 때 스크롤 힌트 바로 표시 (PC에서만)
   useEffect(() => {
-    if (analysisData && productName.trim() === analysisKeyword) {
+    if (analysisData && productName.trim() === analysisKeyword && !isMobile) {
       setShowScrollHint(true);
     } else {
       setShowScrollHint(false);
     }
-  }, [analysisData, productName, analysisKeyword]);
+  }, [analysisData, productName, analysisKeyword, isMobile]);
 
   // 다음 단계 버튼이 화면에 보일 때 힌트 숨김 (Intersection Observer 사용)
   useEffect(() => {
