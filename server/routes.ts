@@ -4101,7 +4101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: 'Missing productName' });
     }
 
-    const apiKey = process.env.CLAUDE_API_KEY;
+    const apiKey = process.env.CLAUDE_OPTIMIZE_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: 'Claude API key not configured' });
     }
@@ -4126,44 +4126,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const client = new Anthropic({ apiKey, maxRetries: 2 });
 
     const prompt = `## 목표
-    기존 상품명을 네이버 스마트스토어 상위노출 최적화 상품명으로 재배열
-    
-    ## 입력값
-    기존 상품명 : ${productName}
-    
-    ## 상품명 생성 규칙 (반드시 이 순서대로 배치하고 이 순서에 해당하지 않은 상품명 단어도 반드시 배치, 단어 생략 절대 금지)
-    1.브랜드/제조사
-    2.시리즈
-    3.모델명
-    4.상품 유형
-    5.색상
-    6.소재
-    7.수량/용량
-    8.사이즈
-    9.성별/나이
-    10.속성
-    
-    ## 중요사항
-    - 순서 번호대로 기존 상품명 단어를 새롭게 배치하여 상품명 생성
-    - 기존 상품명에 있는 단어 반드시 모두 사용
-    - 순서에 해당하는 것이 없으면 생략, 새로운 단어 추가 금지
-    - **상품명 생성 규칙에 해당하는 단어가 여러 개면 모두 배치, 상품명 단어 생략 절대 금지**
-    - 생성된 상품명의 단어 순서가 상품명 생성 규칙과 정확히 일치해야 함
+기존 상품명의 단어를 단어 배치 규칙 순서대로 재배열한 상품명 생성
 
-    ## 출력 형식:
-    상품명: [최적화 상품명]
-    
-    ## 최적화 이유
-    [순서별로 어떤 키워드가 어디에 배치되었는지 설명]`;
+## 기존 상품명: ${productName}
+
+## 단어 배치 규칙 (반드시 번호 순서대로만 배치할 것)
+1. 브랜드/제조사
+2. 시리즈  
+3. 모델명
+4. 상품 유형
+5. 색상
+6. 소재
+7. 수량/용량
+8. 사이즈
+9. 성별/나이
+10. 속성
+
+## 중요 규칙
+- 반드시 1번부터 10번 순서대로 단어를 배치할 것
+- 기존 상품명의 모든 단어를 사용할 것
+- 단어 생략 금지
+- 해당 없는 카테고리는 건너뛰고 다음 순서로 진행
+
+## 작업 과정
+1. 먼저 각 단어를 1-10번 카테고리로 분류
+2. 분류된 카테고리 번호 순서대로 단어들을 배치
+3. 최종 상품명 생성
+
+## 출력 형식 (정확히 이 형식을 따를 것):
+상품명: [1번부터 10번 순서대로 재배열한 상품명]
+최적화 이유: [단어 카테고리 분류, 각 단어가 몇 번 카테고리에 해당하는지 설명]`;
+
     
 
     const call = async () => {
       const response = await (client as any).messages.create({
         model: 'claude-3-5-haiku-20241022',
         max_tokens: 500,
-        temperature: 0.2,
-        top_p: 0.2,
-        system: '',
+        temperature: 0.1,
+        top_p: 0.1,
+        system: '단어 배치 규칙 절대 준수',
         messages: [
           { role: 'user', content: prompt }
         ],
@@ -4193,19 +4195,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // 단순 파싱: 마지막 "상품명:" 에서 상품명 추출
         const nameMatch = raw.match(/상품명:\s*(.+?)(?:\n|$)/g);
-        const productNameRes = nameMatch ? nameMatch[nameMatch.length - 1].replace('상품명:', '').trim().replace(/^\[|\]$/g, '') : '';
+        const productNameRes = nameMatch ? nameMatch[nameMatch.length - 1].replace('상품명:', '').trim() : '';
         
-        // 단순 파싱: "## 최적화 이유" 또는 "### 최적화 이유"부터 끝까지 추출
-        const reasonMatch = raw.match(/##+ 최적화 이유([\s\S]*)$/);
+        console.log('추출된 상품명:', productNameRes);
+        
+        // 1) "단어 분류 및 재배열" 섹션 추출 (## 단어 ... ~ 다음 ## 또는 ### 헤더 사이)
+        let classificationSection = '';
+        try {
+          // ## 단어 분류 및 재배열 다음부터 다음 헤더(##, ###, 상품명:) 전까지 추출
+          const clsMatch = raw.match(/## 단어[\s\S]*?\n([\s\S]*?)(?=\n##|\n###|상품명:|최적화 이유:|$)/);
+          if (clsMatch && clsMatch[1]) {
+            classificationSection = clsMatch[1].trim();
+          }
+        } catch {}
+        
+        // 2) "최적화 이유:" 이후 bullet 섹션 추출
+        const reasonMatch = raw.match(/최적화 이유:\s*([\s\S]+)$/);
         let reasonRes = reasonMatch ? reasonMatch[1] : '';
         
         // 마지막에 있는 "상품명:" 라인 제거
         reasonRes = reasonRes.replace(/\n상품명:.*$/, '').trim();
         
         console.log('추출된 상품명:', productNameRes);
+        console.log('추출된 분류:', classificationSection);
         console.log('추출된 이유:', reasonRes);
         
-        const formattedReason = reasonRes;
+        // 분류 섹션 + 빈 줄 + 이유 섹션을 합친다
+        const formattedReason = (classificationSection ? `단어 분류 및 재배열\n${classificationSection}\n\n` : '') + reasonRes;
         
         console.log('최종 포맷된 이유:', formattedReason);
         

@@ -144,7 +144,7 @@ export default function OriginalProductOptimizerPage() {
         </Card>
 
         {/* 입력 카드 */}
-        <Card className="border border-blue-200 bg-blue-50 shadow-sm max-w-3xl mx-auto">
+        <Card className="border border-blue-200 bg-blue-50 shadow-sm max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
               <Coins className="h-5 w-5 text-purple-600" />
@@ -182,7 +182,7 @@ export default function OriginalProductOptimizerPage() {
             
             {/* 결과 표시 */}
             {result && showResult && (
-              <div className="space-y-6 mt-8">
+              <div className="space-y-6 mt-8 max-w-6xl mx-auto">
                 {/* 최적화된 상품명 섹션 */}
                 <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 shadow-lg">
                   <CardHeader className="pb-3">

@@ -1128,7 +1128,7 @@ export default function KeywordCompetitionAnalysisPage() {
 
           {/* 빠른 카드 */}
             <Link href="/product-optimizer/quick" onClick={(e: any) => handleTopMenuNavigate(e, "/product-optimizer/quick")}>
-            <Card className="border hover:border-green-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
+            <Card className="border hover:border-blue-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
               <CardHeader className="py-2">
                 <CardTitle className="text-base font-bold">빠른 상품명 최적화</CardTitle>
               </CardHeader>
