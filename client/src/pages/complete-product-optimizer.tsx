@@ -152,7 +152,7 @@ export default function CompleteProductOptimizerPage() {
         />
 
         {/* 사용 안내 말풍성 */}
-        {!hasAnalysisStarted && (
+        {false && (
           <div className="max-w-2xl mx-auto mb-6 relative">
             <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-4 shadow-md relative">
               <div className="flex items-start gap-3">
