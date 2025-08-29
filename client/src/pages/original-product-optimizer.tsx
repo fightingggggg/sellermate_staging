@@ -7,16 +7,27 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Coins, Copy } from "lucide-react";
 import MenuCardGrid from "@/components/MenuCardGrid";
+import { useAuth } from "@/contexts/AuthContext";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import LoginPage from "@/components/LoginPage";
 
 export default function OriginalProductOptimizerPage() {
   const [productName, setProductName] = useState("");
   const [result, setResult] = useState<null | { productName: string; reason: string }>(null);
   const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { currentUser } = useAuth();
 
   const handleOptimize = async () => {
     if (!productName.trim()) {
       alert("상품명을 입력해주세요.");
+      return;
+    }
+
+    // 로그인 상태 체크
+    if (!currentUser) {
+      setShowLoginModal(true);
       return;
     }
 
@@ -237,6 +248,15 @@ export default function OriginalProductOptimizerPage() {
           </CardContent>
         </Card>
       </div>
+
+             {/* 로그인 모달 */}
+       <Dialog open={showLoginModal} onOpenChange={setShowLoginModal}>
+         <DialogContent className="max-w-md p-0 border-none bg-transparent shadow-none">
+           <LoginPage isModal={true} onLoginSuccess={() => {
+             setShowLoginModal(false);
+           }} />
+         </DialogContent>
+       </Dialog>
     </DashboardLayout>
   );
 } 
