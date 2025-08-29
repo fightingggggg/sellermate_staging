@@ -1156,12 +1156,30 @@ export default function KeywordCompetitionAnalysisPage() {
           </Link>
         </div>
 
-          {/* 설명 카드 */}
-          <Card className="border border-green-200 bg-green-50 shadow-sm max-w-2xl mx-auto mb-6">
-            <CardContent className="py-4 text-center">
-              <p className="text-xs sm:text-sm font-medium text-gray-700">검색량과 리뷰 데이터를 기반으로 상위 노출 가능성을 한눈에 확인할 수 있어요.</p>
-            </CardContent>
-          </Card>
+          {/* 사용 안내 말풍성 */}
+          <div className="max-w-2xl mx-auto mb-6 relative">
+            <div className="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-4 shadow-md relative">
+              <div className="flex items-start gap-3">
+                <div className="bg-green-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-green-800 mb-1">언제 사용하면 좋을까요?</p>
+                  <p className="text-sm text-green-700 leading-relaxed mb-1">
+                    키워드의 <span className="font-semibold">월간 검색량과 상위노출 경쟁률을 확인</span>하고 싶을 때 사용!
+                    <br/>검색량과 <span className="font-semibold">리뷰, 순위, 묶음상품 데이터를 기반으로 상위 노출 가능성을 한눈에 확인</span>할 수 있어요.
+                  </p>
+                </div>
+              </div>
+              {/* 말풍성 꼬리 */}
+              <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-green-200"></div>
+              <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-green-100"></div>
+            </div>
+          </div>
+
+
 
           {/* 검색 입력 카드 */}
           <Card className="border-2 border-green-100 shadow-lg max-w-2xl mx-auto">

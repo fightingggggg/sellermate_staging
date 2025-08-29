@@ -4137,25 +4137,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 4. 상품 유형
 5. 색상
 6. 소재
-7. 수량/용량
+7. 패키지 내용물 수량
 8. 사이즈
-9. 성별/나이
+9. 성별,나이 표현
 10. 속성
 
 ## 중요 규칙
-- 반드시 1번부터 10번 순서대로 단어를 배치할 것
-- 기존 상품명의 모든 단어를 사용할 것
-- 단어 생략 금지
+- 반드시 1번부터 10번 순서대로 단어를 배치해 상품명을 생성할 것
+- 기존 상품명의 모든 단어를 사용할 것 
+- 단어 생략 금지 (중복 단어도 모두 사용)
 - 해당 없는 카테고리는 건너뛰고 다음 순서로 진행
 
 ## 작업 과정
 1. 먼저 각 단어를 1-10번 카테고리로 분류
 2. 분류된 카테고리 번호 순서대로 단어들을 배치
-3. 최종 상품명 생성
+3. 번호 순서대로 단어들을 배치해 최종 상품명 생성
 
-## 출력 형식 (정확히 이 형식을 따를 것):
-상품명: [1번부터 10번 순서대로 재배열한 상품명]
-최적화 이유: [단어 카테고리 분류, 각 단어가 몇 번 카테고리에 해당하는지 설명]`;
+## 응답 출력 형식 (정확히 이 형식을 따를 것):
+단어 카테고리 분류 : [단어 카테고리 분류]
+최적화 이유: [상품명 배치 이유, 각 단어가 몇 번 카테고리에 해당하는지 설명]
+상품명: [1번부터 10번 순서대로 재배열한 상품명]`;
 
     
 
@@ -4199,29 +4200,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log('추출된 상품명:', productNameRes);
         
-        // 1) "단어 분류 및 재배열" 섹션 추출 (## 단어 ... ~ 다음 ## 또는 ### 헤더 사이)
+        // 1) 단어 분류 섹션 추출 (다양한 패턴 지원)
         let classificationSection = '';
         try {
-          // ## 단어 분류 및 재배열 다음부터 다음 헤더(##, ###, 상품명:) 전까지 추출
-          const clsMatch = raw.match(/## 단어[\s\S]*?\n([\s\S]*?)(?=\n##|\n###|상품명:|최적화 이유:|$)/);
+          // "단어 카테고리 분류:" 패턴 (콜론 포함)
+          let clsMatch = raw.match(/단어 카테고리 분류:\s*([\s\S]*?)(?=\n상품명:|상품명:|최적화 이유:|$)/);
           if (clsMatch && clsMatch[1]) {
             classificationSection = clsMatch[1].trim();
           }
+          
+          // ### 단어 카테고리 분류 패턴
+          if (!classificationSection) {
+            clsMatch = raw.match(/### 단어 카테고리 분류\s*([\s\S]*?)(?=\n###|\n##|상품명:|최적화 이유:|$)/);
+            if (clsMatch && clsMatch[1]) {
+              classificationSection = clsMatch[1].trim();
+            }
+          }
+          
+          // ## 단어 분류 및 재배열 패턴
+          if (!classificationSection) {
+            clsMatch = raw.match(/## 단어 분류 및 재배열\s*([\s\S]*?)(?=\n###|\n##|상품명:|최적화 이유:|$)/);
+            if (clsMatch && clsMatch[1]) {
+              classificationSection = clsMatch[1].trim();
+            }
+          }
+          
+          // ### 단어 분류 패턴  
+          if (!classificationSection) {
+            clsMatch = raw.match(/### 단어 분류\s*([\s\S]*?)(?=\n###|\n##|상품명:|최적화 이유:|$)/);
+            if (clsMatch && clsMatch[1]) {
+              classificationSection = clsMatch[1].trim();
+            }
+          }
         } catch {}
         
-        // 2) "최적화 이유:" 이후 bullet 섹션 추출
-        const reasonMatch = raw.match(/최적화 이유:\s*([\s\S]+)$/);
-        let reasonRes = reasonMatch ? reasonMatch[1] : '';
+        // 2) "### 최적화 이유" 섹션 추출
+        let reasonSection = '';
+        try {
+          const reasonMatch = raw.match(/### 최적화 이유\s*([\s\S]*?)(?=\n###|\n##|$)/);
+          if (reasonMatch && reasonMatch[1]) {
+            reasonSection = reasonMatch[1].trim();
+          }
+        } catch {}
         
-        // 마지막에 있는 "상품명:" 라인 제거
-        reasonRes = reasonRes.replace(/\n상품명:.*$/, '').trim();
+        // 3) "최적화 이유:" (콜론 포함) 이후 섹션도 확인
+        if (!reasonSection) {
+          const reasonMatch2 = raw.match(/최적화 이유:\s*([\s\S]+)$/);
+          if (reasonMatch2) {
+            reasonSection = reasonMatch2[1].replace(/\n상품명:.*$/, '').trim();
+          }
+        }
         
-        console.log('추출된 상품명:', productNameRes);
         console.log('추출된 분류:', classificationSection);
-        console.log('추출된 이유:', reasonRes);
+        console.log('추출된 이유:', reasonSection);
         
-        // 분류 섹션 + 빈 줄 + 이유 섹션을 합친다
-        const formattedReason = (classificationSection ? `단어 분류 및 재배열\n${classificationSection}\n\n` : '') + reasonRes;
+        // 분류 섹션과 이유 섹션을 합쳐서 포맷팅
+        let formattedReason = '';
+        
+        if (classificationSection) {
+          formattedReason += `단어 카테고리 분류\n${classificationSection}`;
+        }
+        
+        if (reasonSection) {
+          if (formattedReason) formattedReason += '\n\n';
+          formattedReason += `최적화 이유\n${reasonSection}`;
+        }
+        
+        // 분류나 이유가 둘 다 없으면 전체 응답에서 분류 정보를 찾아서 사용
+        if (!formattedReason && raw.includes('브랜드/제조사:')) {
+          // 1. 브랜드/제조사:부터 시작하는 분류 리스트 찾기
+          const fallbackMatch = raw.match(/(1\.\s*브랜드\/제조사:[\s\S]*?)(?=상품명:|최적화 이유:|### |## |$)/);
+          if (fallbackMatch) {
+            formattedReason = `단어 카테고리 분류\n${fallbackMatch[1].trim()}`;
+          }
+          
+          // 분류만 있고 이유가 없으면 최적화 이유도 찾아서 추가
+          if (formattedReason && reasonSection) {
+            formattedReason += `\n\n최적화 이유\n${reasonSection}`;
+          }
+        }
         
         console.log('최종 포맷된 이유:', formattedReason);
         

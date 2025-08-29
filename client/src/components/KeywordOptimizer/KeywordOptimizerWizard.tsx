@@ -173,7 +173,7 @@ export default function KeywordOptimizerWizard() {
   return (
     <PrefillProvider>
       <div className="w-full max-w-screen-2xl mx-auto flex flex-col gap-6 px-2 sm:px-4 md:px-6 lg:px-8 py-0">
-        <StepperHeader current={step} />
+        {/* <StepperHeader current={step} /> */}
         {step === 1 && <Step1Collect onDone={goNext} />}
         {step === 2 && <Step2Refine onPrev={goPrev} onDone={goNext} />}
         {step === 3 && <Step3Generate onPrev={goPrev} onDone={() => setStep(2)} />}

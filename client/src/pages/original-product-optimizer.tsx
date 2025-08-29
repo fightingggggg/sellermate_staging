@@ -134,17 +134,32 @@ export default function OriginalProductOptimizerPage() {
           </Link>
         </div>
 
-        {/* 설명 카드 – 메뉴 아래 */}
-        <Card className="border border-blue-200 bg-white shadow-sm max-w-2xl mx-auto mb-6">
-          <CardContent className="py-4 text-center">
-            <p className="text-xs sm:text-sm font-medium text-gray-700">
-               입력한 상품명을 네이버 상위노출 규칙에 맞게 재배열합니다.
-             </p>
-          </CardContent>
-        </Card>
+        {/* 사용 안내 말풍성 */}
+        <div className="max-w-2xl mx-auto mb-6 relative">
+          <div className="bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-200 rounded-2xl p-4 shadow-md relative">
+            <div className="flex items-start gap-3">
+              <div className="bg-purple-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-purple-800 mb-1">언제 사용하면 좋을까요?</p>
+                <p className="text-sm text-purple-700 leading-relaxed mb-1">
+                  키워드 조합 상품명이 아닌 <span className="font-semibold">브랜드, 사이즈, 수량 등이 포함된 상품명</span>일 때 사용!
+                  <br/>입력한 상품명을 <span className="font-semibold">네이버 상품명 SEO, 상위노출 최적화 규칙에 맞게 재배열</span>합니다.
+                </p>
+                
+              </div>
+            </div>
+            {/* 말풍성 꼬리 */}
+            <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-purple-200"></div>
+            <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-purple-100"></div>
+          </div>
+        </div>
 
         {/* 입력 카드 */}
-        <Card className="border border-blue-200 bg-blue-50 shadow-sm max-w-4xl mx-auto">
+        <Card className="border-2 border-purple-200 bg-purple-50 shadow-sm max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
               <Coins className="h-5 w-5 text-purple-600" />
@@ -158,9 +173,9 @@ export default function OriginalProductOptimizerPage() {
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
                 onKeyPress={(e) => { if (e.key === 'Enter') handleOptimize(); }}
-                className="flex-1 px-4 py-4 text-sm md:px-8 md:py-6 md:text-lg border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8] transition-all duration-200"
+                className="flex-1 px-4 py-4 text-sm md:px-8 md:py-6 md:text-lg border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
               />
-              <Button disabled={loading} onClick={handleOptimize} className="bg-[#1a73e8] hover:bg-[#1a73e8]/90 text-white px-4 py-4 md:px-8 md:py-6 rounded-lg font-semibold transition-all duration-200 hover:scale-105 md:w-auto w-full flex items-center justify-center gap-2">
+              <Button disabled={loading} onClick={handleOptimize} className="bg-purple-600 hover:bg-purple-600/90 text-white px-4 py-4 md:px-8 md:py-6 rounded-lg font-semibold transition-all duration-200 hover:scale-105 md:w-auto w-full flex items-center justify-center gap-2">
                 {loading ? (
                   <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
                 ) : (
@@ -173,10 +188,10 @@ export default function OriginalProductOptimizerPage() {
             {/* 로딩 스피너 - 빠른 상품명 최적화와 같은 스타일 */}
             {loading && (
               <div className="flex items-center gap-2 mt-4 w-full">
-                <div className="flex-1 h-1 bg-blue-100 overflow-hidden rounded animate-pulse">
-                  <div className="w-full h-full bg-gradient-to-r from-sky-400 to-blue-600" />
+                <div className="flex-1 h-1 bg-purple-100 overflow-hidden rounded animate-pulse">
+                  <div className="w-full h-full bg-gradient-to-r from-purple-400 to-purple-600" />
                 </div>
-                <span className="text-sm text-blue-600 whitespace-nowrap">상품명 최적화 중...</span>
+                <span className="text-sm text-purple-600 whitespace-nowrap">상품명 최적화 중...</span>
               </div>
             )}
             
@@ -184,15 +199,15 @@ export default function OriginalProductOptimizerPage() {
             {result && showResult && (
               <div className="space-y-6 mt-8 max-w-6xl mx-auto">
                 {/* 최적화된 상품명 섹션 */}
-                <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 shadow-lg">
+                <Card className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-purple-100 shadow-lg">
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-3 text-xl font-bold text-blue-800">
-                      <Sparkles className="h-6 w-6 text-blue-600" />
+                    <CardTitle className="flex items-center gap-3 text-xl font-bold text-purple-800">
+                      <Sparkles className="h-6 w-6 text-purple-600" />
                       최적화된 상품명
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="bg-white border border-blue-200 rounded-lg p-6">
+                    <div className="bg-white border border-purple-200 rounded-lg p-6">
                       <div className="flex items-start gap-3">
                         <p className="text-lg font-semibold text-gray-900 leading-relaxed flex-1">
                           {result.productName}
@@ -207,7 +222,7 @@ export default function OriginalProductOptimizerPage() {
                               optimizedName: result.productName
                             });
                           }}
-                          className="border-blue-600 text-blue-600 hover:bg-blue-50 shrink-0"
+                          className="border-purple-600 text-purple-600 hover:bg-purple-50 shrink-0"
                         >
                           <Copy className="w-4 h-4" />
                         </Button>
@@ -217,17 +232,17 @@ export default function OriginalProductOptimizerPage() {
                 </Card>
 
                 {/* 최적화 이유 섹션 */}
-                <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 shadow-lg">
+                <Card className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-purple-100 shadow-lg">
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-3 text-xl font-bold text-blue-800">
-                      <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <CardTitle className="flex items-center gap-3 text-xl font-bold text-purple-800">
+                      <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       최적화 이유
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="bg-white border border-blue-200 rounded-lg p-6">
+                    <div className="bg-white border border-purple-200 rounded-lg p-6">
                       <div 
                         className="text-base text-gray-700 leading-relaxed whitespace-pre-line" 
                         style={{ 
