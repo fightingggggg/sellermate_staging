@@ -3,7 +3,6 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Info, X, Download } from "lucide-react";
@@ -21,6 +20,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
 import { sampleKeywordInput, sampleKeywordRaw, sampleAnalysisData, sampleStatsData } from "@/sample/sampleData";
 import { CHROME_EXTENSION_ID, CHROME_WEBSTORE_URL } from "@/lib/constants";
+import MenuCardGrid from "@/components/MenuCardGrid";
 
 interface KeywordItem {
   key: string;
@@ -1097,89 +1097,35 @@ export default function KeywordCompetitionAnalysisPage() {
         </h2>
 
         {/* 상단 메뉴 카드 */}
-        <div className="grid md:grid-cols-4 gap-4 mb-6 max-w-3xl mx-auto">
-          {/* 메인 키워드 경쟁률 분석 카드 (현재 페이지) */}
-          <Link href="/keyword-competition-analysis" onClick={(e: any) => handleTopMenuNavigate(e, "/keyword-competition-analysis")}>
-            <Card className="border-2 border-green-500 shadow-sm hover:shadow-md transition">
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">키워드 경쟁률 분석</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                월간 검색량과 1페이지 묶음상품, 리뷰 수, 순위로 노출 경쟁률 확인
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* 완벽 카드 */}
-            <Link href="/product-optimizer/complete" onClick={(e: any) => handleTopMenuNavigate(e, "/product-optimizer/complete")}>
-            <Card className="border hover:border-blue-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100">
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">완벽한 상품명 최적화</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                실제 상위 키워드, 검색 로직, 네이버 SEO를 고려한 상품명
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* 빠른 카드 */}
-            <Link href="/product-optimizer/quick" onClick={(e: any) => handleTopMenuNavigate(e, "/product-optimizer/quick")}>
-            <Card className="border hover:border-blue-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">빠른 상품명 최적화</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                실제 상위 키워드, 네이버 SEO를 고려한 상품명
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* 상품명 그대로 최적화 카드 */}
-          <Link href="/product-optimizer/original" onClick={(e:any)=>handleTopMenuNavigate(e, "/product-optimizer/original") }>
-            <Card className="border hover:border-purple-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col relative">
-              <Badge variant="secondary" className="absolute -top-2 -right-2 bg-purple-100 text-purple-700 text-xs px-2 py-0.5 z-10">Beta</Badge>
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">상품명 그대로 최적화</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                기존 상품명을 SEO 맞게 재배열
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
+        <MenuCardGrid 
+          currentPageId="keyword-analysis"
+          onCardClick={handleTopMenuNavigate}
+        />
 
           {/* 사용 안내 말풍성 */}
-          <div className="max-w-2xl mx-auto mb-6 relative">
-            <div className="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-4 shadow-md relative">
-              <div className="flex items-start gap-3">
-                <div className="bg-green-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                  </svg>
+          {!isAnalyzing && !analysisData && (
+            <div className="max-w-2xl mx-auto mb-6 relative">
+              <div className="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-200 rounded-2xl p-4 shadow-md relative">
+                <div className="flex items-start gap-3">
+                  <div className="bg-green-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-green-800 mb-1">언제 사용하면 좋을까요?</p>
+                    <p className="text-sm text-green-700 leading-relaxed mb-1">
+                      키워드의 <span className="font-semibold">월간 검색량과 상위노출 경쟁률을 확인</span>하고 싶을 때 사용!
+                      <br/>검색량과 <span className="font-semibold">리뷰, 순위, 묶음상품 데이터를 기반으로 상위 노출 가능성을 한눈에 확인</span>할 수 있어요.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-green-800 mb-1">언제 사용하면 좋을까요?</p>
-                  <p className="text-sm text-green-700 leading-relaxed mb-1">
-                    키워드의 <span className="font-semibold">월간 검색량과 상위노출 경쟁률을 확인</span>하고 싶을 때 사용!
-                    <br/>검색량과 <span className="font-semibold">리뷰, 순위, 묶음상품 데이터를 기반으로 상위 노출 가능성을 한눈에 확인</span>할 수 있어요.
-                  </p>
-                </div>
+                {/* 말풍성 꼬리 */}
+                <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-green-200"></div>
+                <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-green-100"></div>
               </div>
-              {/* 말풍성 꼬리 */}
-              <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-green-200"></div>
-              <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-green-100"></div>
             </div>
-          </div>
-
-
+          )}
 
           {/* 검색 입력 카드 */}
           <Card className="border-2 border-green-100 shadow-lg max-w-2xl mx-auto">

@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,11 +9,30 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
 import { useAuth } from "@/contexts/AuthContext";
 import { sampleKeywordRaw, sampleAnalysisData, sampleCompleteOptimizerData } from "@/sample/sampleData";
+import MenuCardGrid from "@/components/MenuCardGrid";
 
 // 더 이상 마법사 컴포넌트를 렌더하지 않음 (인트로 페이지)
 
 export default function CompleteProductOptimizerPage() {
   const { currentUser } = useAuth();
+  const [hasAnalysisStarted, setHasAnalysisStarted] = useState(false);
+
+  // 분석 데이터가 있는지 확인하여 안내 메시지 표시 여부 결정
+  useEffect(() => {
+    const checkAnalysisData = () => {
+      const hasSavedData = localStorage.getItem("latestKeywordAnalysis");
+      const allowPrefill = sessionStorage.getItem("allowPrefill") === "1";
+      if (hasSavedData || allowPrefill) {
+        setHasAnalysisStarted(true);
+      }
+    };
+    
+    checkAnalysisData();
+    // 주기적으로 확인 (키워드 입력 시에도 반영되도록)
+    const interval = setInterval(checkAnalysisData, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // 게스트(비회원) 예시 데이터 캐시 주입 (Step2 화면)
   if (typeof window !== "undefined") {
     const hasSample = localStorage.getItem("latestKeywordAnalysis");
@@ -130,87 +146,35 @@ export default function CompleteProductOptimizerPage() {
           <span className="font-bold text-blue-600"> 순위 상승을 경험</span>했어요!
         </h2>
         {/* 상단 메뉴 카드 */}
-        <div className="grid md:grid-cols-4 gap-4 mb-6 max-w-3xl mx-auto">
-          {/* 메인 키워드 경쟁률 분석 카드 (먼저 표시) */}
-          <Link href="/keyword-competition-analysis" onClick={(e: any) => handleTopMenuNavigate(e, "/keyword-competition-analysis")}>
-            <Card className="border hover:border-green-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">키워드 경쟁률 분석</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                  월간 검색량과 1페이지 묶음상품, 리뷰 수, 순위로 노출 경쟁률 확인
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* 완벽 카드 (현재 페이지) */}
-          <Link href="/product-optimizer/complete" onClick={(e: any) => handleTopMenuNavigate(e, "/product-optimizer/complete")}>
-            <Card className="border-2 border-blue-500 shadow-sm hover:shadow-md transition h-full flex flex-col">
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">완벽한 상품명 최적화</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                  실제 상위 키워드, 검색 로직, 네이버 SEO를 고려한 상품명
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* 빠른 카드 */}
-          <Link href="/product-optimizer/quick" onClick={(e:any)=>handleTopMenuNavigate(e, "/product-optimizer/quick") }>
-            <Card className="border hover:border-sky-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">빠른 상품명 최적화</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                  실제 상위 키워드, 네이버 SEO를 고려한 상품명
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* 상품명 그대로 최적화 카드 */}
-          <Link href="/product-optimizer/original" onClick={(e:any)=>handleTopMenuNavigate(e, "/product-optimizer/original") }>
-            <Card className="border hover:border-purple-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col relative">
-              <Badge variant="secondary" className="absolute -top-2 -right-2 bg-purple-100 text-purple-700 text-xs px-2 py-0.5 z-10">Beta</Badge>
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">상품명 그대로 최적화</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                  기존 상품명을 SEO 맞게 재배열
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
+        <MenuCardGrid 
+          currentPageId="complete-optimizer"
+          onCardClick={handleTopMenuNavigate}
+        />
 
         {/* 사용 안내 말풍성 */}
-        <div className="max-w-2xl mx-auto mb-6 relative">
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-4 shadow-md relative">
-            <div className="flex items-start gap-3">
-              <div className="bg-blue-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                </svg>
+        {!hasAnalysisStarted && (
+          <div className="max-w-2xl mx-auto mb-6 relative">
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-4 shadow-md relative">
+              <div className="flex items-start gap-3">
+                <div className="bg-blue-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-blue-800 mb-1">언제 사용하면 좋을까요?</p>
+                  <p className="text-sm text-blue-700 leading-relaxed mb-1">
+                    <span className="font-semibold">네이버 검색 로직을 반영하는 키워드 분석으로 완벽한 상품명</span> 필요할 때 사용!
+                    <br/>실제 상위 키워드, <span className="font-semibold">네이버 검색 로직, 네이버 SEO를 모두 고려</span>한 상품명을 만들어요.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-blue-800 mb-1">언제 사용하면 좋을까요?</p>
-                <p className="text-sm text-blue-700 leading-relaxed mb-1">
-                  <span className="font-semibold">네이버 검색 로직을 반영하는 키워드 분석으로 완벽한 상품명</span> 필요할 때 사용!
-                  <br/>실제 <span className="font-semibold"> 상위 키워드, 네이버 검색 로직, 네이버 SEO를 모두 고려한 상품명</span>을 만들어요.
-                </p>
-              </div>
+              {/* 말풍성 꼬리 */}
+              <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-blue-200"></div>
+              <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-blue-100"></div>
             </div>
-            {/* 말풍성 꼬리 */}
-            <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-blue-200"></div>
-            <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-blue-100"></div>
           </div>
-        </div>
+        )}
 
         {/* 확인 팝업 */}
         <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

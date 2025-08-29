@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Coins, Copy } from "lucide-react";
+import MenuCardGrid from "@/components/MenuCardGrid";
 
 export default function OriginalProductOptimizerPage() {
   const [productName, setProductName] = useState("");
@@ -103,60 +103,35 @@ export default function OriginalProductOptimizerPage() {
         </h2>
 
         {/* 상단 메뉴 카드 */}
-        <div className="grid md:grid-cols-4 gap-4 mb-6 max-w-3xl mx-auto">
-          <Link href="/keyword-competition-analysis" onClick={(e: any)=>handleTopMenuNavigate(e, "/keyword-competition-analysis") }>
-            <Card className="border hover:border-green-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
-              <CardHeader className="py-2"><CardTitle className="text-base font-bold">키워드 경쟁률 분석</CardTitle></CardHeader>
-              <CardContent className="pt-0 pb-2"><CardDescription className="text-xs text-gray-600">월간 검색량과 1페이지 묶음상품, 리뷰 수, 순위로 노출 경쟁률 확인</CardDescription></CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/product-optimizer/complete" onClick={(e: any)=>handleTopMenuNavigate(e, "/product-optimizer/complete") }>
-            <Card className="border hover:border-blue-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
-              <CardHeader className="py-2"><CardTitle className="text-base font-bold">완벽한 상품명 최적화</CardTitle></CardHeader>
-              <CardContent className="pt-0 pb-2"><CardDescription className="text-xs text-gray-600">실제 상위 키워드, 검색 로직, 네이버 SEO를 고려한 상품명</CardDescription></CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/product-optimizer/quick" onClick={(e: any)=>handleTopMenuNavigate(e, "/product-optimizer/quick") }>
-            <Card className="border hover:border-sky-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
-              <CardHeader className="py-2"><CardTitle className="text-base font-bold">빠른 상품명 최적화</CardTitle></CardHeader>
-              <CardContent className="pt-0 pb-2"><CardDescription className="text-xs text-gray-600">실제 상위 키워드, 네이버 SEO를 고려한 상품명</CardDescription></CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/product-optimizer/original" onClick={(e: any)=>handleTopMenuNavigate(e, "/product-optimizer/original") }>
-            <Card className="border-2 border-purple-500 shadow-sm hover:shadow-md transition h-full flex flex-col relative">
-              <Badge variant="secondary" className="absolute -top-2 -right-2 bg-purple-100 text-purple-700 text-xs px-2 py-0.5 z-10">Beta</Badge>
-              <CardHeader className="py-2"><CardTitle className="text-base font-bold">상품명 그대로 최적화</CardTitle></CardHeader>
-              <CardContent className="pt-0 pb-2"><CardDescription className="text-xs text-gray-600">기존 상품명을 SEO 맞게 재배열</CardDescription></CardContent>
-            </Card>
-          </Link>
-        </div>
+        <MenuCardGrid 
+          currentPageId="original-optimizer"
+          onCardClick={handleTopMenuNavigate}
+        />
 
         {/* 사용 안내 말풍성 */}
-        <div className="max-w-2xl mx-auto mb-6 relative">
-          <div className="bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-200 rounded-2xl p-4 shadow-md relative">
-            <div className="flex items-start gap-3">
-              <div className="bg-purple-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                </svg>
+        {!loading && !result && (
+          <div className="max-w-2xl mx-auto mb-6 relative">
+            <div className="bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-200 rounded-2xl p-4 shadow-md relative">
+              <div className="flex items-start gap-3">
+                <div className="bg-purple-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-purple-800 mb-1">언제 사용하면 좋을까요?</p>
+                  <p className="text-sm text-purple-700 leading-relaxed mb-1">
+                    키워드 조합 상품명이 아닌 <span className="font-semibold">브랜드, 사이즈, 수량 등이 포함된 상품명</span>일 때 사용!
+                    <br/>입력한 상품명을 <span className="font-semibold">네이버 상품명 SEO, 상위노출 최적화 규칙에 맞게 재배열</span>합니다.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-purple-800 mb-1">언제 사용하면 좋을까요?</p>
-                <p className="text-sm text-purple-700 leading-relaxed mb-1">
-                  키워드 조합 상품명이 아닌 <span className="font-semibold">브랜드, 사이즈, 수량 등이 포함된 상품명</span>일 때 사용!
-                  <br/>입력한 상품명을 <span className="font-semibold">네이버 상품명 SEO, 상위노출 최적화 규칙에 맞게 재배열</span>합니다.
-                </p>
-                
-              </div>
+              {/* 말풍성 꼬리 */}
+              <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-purple-200"></div>
+              <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-purple-100"></div>
             </div>
-            {/* 말풍성 꼬리 */}
-            <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-purple-200"></div>
-            <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-purple-100"></div>
           </div>
-        </div>
+        )}
 
         {/* 입력 카드 */}
         <Card className="border-2 border-purple-200 bg-purple-50 shadow-sm max-w-2xl mx-auto">

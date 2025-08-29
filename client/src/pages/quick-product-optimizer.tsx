@@ -1,16 +1,17 @@
 import React from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { PrefillProvider } from "@/components/KeywordOptimizer/KeywordOptimizerWizard";
+import { useOptimizer } from "@/contexts/OptimizerContext";
 import QuickStep1Collect from "@/components/KeywordOptimizer/steps/QuickStep1Collect";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
+import MenuCardGrid from "@/components/MenuCardGrid";
 
-export default function QuickProductOptimizerPage() {
+function QuickPageInner() {
   const [, navigate] = useLocation();
+  const { aiResult } = useOptimizer();
 
   // 모바일 체크 및 PC 전용 모달
   const isMobile = useIsMobile();
@@ -55,93 +56,38 @@ export default function QuickProductOptimizerPage() {
         </h2>
 
         {/* 상단 메뉴 카드 */}
-        <div className="grid md:grid-cols-4 gap-4 mb-6 max-w-3xl mx-auto">
-          {/* 메인 키워드 경쟁률 분석 카드 */}
-          <Link href="/keyword-competition-analysis" onClick={(e: any) => handleTopMenuNavigate(e, "/keyword-competition-analysis")}>
-            <Card className="border hover:border-green-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">키워드 경쟁률 분석</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                  월간 검색량과 1페이지 묶음상품, 리뷰 수, 순위로 노출 경쟁률 확인
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* 완벽 카드 */}
-          <Link href="/product-optimizer/complete" onClick={(e: any) => handleTopMenuNavigate(e, "/product-optimizer/complete")}>
-            <Card className="border hover:border-blue-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col">
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">완벽한 상품명 최적화</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                  실제 상위 키워드, 검색 로직, 네이버 SEO를 고려한 상품명
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* 빠른 카드 (현재 페이지) */}
-          <Link href="/product-optimizer/quick" onClick={(e: any) => handleTopMenuNavigate(e, "/product-optimizer/quick")}>
-            <Card className="border-2 border-sky-500 shadow-sm hover:shadow-md transition h-full flex flex-col">
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">빠른 상품명 최적화</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                  실제 상위 키워드, 네이버 SEO를 고려한 상품명
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-
-          {/* 상품명 그대로 최적화 카드 */}
-          <Link href="/product-optimizer/original" onClick={(e: any)=>handleTopMenuNavigate(e, "/product-optimizer/original") }>
-            <Card className="border hover:border-purple-400 shadow-sm hover:shadow-md transition opacity-50 hover:opacity-100 h-full flex flex-col relative">
-              <Badge variant="secondary" className="absolute -top-2 -right-2 bg-purple-100 text-purple-700 text-xs px-2 py-0.5 z-10">Beta</Badge>
-              <CardHeader className="py-2">
-                <CardTitle className="text-base font-bold">상품명 그대로 최적화</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <CardDescription className="text-xs text-gray-600">
-                  기존 상품명을 SEO 맞게 재배열
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
+        <MenuCardGrid 
+          currentPageId="quick-optimizer"
+          onCardClick={handleTopMenuNavigate}
+        />
 
         {/* 사용 안내 말풍성 */}
-        <div className="max-w-2xl mx-auto mb-6 relative">
-          <div className="bg-gradient-to-r from-sky-50 to-sky-100 border-2 border-sky-200 rounded-2xl p-4 shadow-md relative">
-            <div className="flex items-start gap-3">
-              <div className="bg-sky-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                </svg>
+        {!aiResult && (
+          <div className="max-w-2xl mx-auto mb-6 relative">
+            <div className="bg-gradient-to-r from-sky-50 to-sky-100 border-2 border-sky-200 rounded-2xl p-4 shadow-md relative">
+              <div className="flex items-start gap-3">
+                <div className="bg-sky-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-sky-800 mb-1">언제 사용하면 좋을까요?</p>
+                  <p className="text-sm text-sky-700 leading-relaxed mb-1">
+                    <span className="font-semibold">빠르게 키워드 기반 상품명을 생성</span>하고 싶을 때 사용!
+                    <br/>실제 상위 키워드와 <span className="font-semibold">네이버 SEO를 고려한 상품명</span>을 만들어요.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-sky-800 mb-1">언제 사용하면 좋을까요?</p>
-                <p className="text-sm text-sky-700 leading-relaxed mb-1">
-                  <span className="font-semibold">빠르게 키워드 기반 상품명을 생성</span>하고 싶을 때 사용!
-                  <br/>실제 <span className="font-semibold">상위 키워드와 네이버 SEO를 고려한 상품명</span>을 만들어요.
-                </p>
-              </div>
+              {/* 말풍성 꼬리 */}
+              <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-sky-200"></div>
+              <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-sky-100"></div>
             </div>
-            {/* 말풍성 꼬리 */}
-            <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-sky-200"></div>
-            <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-sky-100"></div>
           </div>
-        </div>
+        )}
 
 
-
-        <PrefillProvider>
-          <QuickStep1Collect onDone={() => {}} />
-        </PrefillProvider>
+        <QuickStep1Collect onDone={() => {}} />
 
         {/* PC 전용 모달 */}
         <PcOnlyModal 
@@ -150,5 +96,13 @@ export default function QuickProductOptimizerPage() {
         />
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function QuickProductOptimizerPage() {
+  return (
+    <PrefillProvider>
+      <QuickPageInner />
+    </PrefillProvider>
   );
 } 
