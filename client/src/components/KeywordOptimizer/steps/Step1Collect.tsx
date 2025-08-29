@@ -883,6 +883,32 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
     <div className="w-full max-w-none px-0 space-y-10">
       {/* 단계 설명 */}
       {/* <h2 className="text-2xl font-bold text-center">1단계 – 상위 노출 상품 분석으로 핵심 키워드·태그 파악</h2> */}
+      
+      {/* 사용 안내 말풍성 - 분석 데이터나 결과가 없을 때만 표시 */}
+      {!analysisData && (!ctxAnalysisData || Object.keys(ctxAnalysisData).length === 0) && (
+        <div className="max-w-2xl mx-auto mb-6 relative">
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200 rounded-2xl p-4 shadow-md relative">
+            <div className="flex items-start gap-3">
+              <div className="bg-blue-500 rounded-full p-1.5 flex-shrink-0 mt-0.5">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-blue-800 mb-1">언제 사용하면 좋을까요?</p>
+                <p className="text-sm text-blue-700 leading-relaxed mb-1">
+                  <span className="font-semibold">네이버 검색 로직을 반영하는 키워드 분석으로 완벽한 상품명</span> 필요할 때 사용!
+                  <br/>실제 상위 키워드, <span className="font-semibold">네이버 검색 로직, 네이버 SEO를 모두 고려</span>한 상품명을 만들어요.
+                </p>
+              </div>
+            </div>
+            {/* 말풍성 꼬리 */}
+            <div className="absolute left-8 -bottom-2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-blue-200"></div>
+            <div className="absolute left-8 -bottom-1.5 w-0 h-0 border-l-7 border-r-7 border-t-7 border-l-transparent border-r-transparent border-t-blue-100"></div>
+          </div>
+        </div>
+      )}
+      
       {/* 기존 내용 시작 */}
       
       {/* 검색 섹션 */}
