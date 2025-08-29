@@ -123,6 +123,7 @@ export default function OriginalProductOptimizerPage() {
                   <p className="text-sm text-purple-700 leading-relaxed mb-1">
                     키워드 조합 상품명이 아닌 <span className="font-semibold">브랜드, 사이즈, 수량 등이 포함된 상품명</span>일 때 사용!
                     <br/>입력한 상품명을 <span className="font-semibold">네이버 상품명 SEO, 상위노출 최적화 규칙에 맞게 재배열</span>합니다.
+                    <br/>키워드 조합 상품명은 완벽한, 빠른 상품명 최적화 기능을 사용하세요!
                   </p>
                 </div>
               </div>
