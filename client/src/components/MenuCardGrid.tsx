@@ -42,7 +42,7 @@ const DEFAULT_CARDS: MenuCardItem[] = [
   {
     id: "original-optimizer",
     title: "상품명 그대로 최적화",
-    description: "브랜드·모델명 등 고정 상품\n단어 순서만 바꿔도\n순위 상승!",
+    description: "상품명 단어 순서만 바꿔도\n순위 상승!",
     href: "/product-optimizer/original",
     activeColor: "purple",
     showBadge: true,
