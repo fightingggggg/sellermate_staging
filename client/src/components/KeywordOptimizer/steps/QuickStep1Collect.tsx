@@ -34,7 +34,7 @@ import { Link } from "wouter";
 import RobotVerificationDialog from "@/components/ui/robot-verification-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
-import { sampleKeywordInput, sampleKeywordRaw, sampleAnalysisData, sampleQuickAIResult, sampleCategoriesDetailed } from "@/sample/sampleData";
+
 import { CHROME_EXTENSION_ID, CHROME_WEBSTORE_URL } from "@/lib/constants";
 
 interface Step1CollectProps {
@@ -90,8 +90,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
   const [showAllCatKeywordCounts, setShowAllCatKeywordCounts] = useState(false);
   const [showAllCatTags, setShowAllCatTags] = useState(false);
   // 페이지 번호 입력 (문자열로 관리, 빈값 허용)
-  // 비로그인 사용자일 때 예시 데이터를 보여주기 위해 기본값 1 설정
-  const [pageIndex, setPageIndex] = useState<string>(currentUser ? "" : "1");
+  const [pageIndex, setPageIndex] = useState<string>("");
   const [pageError, setPageError] = useState<boolean>(false);
   
   // 모달 상태
@@ -107,16 +106,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
   useEffect(() => {
     if (didMountRef.current) return;
     didMountRef.current = true;
-    // 게스트 대상 예시 데이터 자동 주입
-    if (!currentUser && !ctxAnalysisData) {
-      setProductName(sampleKeywordInput);
-      setMainKeyword(sampleKeywordRaw);
-      setAnalysisData(sampleAnalysisData as any);
-      setCtxAnalysisData(sampleAnalysisData as any);
-      setAnalysisKeyword(sampleKeywordInput);
-      setCategoriesDetailed(sampleCategoriesDetailed as any);
-      setAiResult(sampleQuickAIResult as any);
-    }
+    // 예시 데이터 자동 주입 제거됨 - 비로그인 사용자에게는 빈 화면 표시
   }, []);
 
   // PrefillProvider로 전달된 분석 데이터를 로컬 state에 동기화
@@ -730,7 +720,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
                     setCurrentCatIdx(0);
                     setSelectedCategoryIndex(0);
                   }
-                  // sampleKeywordInput(예시) 지우면 예시 데이터도 제거
+                  // 입력값이 비어있으면 데이터 초기화
                   if (val === "") {
                     setAnalysisData(undefined);
                     setCtxAnalysisData(undefined as any);
@@ -740,14 +730,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
                 }}
                 onKeyDown={handleKeyPress}
                 onFocus={() => {
-                  if (productName === sampleKeywordInput) {
-                    setProductName("");
-                    setMainKeyword("");
-                    setAnalysisData(undefined);
-                    setCtxAnalysisData(undefined as any);
-                    setCategoriesDetailed([]);
-                    setAiResult(undefined as any);
-                  }
+                  // 예시 데이터 자동 제거 로직 삭제됨
                 }}
                 className={isMobile ? "flex-1 w-full min-w-0 text-sm py-3 border-2 border-gray-200 focus:border-blue-400 transition-colors" : "flex-1 w-full min-w-0 text-lg py-6 border-2 border-gray-200 focus:border-blue-400 transition-colors"}
               />
@@ -775,20 +758,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
 
       </div>
 
-      {/* 안내 문구: 예시 데이터일 때만 노출 */}
-      {!currentUser && (
-        productName === sampleKeywordInput ||
-        (analysisData && analysisData.keywords && Array.isArray(analysisData.keywords) &&
-          analysisData.keywords.length === sampleAnalysisData.keywords?.length &&
-          analysisData.keywords.every((k: any, i: number) => k.key === sampleAnalysisData.keywords[i].key && k.value === sampleAnalysisData.keywords[i].value)
-        )
-      ) && (
-        <div className="max-w-2xl mx-auto">
-          <p className="text-xs text-blue-500 mt-2 text-center">
-            현재는 예시 화면입니다. 로그인하시면 실제 데이터를 바로 확인하실 수 있어요!
-          </p>
-        </div>
-      )}
+
 
       {/* 사용량 제한 메시지 */}
       {usageLimitMessage && (

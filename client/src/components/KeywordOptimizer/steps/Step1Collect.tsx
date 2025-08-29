@@ -34,7 +34,7 @@ import { Link } from "wouter";
 import RobotVerificationDialog from "@/components/ui/robot-verification-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
-import { sampleKeywordInput, sampleKeywordRaw, sampleAnalysisData, sampleCategoriesDetailed } from "@/sample/sampleData";
+
 import { CHROME_EXTENSION_ID, CHROME_WEBSTORE_URL } from "@/lib/constants";
 
 interface Step1CollectProps {
@@ -100,8 +100,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
   const [showAllCatKeywordCounts, setShowAllCatKeywordCounts] = useState(false);
   const [showAllCatTags, setShowAllCatTags] = useState(false);
   // 페이지 번호 입력 (문자열로 관리, 빈값 허용)
-  // 비로그인 사용자일 때 예시 데이터를 보여주기 위해 기본값 1 설정
-  const [pageIndex, setPageIndex] = useState<string>(currentUser ? "" : "1");
+  const [pageIndex, setPageIndex] = useState<string>("");
   const [pageError, setPageError] = useState<boolean>(false);
   
   // 모달 상태
@@ -139,18 +138,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
   useEffect(() => {
     if (didMountRef.current) return;
     didMountRef.current = true;
-    // 게스트 비회원 예시 데이터
-    if (!currentUser && !ctxAnalysisData) {
-      setProductName(sampleKeywordInput);
-      setMainKeyword(sampleKeywordRaw);
-      setAnalysisData(sampleAnalysisData as any);
-      setCtxAnalysisData(sampleAnalysisData as any);
-      setAnalysisKeyword(sampleKeywordInput);
-      const sorted = [...sampleCategoriesDetailed].sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
-      setCategoriesDetailed(sorted);
-      setCurrentCatIdx(0);
-      setSelectedCategoryIndex(0);
-    }
+    // 예시 데이터 자동 주입 제거됨 - 비로그인 사용자에게는 빈 화면 표시
   }, []);
 
   // PrefillProvider로 전달된 분석 데이터를 로컬 state에 동기화
@@ -811,15 +799,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
   const lastTieIdxCatKC = topCatKeywordCountsWithTies.length - 1;
   const lastTieIdxCatTag = topCatTagsWithTies.length -1;
 
-  // 예시 데이터 여부 판별 - 로그인한 유저는 예시 데이터가 아닌 실제 분석 결과로 처리
-  const isSample = !currentUser && (
-    productName === sampleKeywordInput ||
-    productName === sampleKeywordRaw ||
-    (analysisData && analysisData.keywords && Array.isArray(analysisData.keywords) &&
-      analysisData.keywords.length === sampleAnalysisData.keywords?.length &&
-      analysisData.keywords.every((k: any, i: number) => k.key === sampleAnalysisData.keywords[i].key && k.value === sampleAnalysisData.keywords[i].value)
-    )
-  );
+
 
   // 스크롤 유도 상태 추가
   const [showScrollHint, setShowScrollHint] = useState(false);
@@ -978,13 +958,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
                 onKeyDown={handleKeyPress}
                 className={isMobile ? "flex-1 w-full min-w-0 text-sm py-3 border-2 border-gray-200 focus:border-blue-400 transition-colors" : "flex-1 w-full min-w-0 text-lg py-6 border-2 border-gray-200 focus:border-blue-400 transition-colors"}
                 onFocus={() => {
-                  if (productName === sampleKeywordInput) {
-                    setProductName("");
-                    setMainKeyword("");
-                    setAnalysisData(undefined);
-                    setCtxAnalysisData(undefined as any);
-                    setCategoriesDetailed([]);
-                  }
+                  // 예시 데이터 자동 제거 로직 삭제됨
                 }}
               />
               <Button
@@ -1029,14 +1003,7 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
         </div>
       )}
 
-      {/* 안내 문구: 예시 데이터일 때만 노출 */}
-      {!currentUser && isSample && (
-        <div className="max-w-2xl mx-auto">
-          <p className="text-xs text-blue-500 mt-2 text-center">
-            현재는 예시 화면입니다. 로그인하시면 실제 데이터를 바로 확인하실 수 있어요!
-          </p>
-        </div>
-      )}
+
 
       {/* 히스토리 컨테이너 (고정 높이로 레이아웃 안정성 확보) */}
       <div className="max-w-4xl mx-auto mt-6" style={{ minHeight: currentUser && !productName.trim() ? 'auto' : '0px' }}>
@@ -1792,12 +1759,9 @@ export default function Step1Collect({ onDone }: Step1CollectProps) {
 
               {/* 다음 단계 버튼 */}
               <div ref={nextStepButtonRef} className="flex flex-col items-center mt-8">
-                <Button className="px-6" onClick={handleNext} disabled={isSample}>
+                <Button className="px-6" onClick={handleNext}>
                   다음 단계로
                 </Button>
-                {isSample && (
-                  <p className="text-sm text-blue-500 mt-2">예시 데이터에서는 다음 단계로 진행할 수 없습니다. 로그인 하시면 바로 이용가능합니다.</p>
-                )}
               </div>
             </div>
           </>

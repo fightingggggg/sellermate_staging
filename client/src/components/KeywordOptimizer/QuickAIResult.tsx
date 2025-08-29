@@ -8,7 +8,7 @@ import { HistoryService } from "@/lib/historyService";
 import { UsageService } from "@/lib/usageService";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "wouter";
-import { sampleKeywordInput, sampleKeywordRaw, sampleAnalysisData } from "@/sample/sampleData";
+
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface QuickAIResultProps {
@@ -30,15 +30,6 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
   const lastCallKeyRef = useRef<string | null>(null);
   const isMobile = useIsMobile();
 
-  // 예시 데이터 여부 판별
-  const isSample = (
-    mainKeyword === sampleKeywordInput ||
-    (analysisData && analysisData.keywords && Array.isArray(analysisData.keywords) &&
-      analysisData.keywords.length === sampleAnalysisData.keywords?.length &&
-      analysisData.keywords.every((k: any, i: number) => k.key === sampleAnalysisData.keywords[i].key && k.value === sampleAnalysisData.keywords[i].value)
-    )
-  );
-
   // propagate message to parent
   useEffect(() => {
     if (onLimitMessage) onLimitMessage(usageLimitMessage);
@@ -53,7 +44,6 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
   }, [mainKeyword, selectedCategoryIndex]);
 
   useEffect(() => {
-    if (isSample) return; // 예시 데이터면 AI 호출하지 않음
     if (!analysisData || !mainKeyword) return;
 
     // 카테고리 인덱스를 포함해 카테고리 변경 시에도 별도 호출이 이뤄지도록 키 생성
@@ -670,23 +660,6 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
   };
 
   if (!aiResult) {
-    if (isSample) {
-      return (
-        <Card className="mt-8 border-2 border-blue-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-700">
-              <Sparkles className="w-5 h-5" /> 예시 데이터 안내
-            </CardTitle>
-            <CardDescription>아래는 예시 데이터입니다. 실제 상품명 생성을 원하시면 키워드를 입력해 주세요.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button disabled className="px-8 py-4 bg-gradient-to-r from-indigo-400 to-blue-400 text-white font-semibold flex items-center gap-2 opacity-60 cursor-not-allowed">
-              <Sparkles className="w-5 h-5" /> 상품명, 태그 생성하기 (예시에서는 비활성화)
-            </Button>
-          </CardContent>
-        </Card>
-      );
-    }
     if (loading) {
       return (
         <Card className="mt-8 border-2 border-blue-200 animate-pulse">
@@ -749,8 +722,8 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
         <div className="flex justify-center mb-6">
           <Button
             onClick={handleRegenerate}
-            disabled={loading || isSample}
-            className={`px-8 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold flex items-center gap-2${isSample ? ' opacity-60 cursor-not-allowed' : ''}`}
+            disabled={loading}
+            className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold flex items-center gap-2"
           >
             {loading ? (
               <>

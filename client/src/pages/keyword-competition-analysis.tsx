@@ -18,7 +18,7 @@ import RobotVerificationDialog from "@/components/ui/robot-verification-dialog";
 import { useUsage } from "@/contexts/UsageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PcOnlyModal } from "@/components/ui/pc-only-modal";
-import { sampleKeywordInput, sampleKeywordRaw, sampleAnalysisData, sampleStatsData } from "@/sample/sampleData";
+
 import { CHROME_EXTENSION_ID, CHROME_WEBSTORE_URL } from "@/lib/constants";
 import MenuCardGrid from "@/components/MenuCardGrid";
 
@@ -649,10 +649,7 @@ export default function KeywordCompetitionAnalysisPage() {
     }
 
     // 3) 동일 키워드 캐시 활용 (로그인/확장프로그램 모두 충족 시에만)
-    // 로그인한 사용자가 예시 키워드를 입력한 경우 캐시를 무시하고 실제 분석 수행
-    if (currentUser && trimmed === sampleKeywordRaw) {
-      console.log('[LOG] [CACHE] 로그인한 사용자의 예시 키워드 입력, 캐시 무시하고 실제 분석 수행:', trimmed);
-    } else {
+    {
       try {
         const raw = localStorage.getItem("latestKeywordFull");
         if (raw) {
@@ -791,10 +788,7 @@ export default function KeywordCompetitionAnalysisPage() {
         }
 
         // 3) 동일 키워드 캐시 활용 (로그인/확장프로그램 모두 충족 시에만)
-        // 로그인한 사용자가 예시 키워드를 입력한 경우 캐시를 무시하고 실제 분석 수행
-        if (currentUser && trimmed === sampleKeywordRaw) {
-          console.log('[LOG] [CACHE] 로그인한 사용자의 예시 키워드 입력 (자동 분석), 캐시 무시하고 실제 분석 수행:', trimmed);
-        } else {
+        {
           try {
             const raw = localStorage.getItem("latestKeywordFull");
             if (raw) {
@@ -1064,18 +1058,12 @@ export default function KeywordCompetitionAnalysisPage() {
     } catch {}
   };
 
-  //  게스트(비회원)이며 히스토리가 없는 경우 – 예시 데이터 자동 주입
+  //  예시 데이터 자동 주입 제거됨 - 비로그인 사용자에게는 빈 화면 표시
   const didMountRef = useRef(false);
   useEffect(() => {
     if (didMountRef.current) return;
     didMountRef.current = true;
-    // 비회원(guest)일 때만 예시 데이터 자동 주입
-    if (!currentUser && !analysisData && !keyword.trim()) {
-      setKeyword(sampleKeywordInput);
-      setAnalysisData(sampleAnalysisData as any);
-      setPrefillStatsData(sampleStatsData as any);
-      setIsAnalyzing(false);
-    }
+    // 예시 데이터 자동 주입 로직 제거됨
   }, [currentUser]);
 
   return (
@@ -1149,11 +1137,7 @@ export default function KeywordCompetitionAnalysisPage() {
                     }
                   }}
                   onFocus={() => {
-                    if (keyword === sampleKeywordInput) {
-                      setKeyword("");
-                      setAnalysisData(null);
-                      setPrefillStatsData(null as any);
-                    }
+                    // 예시 데이터 자동 제거 로직 삭제됨
                   }}
                   className={isMobile ? "flex-1 w-full min-w-0 text-sm py-3 border-2 border-gray-200 focus:border-green-500 transition-colors" : "flex-1 w-full min-w-0 text-lg py-6 border-2 border-gray-200 focus:border-green-500 transition-colors"}
                   onKeyDown={(e) => {
@@ -1171,12 +1155,7 @@ export default function KeywordCompetitionAnalysisPage() {
               <p className="text-sm text-gray-500">* 해당 키워드의 월간 검색량과 경쟁률을 분석합니다.</p>
             </CardContent>
           </Card>
-          {/* 예시 데이터 안내 문구 - 카드 밖 */}
-          {!currentUser && keyword === sampleKeywordInput && (
-            <div className="max-w-2xl mx-auto">
-              <p className="text-xs text-blue-500 mt-2 text-center">현재는 예시 화면입니다. 로그인하시면 실제 데이터를 바로 확인하실 수 있어요!</p>
-            </div>
-          )}
+
 
           {/* 키워드 분석 사용량 제한 메시지 */}
           {keywordAnalysisLimitMessage && (
@@ -1378,14 +1357,7 @@ export default function KeywordCompetitionAnalysisPage() {
              
             if (!resultMsg) return null;
 
-            // 예시 데이터 여부 판별
-            const isSample = (
-              keyword === sampleKeywordInput ||
-              (analysisData && analysisData.keywords && Array.isArray(analysisData.keywords) &&
-                analysisData.keywords.length === sampleAnalysisData.keywords?.length &&
-                analysisData.keywords.every((k: any, i: number) => k.key === sampleAnalysisData.keywords[i].key && k.value === sampleAnalysisData.keywords[i].value)
-              )
-            );
+
 
                         return (
               <Card className="border-2 border-green-600 bg-green-50 shadow-md">
@@ -1412,22 +1384,22 @@ export default function KeywordCompetitionAnalysisPage() {
 
                   {/* 상품명 최적화 버튼 그룹 */}
                   <div className="flex gap-3 justify-center pt-3">
-                  <Link href="/product-optimizer/complete" onClick={(e: any) => { if (isSample) { e.preventDefault(); return; } handleMenuNavigate(e, "/product-optimizer/complete"); }}>
+                  <Link href="/product-optimizer/complete" onClick={(e: any) => handleMenuNavigate(e, "/product-optimizer/complete")}>
                     <Button 
                       variant="default" 
                       size="sm" 
-                      className={`px-4 ${productOptimizationLimit?.canUse && !isSample ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
-                      disabled={!productOptimizationLimit?.canUse || isSample}
+                      className={`px-4 ${productOptimizationLimit?.canUse ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
+                      disabled={!productOptimizationLimit?.canUse}
                     >
                       {`완벽 최적화 (${productOptimizationLimit?.currentCount ?? 0}/${productOptimizationLimit?.maxCount ?? 10})`}
                     </Button>
                 </Link>
-                  <Link href="/product-optimizer/quick" onClick={(e: any) => { if (isSample) { e.preventDefault(); return; } handleMenuNavigate(e, "/product-optimizer/quick"); }}>
+                  <Link href="/product-optimizer/quick" onClick={(e: any) => handleMenuNavigate(e, "/product-optimizer/quick")}>
                     <Button 
                       variant="outline" 
                       size="sm"
-                      className={`px-4 ${productOptimizationLimit?.canUse && !isSample ? 'border-green-600 text-green-700 hover:bg-green-50' : 'border-gray-400 text-gray-400 cursor-not-allowed'}`}
-                      disabled={!productOptimizationLimit?.canUse || isSample}
+                      className={`px-4 ${productOptimizationLimit?.canUse ? 'border-green-600 text-green-700 hover:bg-green-50' : 'border-gray-400 text-gray-400 cursor-not-allowed'}`}
+                      disabled={!productOptimizationLimit?.canUse}
                     >
                       {`빠른 최적화 (${productOptimizationLimit?.currentCount ?? 0}/${productOptimizationLimit?.maxCount ?? 10})`}
                     </Button>
