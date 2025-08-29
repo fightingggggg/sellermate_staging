@@ -4145,7 +4145,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 ## 중요 규칙
 - 반드시 1번부터 10번 순서대로 단어를 배치해 상품명을 생성할 것
 - 기존 상품명의 모든 단어를 사용할 것 
-- 단어 생략 금지 (중복 단어도 모두 사용)
+- 중복 단어도 모두 사용할 것
+- 단어 생략 금지 
 - 해당 없는 카테고리는 건너뛰고 다음 순서로 진행
 
 ## 작업 과정
@@ -4166,7 +4167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         max_tokens: 500,
         temperature: 0.1,
         top_p: 0.1,
-        system: '단어 배치 규칙 절대 준수',
+        system: '규칙 절대 준수',
         messages: [
           { role: 'user', content: prompt }
         ],
