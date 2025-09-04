@@ -836,8 +836,8 @@ export default function QuickAIResult({ onLimitMessage }: QuickAIResultProps) {
           <div className="space-y-6">
             {/* 생성 이유 */}
             <div className="border rounded-lg p-4 bg-white shadow-sm">
-              <h4 className="font-semibold text-base mb-2 flex items-center gap-1"><ListOrdered className="w-5 h-5 text-purple-500"/> 생성 이유</h4>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-wrap" style={{ fontFamily: 'Pretendard' }}>{aiResult.reason}</p>
+              <h4 className="font-semibold text-base mb-2 flex items-center gap-1"><ListOrdered className="w-5 h-5 text-purple-500"/> 최적화 이유</h4>
+              <p className="text-gray-700 leading-relaxed whitespace-pre-wrap" style={{ fontFamily: 'Pretendard' }}>{aiResult.reason?.replace(/\n{3,}/g, '\n\n')}</p>
             </div>
           </div>
         </div>

@@ -2665,7 +2665,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
               {/* 오른쪽 영역 - 최적화 이유 */}
               <div className="border rounded-lg p-4 bg-white shadow-sm flex flex-col gap-2 h-fit">
                 <h4 className="font-semibold text-base flex items-center gap-1"><ListOrdered className="w-5 h-5 text-yellow-500"/> 최적화 이유</h4>
-                <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700" style={{ fontFamily: 'Pretendard' }}>{genReason}</pre>
+                <pre className="whitespace-pre-wrap leading-relaxed text-gray-700" style={{ fontFamily: 'Pretendard' }}>{genReason?.replace(/\n{3,}/g, '\n\n')}</pre>
               </div>
             </div>
           )}

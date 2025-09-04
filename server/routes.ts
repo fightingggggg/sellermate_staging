@@ -302,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
 
-    console.log('[generate-name] params', { query, keyword, keywordCountNum });
+
 
     // 중복요청 병합 및 캐시 키
     const reqKey = JSON.stringify({ query, keyword, keywordCountNum });
@@ -350,6 +350,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
     const callClaudeWithRetry = async (): Promise<{ productName: string; reason: string }> => {
+      console.log('[generate-name] AI API 호출 파라미터:', { query, keyword, keywordCount });
+      
       const prompt = `
       ## 목표
       네이버 스마트스토어 상위노출 최적화 포괄적 상품명 1개 생성
@@ -361,7 +363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ## 상품명 생성 규칙 (매우 중요)
         - **입력값에 제공된 단어만 사용할 것 (새로운 단어 생성 금지)**
         - **입력값의 단어, 띄어쓰기 등 원본 그대로 사용 (어떠한 형태도 변경 금지)**
-        - **${query}는 반드시 모두 원본 형태 그대로 각각 단독 개별 사용 (단어 대체, 변형, 생략, 포함 금지)**
+        - **$필수 키워드 단어는 반드시 모두 원본 형태 그대로 각각 단독 개별 사용 (단어 대체, 변형, 생략, 포함 금지)**
         - 정확히 ${keywordCount}개의 단어만 사용 
         - 동일 단어 반복 금지 (단, 필수 키워드와 동일 단어는 비연속 배치해서 반복 가능)
         - **동일 단어는 비연속 배치**
@@ -409,23 +411,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const pow = Math.min(attempt - 1, 6);
             const jitter = 0.7 + Math.random() * 0.6; // 0.7x ~ 1.3x
             const delay = Math.min(maxDelay, Math.round(baseDelay * Math.pow(2, pow) * jitter));
-            console.log(`[generate-name] retry backoff ${delay}ms (attempt ${attempt}/${maxAttempts})`);
             await wait(delay);
           }
 
-          console.log('[generate-name] calling Claude (attempt', attempt, ')');
           const response = await client.messages.create(request as any);
 
           const firstContent = (response as any).content?.[0];
           const aiResponse = firstContent && firstContent.type === 'text' ? firstContent.text.trim() : '';
+          
           if (!aiResponse) {
             throw new Error('Empty response from Claude');
           }
 
-          const productNameMatch = aiResponse.match(/상품명:\s*(.+?)(?=\s*최적화 이유:|$)/);
-          const reasonMatch = aiResponse.match(/최적화 이유:\s*([\s\S]+)$/);
+          const productNameMatch = aiResponse.match(/상품명:\s*(.+?)(?=\n|$)/);
+          const reasonMatch = aiResponse.match(/(?:##?\s*)?최적화 이유:\s*([\s\S]+)$/);
           const productName = productNameMatch?.[1]?.trim() || '';
           const reasonDetails = reasonMatch?.[1]?.trim() || '';
+          
           if (!productName) {
             throw new Error('Failed to parse product name');
           }
@@ -4180,13 +4182,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const text = typeof textRaw === 'string' ? textRaw : String(textRaw || '');
       
-      // 디버깅 로그 추가
-      console.log('=== Claude API 원본 응답 ===');
-      console.log('응답 텍스트:', text);
-      console.log('응답 텍스트 길이:', text.length);
-      console.log('========================');
-      
-      return text.trim();
+
+        
+        return text.trim();
     };
 
     const promise = (async () => {
@@ -4194,14 +4192,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const raw = await call();
         
-        console.log('=== 파싱 과정 디버깅 ===');
-        console.log('원본 응답:', raw);
-        
         // 단순 파싱: 마지막 "상품명:" 에서 상품명 추출
         const nameMatch = raw.match(/상품명:\s*(.+?)(?:\n|$)/g);
         const productNameRes = nameMatch ? nameMatch[nameMatch.length - 1].replace('상품명:', '').trim() : '';
-        
-        console.log('추출된 상품명:', productNameRes);
         
         // 1) 단어 분류 섹션 추출 (다양한 패턴 지원)
         let classificationSection = '';
@@ -4254,9 +4247,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        console.log('추출된 분류:', classificationSection);
-        console.log('추출된 이유:', reasonSection);
-        
         // 분류 섹션과 이유 섹션을 합쳐서 포맷팅
         let formattedReason = '';
         
@@ -4283,11 +4273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        console.log('최종 포맷된 이유:', formattedReason);
-        
         const value = { productName: productNameRes, reason: formattedReason };
-        console.log('최종 반환값:', value);
-        console.log('===================');
         
         generateNameCache.set(reqKey, { value, expiresAt: Date.now()+GENERATE_NAME_CACHE_TTL_MS});
         return value;
