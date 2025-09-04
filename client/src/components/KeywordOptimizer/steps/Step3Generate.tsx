@@ -2610,6 +2610,9 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
+                  <p className="text-xs text-gray-500 mt-2" style={{ fontFamily: 'Pretendard' }}>
+                    브랜드, 용량, 시리즈 등의 키워드는 판매 상품에 맞는 키워드로 변경해 활용하세요
+                  </p>
                 </div>
 
                 {/* 추천 태그 */}
@@ -2662,7 +2665,7 @@ export default function Step3Generate({ onPrev, onDone }: Step3GenerateProps) {
               {/* 오른쪽 영역 - 최적화 이유 */}
               <div className="border rounded-lg p-4 bg-white shadow-sm flex flex-col gap-2 h-fit">
                 <h4 className="font-semibold text-base flex items-center gap-1"><ListOrdered className="w-5 h-5 text-yellow-500"/> 최적화 이유</h4>
-                <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{genReason}</pre>
+                <pre className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700" style={{ fontFamily: 'Pretendard' }}>{genReason}</pre>
               </div>
             </div>
           )}

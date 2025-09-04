@@ -4,6 +4,7 @@ import { sendVerificationEmail, sendRefundSuccessEmail, sendPaymentSuccessEmail,
 import crypto from "crypto";
 import admin from "firebase-admin";
 import { autoPaymentScheduler } from "./scheduler";
+import Anthropic from '@anthropic-ai/sdk';
 // ensure admin initialized via email.ts or here fallback
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -327,8 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     */
 
-    // 타입 안전한 import 및 클라이언트 준비
-    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    // 클라이언트 준비
     const client = new Anthropic({ apiKey, maxRetries: 2 });
 
     // 재시도 로직 헬퍼
@@ -385,7 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
         ## 출력 형식:
         상품명: [상품명]
-        최적화 이유: [번호 매겨 최적화 근거 자세히 설명]`;
+        최적화 이유: [번호 매겨 최적화 근거와 전략 자세히 설명]`;
 
       const request = {
         model: 'claude-3-5-haiku-20241022',
@@ -430,9 +430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             throw new Error('Failed to parse product name');
           }
 
-          let reason = `(판매 상품에 맞는 브랜드, 용량, 수량, 시리즈 등을 검색하거나 변경해 활용하세요)\n` +
-            `* 네이버 상품명 SEO 규칙 준수 \"브랜드/제조사-시리즈-모델명-상품 유형-색상-소재-패키지 수량-사이즈-성별 나이 표현-속성-판매옵션\" 순서로 조합.\n` +
-            reasonDetails;
+          let reason = reasonDetails + '\n\n* 네이버 상품명 SEO 규칙 준수 "브랜드/제조사-시리즈-모델명-상품 유형-색상-소재-패키지 수량-사이즈-성별 나이 표현-속성-판매옵션" 순서로 조합.';
           // 숫자. 패턴(1. 2. 등)을 기준으로 줄바꿈 삽입
           reason = reason.replace(/(\d+\.)/g, '\n$1').replace(/^\n/, '').trim();
 
@@ -4127,7 +4125,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch {}
     }
 
-    const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey, maxRetries: 2 });
 
     const prompt = `## 목표
