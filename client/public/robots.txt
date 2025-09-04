@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /profile
+Disallow: /subscription
+Disallow: /payment-success
+Disallow: /subscription-complete
+
+# 특정 검색엔진 최적화
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+
+User-agent: Naverbot
+Allow: /
+Disallow: /api/
+
+# 크롤링 속도 제한
+Crawl-delay: 1
+
+Sitemap: https://storebooster.ai.kr/sitemap.xml

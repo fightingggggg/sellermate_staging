@@ -1,0 +1,2 @@
+export const CHROME_EXTENSION_ID = import.meta.env.VITE_CHROME_EXTENSION_ID;
+export const CHROME_WEBSTORE_URL = `https://chromewebstore.google.com/detail/%EC%8A%A4%ED%86%A0%EC%96%B4-%EB%B6%80%EC%8A%A4%ED%84%B0/plgdaggkagiakemkoclkpkbdiocllbbi?authuser=0&hl=ko`; 

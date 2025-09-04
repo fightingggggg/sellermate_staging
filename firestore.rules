@@ -1,0 +1,125 @@
+// Firebase Security Rules - 개선된 히스토리 저장구조용
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ✅ 로그인한 사용자만 자신의 analysisLogs 접근 가능
+    match /analysisLogs/{userEmail}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.email == userEmail;
+    }
+
+    // ✅ 로그인한 사용자가 자신의 userinfo 접근 가능
+    match /usersInfo/{uid} {
+      // 휴대폰 번호 중복 체크 등을 위해 읽기는 공개, 쓰기는 본인만
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // 계정 삭제 기록: 읽기는 공개(재가입 제한 체크), 쓰기는 본인만
+    match /accountDeletions/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /notifications/{email} {
+      allow read, write: if request.auth != null && 
+                           request.auth.token.email == email;
+    }
+    
+    // 구독 정보 (로그인한 사용자만 자신의 구독 정보 읽기/쓰기)
+      match /subscriptions/{subscriptionId} {
+        allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+        allow write: if request.auth != null
+                     && request.auth.uid == request.resource.data.uid
+                     && subscriptionId == request.auth.uid;
+      }
+
+
+
+       // 결제 수단 정보 (접근금지)
+        match /billingKeys/{uid} {
+          allow read, write: if false;
+        }
+        
+      match /billingCards/{uid} {
+        allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+        allow write: if request.auth != null
+                     && request.auth.uid == request.resource.data.uid
+                     && uid == request.auth.uid;
+        }
+    
+           // 결제 내역 (본인만 읽기)
+    match /payments/{paymentId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    
+ // 구독 해지 사유: 문서 ID를 uid로 사용, 본인만 읽기/쓰기 가능
+    match /subscriptionCancellations/{uid} {
+      allow read, create, update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  
+    // 소셜 액세스 토큰 (서버 전용)
+    match /socialTokens/{uid} {
+      allow read, write: if false;
+    }
+
+
+  // 사용자 문서 및 히스토리 서브컬렉션 규칙  
+    match /users/{userId} {
+      allow read, write: if request.auth != null;
+      match /history/{historyId} {
+        allow read, write, create, update, delete: if request.auth != null;
+      }
+      match /usage/{date} {
+        allow read, write, create, update, delete: if request.auth != null;
+      }
+      // 월별 사용량 서브컬렉션 권한 추가
+      match /usageMonthly/{month} {
+        allow read, write, create, update, delete: if request.auth != null;
+      }
+    }
+    
+    
+
+    // 키워드 경쟁률 분석 컬렉션 (월→uid→entry)
+    match /keywordAnalysis/{month}/{uid}/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    
+    // 빠른 상품명 최적화 컬렉션 (월→uid→entry)
+    match /productNameOptimizeQuick/{month}/{uid}/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // 완벽한 상품명 최적화 컬렉션 (월→uid→entry)
+    match /productNameOptimizeComplete/{month}/{uid}/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    
+    // 기존 keyword_history 컬렉션도 로그인 사용자만
+    match /keyword_history/{historyId} {
+      allow read, write: if request.auth != null;
+    }
+    
+
+
+    // 사용자 통계 컬렉션 (user_stats) - 이메일 기반 접근 허용
+    match /user_stats/{safeEmailId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // 기타 모든 문서 접근 거부
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+// 새로운 구조의 주요 장점:
+// 1. 사용자별 서브컬렉션으로 데이터 격리
+// 2. 더 효율적인 쿼리 성능
+// 3. 확장 가능한 구조
+// 4. 사용자 통계 추적 가능
+// 5. 배치 작업으로 성능 향상 
