@@ -367,6 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         - **동일 단어는 비연속 배치**
         - 상위 키워드 배열 순서가 중요도 순서
         - 지역은 하나만 사용
+        - 상품명 구성 순서 준수
 
       ## 상품명 구성 순서
         * 해당 항목이 없는 경우 생략하고 상위 키워드 순서대로 키워드 선택
