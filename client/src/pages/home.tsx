@@ -118,13 +118,14 @@ export default function Home() {
           <div className="flex flex-col items-center justify-center text-center">
             <div className="max-w-4xl mb-8">
               <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                <div className="mb-4 md:mb-6"><span className="text-[#1a73e8]">광고 없이 상위 노출</span>하는</div>
-                <div className="mb-4 md:mb-6">스마트스토어 <span className="text-[#1a73e8]">상품명 키워드</span><span className="block md:inline"> 태그 조합 최적화</span></div>
+                <div className="mb-4 md:mb-6"><span className="text-[#1a73e8]">상위노출 최적화 상품명 </span></div>
+                <div className="mb-4 md:mb-6">키워드, 태그, 카테고리까지<span className="block md:inline"> </span></div>
+                <div className="mb-4 md:mb-6"><span className="text-[#1a73e8]">한 번에 바로 </span>적용해보세요</div>
                 <div className="mb-3 md:mb-4">
                  
-                  <span className="block md:inline">
+                  {/* <span className="block md:inline">
                     <img src="/logo.png" alt="스토어부스터" className="mobile-logo-home inline-block align-top h-[1.5em] mt-2 md:mt-[-0.2em]" />
-                  </span>
+                  </span> */}
                 </div>
               </h2>
               {/* <p className="text-xl mb-8 text-gray-600">
