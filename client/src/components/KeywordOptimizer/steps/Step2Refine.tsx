@@ -367,7 +367,7 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
     }
   };
 
-  const fetchTotal = async (kw: string): Promise<number> => {
+  const fetchShoppingData = async (kw: string): Promise<{ total: number; productId: string | null }> => {
     const res = await fetch(`/api/naver-total?q=${encodeURIComponent(kw)}`);
     const raw = await res.text();
     let json: any = null;
@@ -381,19 +381,18 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
       console.error('네이버 API 호출 실패', json);
       throw new Error('naver api error');
     }
-    return json.total as number;
+    return { total: json.total as number, productId: json.productId as string | null };
   };
 
   // ===== [NEW] total 값 규모에 따른 허용 오차 계산 =====
   const getDynamicThreshold = (total: number): number => {
-    if (total >= 10_000_000) return 10000; // 9자리 이상
-    if (total >= 1_000_000) return 5000;  // 8자리 이상
-    if (total >= 1_000_00) return 1000;  // 7자리 이상
-    if (total >= 100_000) return 800;     // 6자리 이상
-    if (total >= 10_000) return 500;
-    if (total >= 1000) return 100;  
-    if (total >= 100) return 20;       // 4자리 이상
-    return 10;                           // 그 외 (4자리 이하)
+    if (total >= 10_000_000) return 1000; // 1억 개 이상
+    if (total >= 1_000_000) return 800;   // 1천만 개 이상
+    if (total >= 100_000) return 400;     // 10만 개 이상
+    if (total >= 10_000) return 200;      // 1만 개 이상
+    if (total >= 1000) return 100;        // 1천 개 이상
+    if (total >= 100) return 20;          // 100개 이상
+    return 10;                            // 100개 미만
   };
 
 
@@ -409,27 +408,41 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
         return;
       }
 
-      // 2) 네이버 total 값 조회
-      const totalsArr = await Promise.all(selected.map((kw) => fetchTotal(kw)));
-      const totalMap: Record<string, number> = {};
+      // 2) 네이버 쇼핑 데이터 조회 (total + productId)
+      const shoppingDataArr = await Promise.all(selected.map((kw) => fetchShoppingData(kw)));
+      const dataMap: Record<string, { total: number; productId: string | null }> = {};
       selected.forEach((kw, idx) => {
-        totalMap[kw] = totalsArr[idx];
+        dataMap[kw] = shoppingDataArr[idx];
       });
 
-      // 3) total 수가 유사한 키워드끼리 자동 그룹핑
-      type TempGroup = { id: number; repTotal: number; keywords: string[] };
+      // 3) productId 우선, total 수 보조로 키워드 자동 그룹핑
+      type TempGroup = { id: number; repTotal: number; repProductId: string | null; keywords: string[] };
       const tempGroups: TempGroup[] = [];
       let gid = nextId;
 
       selected.forEach((kw) => {
-        const t = totalMap[kw] || 0;
+        const data = dataMap[kw];
+        const t = data?.total || 0;
+        const productId = data?.productId;
+
+        // 동의어 조건: 검색량 차이가 허용 범위 내
         let match = tempGroups.find((g) => {
+          // // 1) productId가 둘 다 있어야 하고 같아야 함
+          // const hasMatchingProductId = productId && g.repProductId && productId === g.repProductId;
+          
+          // 2) 검색량 차이가 허용 범위 내
           const diff = Math.abs(t - g.repTotal);
           const threshold = getDynamicThreshold(Math.max(t, g.repTotal));
-          return diff <= threshold;
+          const hasMatchingTotal = diff <= threshold;
+          
+          // 검색량 조건만 사용
+          return hasMatchingTotal;
+          // return hasMatchingProductId && hasMatchingTotal;
         });
+
         if (!match) {
-          match = { id: gid++, repTotal: t, keywords: [] };
+          // 새 그룹 생성
+          match = { id: gid++, repTotal: t, repProductId: productId, keywords: [] };
           tempGroups.push(match);
         }
         match.keywords.push(kw);
@@ -681,18 +694,33 @@ export default function Step2Refine({ onPrev, onDone }: Step2RefineProps) {
       const mainUsedMap: Record<string,string> = {};
       for(const kw of keywordsToCheck){
         const { spaced, concat } = buildCombination(kw, selectedMain);
-        const [t1,t2] = await Promise.all([fetchTotal(spaced), fetchTotal(concat)]);
-        // 허용 오차 적용 → comb kind
+        const [data1, data2] = await Promise.all([fetchShoppingData(spaced), fetchShoppingData(concat)]);
+        
+        // 조합형 조건: 검색량 차이가 허용 범위 내
+        const t1 = data1.total;
+        const t2 = data2.total;
         const diff = Math.abs(t1 - t2);
         const threshold = getDynamicThreshold(Math.max(t1, t2));
         
-        // 수정된 로직: total 수가 다르면 일체형, 같으면 조합형
-        if (diff <= threshold) {
+        // // 1) productId가 둘 다 있고 같은지 확인
+        // const hasMatchingProductId = data1.productId && data2.productId && data1.productId === data2.productId;
+        
+        // 2) 검색량 차이가 허용 범위 내인지 확인
+        const hasMatchingTotal = diff <= threshold;
+        
+        // 검색량 조건만 사용
+        if (hasMatchingTotal) {
           results[kw] = '조합형';
         } else {
           results[kw] = '일체형';
         }
         
+        // // 두 조건을 모두 충족하면 조합형, 아니면 일체형
+        // if (hasMatchingProductId && hasMatchingTotal) {
+        //   results[kw] = '조합형';
+        // } else {
+        //   results[kw] = '일체형';
+        // }
 
         // 메인 사용 기록
         mainUsedMap[kw] = selectedMain;

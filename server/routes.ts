@@ -262,7 +262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const url = `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(query)}&display=1&start=1`;
+      const url = `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(query)}&display=1&start=5`;
       const resp = await fetch(url, {
         headers: {
           'X-Naver-Client-Id': clientId,
@@ -275,7 +275,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const data = await resp.json();
       const total = data.total ?? 0;
-      res.json({ total });
+      const productId = data.items?.[0]?.productId || null;
+      res.json({ total, productId });
     } catch (err: any) {
       console.error(err);
       res.status(500).json({ error: 'failed to fetch naver api' });
