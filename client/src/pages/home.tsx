@@ -117,10 +117,14 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center justify-center text-center">
             <div className="max-w-4xl mb-8">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                <div className="mb-4 md:mb-6"><span className="text-[#1a73e8]">상위노출 최적화 상품명 </span></div>
-                <div className="mb-4 md:mb-6">키워드, 태그, 카테고리까지<span className="block md:inline"> </span></div>
-                <div className="mb-4 md:mb-6"><span className="text-[#1a73e8]">한 번에 바로 </span>적용해보세요</div>
+              <h2 className="text-2xl md:text-5xl font-bold mb-4">
+                <div className="mb-4 md:mb-6"><span className="text-[#1a73e8]">상품명</span>만 <span className="text-[#1a73e8]">'잘'</span> 바꿔도 <span className="text-[#1a73e8]">순위 상승</span></div>
+               
+                <div className="mb-4 md:mb-6">지금 바로 순위를 올리세요</div>
+                <div className="mb-4 md:mb-6 text-sm md:text-base text-gray-600">
+                  <span className="block md:inline">이미 7.8천 명의 셀러들이 상위노출 최적화 SEO로</span>
+                  <span className="block md:inline"> 순위 올리는 중!</span>
+                </div>
                 <div className="mb-3 md:mb-4">
                  
                   {/* <span className="block md:inline">
